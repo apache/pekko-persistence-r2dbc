@@ -1,5 +1,5 @@
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.6.5") // for maintenance of copyright file header
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 addSbtPlugin("com.lightbend.sbt" % "sbt-java-formatter" % "0.7.0")
 
 // for releasing
