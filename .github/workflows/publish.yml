@@ -10,7 +10,7 @@ jobs:
   sbt:
     name: sbt publish
     runs-on: ubuntu-18.04
-    if: github.repository == 'akka/akka-persistence-r2dbc'
+    if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -33,7 +33,7 @@ jobs:
   documentation:
     name: Documentation
     runs-on: ubuntu-18.04
-    if: github.repository == 'akka/akka-persistence-r2dbc'
+    if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
