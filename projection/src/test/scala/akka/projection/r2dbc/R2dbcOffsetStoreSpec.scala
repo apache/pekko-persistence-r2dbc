@@ -128,7 +128,7 @@ class R2dbcOffsetStoreSpec
       val offsetStore = createOffsetStore(projectionId)
 
       val timeUuidOffset =
-        TimeBasedUUID(UUID.fromString("49225740-2019-11ea-a752-ffae2393b6e4")) //2019-12-16T15:32:36.148Z[UTC]
+        TimeBasedUUID(UUID.fromString("49225740-2019-11ea-a752-ffae2393b6e4")) // 2019-12-16T15:32:36.148Z[UTC]
       offsetStore.saveOffset(timeUuidOffset).futureValue
       val offset = offsetStore.readOffset[TimeBasedUUID]()
       offset.futureValue shouldBe Some(timeUuidOffset)

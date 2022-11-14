@@ -44,7 +44,7 @@ object R2dbcProjectionDocExample {
     final case class CheckedOut(cartId: String, eventTime: Instant) extends Event
   }
 
-  //#handler
+  // #handler
   class ShoppingCartHandler()(implicit ec: ExecutionContext) extends R2dbcHandler[EventEnvelope[ShoppingCart.Event]] {
     private val logger = LoggerFactory.getLogger(getClass)
 
@@ -66,9 +66,9 @@ object R2dbcProjectionDocExample {
       }
     }
   }
-  //#handler
+  // #handler
 
-  //#grouped-handler
+  // #grouped-handler
   import scala.collection.immutable
 
   class GroupedShoppingCartHandler()(implicit ec: ExecutionContext)
@@ -96,7 +96,7 @@ object R2dbcProjectionDocExample {
       session.update(stmts).map(_ => Done)
     }
   }
-  //#grouped-handler
+  // #grouped-handler
 
   implicit val system = ActorSystem[Nothing](Behaviors.empty, "Example")
   implicit val ec: ExecutionContext = system.executionContext
@@ -149,7 +149,7 @@ object R2dbcProjectionDocExample {
     // #initProjections
   }
 
-  //#sourceProvider
+  // #sourceProvider
   import akka.projection.eventsourced.scaladsl.EventSourcedProvider
   import akka.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
   import akka.projection.scaladsl.SourceProvider
@@ -171,10 +171,10 @@ object R2dbcProjectionDocExample {
         entityType,
         minSlice,
         maxSlice)
-  //#sourceProvider
+  // #sourceProvider
 
   object IllustrateExactlyOnce {
-    //#exactlyOnce
+    // #exactlyOnce
     import akka.projection.r2dbc.scaladsl.R2dbcProjection
     import akka.projection.ProjectionId
 
@@ -183,11 +183,11 @@ object R2dbcProjectionDocExample {
     val projection =
       R2dbcProjection
         .exactlyOnce(projectionId, settings = None, sourceProvider, handler = () => new ShoppingCartHandler)
-    //#exactlyOnce
+    // #exactlyOnce
   }
 
   object IllustrateAtLeastOnce {
-    //#atLeastOnce
+    // #atLeastOnce
     import akka.projection.r2dbc.scaladsl.R2dbcProjection
     import akka.projection.ProjectionId
 
@@ -197,11 +197,11 @@ object R2dbcProjectionDocExample {
       R2dbcProjection
         .atLeastOnce(projectionId, settings = None, sourceProvider, handler = () => new ShoppingCartHandler)
         .withSaveOffset(afterEnvelopes = 100, afterDuration = 500.millis)
-    //#atLeastOnce
+    // #atLeastOnce
   }
 
   object IllustrateGrouped {
-    //#grouped
+    // #grouped
     import akka.projection.r2dbc.scaladsl.R2dbcProjection
     import akka.projection.ProjectionId
 
@@ -211,7 +211,7 @@ object R2dbcProjectionDocExample {
       R2dbcProjection
         .groupedWithin(projectionId, settings = None, sourceProvider, handler = () => new GroupedShoppingCartHandler)
         .withGroup(groupAfterEnvelopes = 20, groupAfterDuration = 500.millis)
-    //#grouped
+    // #grouped
   }
 
 }

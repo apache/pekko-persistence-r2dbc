@@ -86,7 +86,7 @@ class EventsBySlicePerfSpec
             .runWith(Sink.fold(0) { case (acc, _) =>
               if (acc > 0 && acc % 100 == 0)
                 println(s"#$iteration Reading [$acc] events from slices [${range.min}-${range.max}] " +
-                s"took [${(System.nanoTime() - t1) / 1000 / 1000}] ms")
+                  s"took [${(System.nanoTime() - t1) / 1000 / 1000}] ms")
               acc + 1
             })
         }

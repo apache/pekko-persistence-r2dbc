@@ -10,34 +10,34 @@ object QueryDocCompileOnly {
   trait MyEvent
   trait MyState
 
-  //#readJournalFor
+  // #readJournalFor
   import akka.persistence.query.PersistenceQuery
   import akka.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 
   val eventQueries = PersistenceQuery(system)
     .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
-  //#readJournalFor
+  // #readJournalFor
 
-  //#durableStateStoreFor
+  // #durableStateStoreFor
   import akka.persistence.state.DurableStateStoreRegistry
   import akka.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 
   val stateQueries = DurableStateStoreRegistry(system)
     .durableStateStoreFor[R2dbcDurableStateStore[MyState]](R2dbcDurableStateStore.Identifier)
-  //#durableStateStoreFor
+  // #durableStateStoreFor
 
   {
-    //#currentEventsByPersistenceId
+    // #currentEventsByPersistenceId
     val persistenceId = PersistenceId("MyEntity", "id1")
     eventQueries
       .currentEventsByPersistenceId(persistenceId.id, 1, 101)
       .map(envelope => s"event with seqNr ${envelope.sequenceNr}: ${envelope.event}")
       .runWith(Sink.foreach(println))
-    //#currentEventsByPersistenceId
+    // #currentEventsByPersistenceId
   }
 
   {
-    //#currentEventsBySlices
+    // #currentEventsBySlices
     import akka.persistence.query.typed.EventEnvelope
 
     // Slit the slices into 4 ranges
@@ -54,11 +54,11 @@ object QueryDocCompileOnly {
         s"event from persistenceId ${envelope.persistenceId} with " +
         s"seqNr ${envelope.sequenceNr}: ${envelope.event}")
       .runWith(Sink.foreach(println))
-    //#currentEventsBySlices
+    // #currentEventsBySlices
   }
 
   {
-    //#currentChangesBySlices
+    // #currentChangesBySlices
     import akka.persistence.query.UpdatedDurableState
 
     // Slit the slices into 4 ranges
@@ -76,6 +76,6 @@ object QueryDocCompileOnly {
         s"state change from persistenceId ${change.persistenceId} with " +
         s"revision ${change.revision}: ${change.value}")
       .runWith(Sink.foreach(println))
-    //#currentChangesBySlices
+    // #currentChangesBySlices
   }
 }

@@ -824,7 +824,6 @@ class R2dbcProjectionSpec
           .withSaveOffset(10, 1.minute)
 
       projectionTestKit.runWithTestSink(projection) { sinkProbe =>
-
         eventually {
           sourceProbe.get should not be null
         }
@@ -870,7 +869,6 @@ class R2dbcProjectionSpec
           .withSaveOffset(10, 2.seconds)
 
       projectionTestKit.runWithTestSink(projection) { sinkProbe =>
-
         eventually {
           sourceProbe.get should not be null
         }

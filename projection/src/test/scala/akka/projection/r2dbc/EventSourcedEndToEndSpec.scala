@@ -264,8 +264,9 @@ class EventSourcedEndToEndSpec
           case e: AssertionError =>
             val missing = expectedEvents.diff(processed.map(_.envelope.event))
             log.error(s"Processed [${processed.size}] events, but expected [$numberOfEvents]. " +
-            s"Missing [${missing.mkString(",")}]. " +
-            s"Received [${processed.map(p => s"(${p.envelope.event}, ${p.envelope.persistenceId}, ${p.envelope.sequenceNr})").mkString(", ")}]. ")
+              s"Missing [${missing.mkString(",")}]. " +
+              s"Received [${processed.map(p =>
+                  s"(${p.envelope.event}, ${p.envelope.persistenceId}, ${p.envelope.sequenceNr})").mkString(", ")}]. ")
             throw e
         }
       }
