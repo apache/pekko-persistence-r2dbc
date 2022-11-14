@@ -289,7 +289,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     queryDao.timestampOfEvent(persistenceId, sequenceNr)
   }
 
-  //LoadEventQuery
+  // LoadEventQuery
   override def loadEnvelope[Event](persistenceId: String, sequenceNr: Long): Future[EventEnvelope[Event]] = {
     queryDao
       .loadEvent(persistenceId, sequenceNr)

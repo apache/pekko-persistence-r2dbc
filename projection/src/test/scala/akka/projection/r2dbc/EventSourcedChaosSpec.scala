@@ -198,7 +198,8 @@ class EventSourcedChaosSpec
               log.error(
                 s"Iteration #$iteration. Processed [${processed.size}] events, but expected [$expectedEventCounts]. " +
                 s"Missing [${missing.mkString(",")}]. " +
-                s"Received [${processed.map(p => s"(${p.envelope.event}, ${p.envelope.persistenceId}, ${p.envelope.sequenceNr})").mkString(", ")}]. " +
+                s"Received [${processed.map(p =>
+                    s"(${p.envelope.event}, ${p.envelope.persistenceId}, ${p.envelope.sequenceNr})").mkString(", ")}]. " +
                 s"Seed [$seed].")
               throw e
           }
