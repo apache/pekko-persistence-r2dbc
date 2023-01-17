@@ -6,22 +6,22 @@ Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
 
 inThisBuild(
   Seq(
-    organization := "com.lightbend.akka",
-    organizationName := "Lightbend Inc.",
-    homepage := Some(url("https://doc.akka.io/docs/akka-persistence-r2dbc/current")),
+    organization := "org.apache.pekko",
+    organizationName := "Apache Software Foundation",
+    homepage := Some(url("https://pekko.apache.org/")),
     scmInfo := Some(
       ScmInfo(
-        url("https://github.com/akka/akka-persistence-r2dbc"),
-        "https://github.com/akka/akka-persistence-r2dbc.git")),
+        url("https://github.com/apache/incubator-pekko-persistence-r2dbc"),
+        "https://github.com/apache/incubator-pekko-persistence-r2dbc.git")),
     startYear := Some(2021),
     developers += Developer(
       "contributors",
       "Contributors",
-      "https://gitter.im/akka/dev",
-      url("https://github.com/akka/akka-persistence-r2dbc/graphs/contributors")),
+      "dev@pekko.apache.org",
+      url("https://github.com/apache/incubator-pekko-persistence-r2dbc/graphs/contributors")),
     licenses := Seq(("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))),
-    description := "An Akka Persistence backed by SQL database with R2DBC",
-    // add snapshot repo when Akka version overriden
+    description := "An Apache Pekko Persistence backed by SQL database with R2DBC",
+    // add snapshot repo when Pekko version overridden
     resolvers ++=
       (if (System.getProperty("override.akka.version") != null)
          Seq("Akka Snapshots".at("https://oss.sonatype.org/content/repositories/snapshots/"))
@@ -33,7 +33,7 @@ def common: Seq[Setting[_]] =
     scalaVersion := Dependencies.Scala213,
     crossVersion := CrossVersion.binary,
     scalafmtOnCompile := true,
-    sonatypeProfileName := "com.lightbend",
+    sonatypeProfileName := "org.apache.pekko",
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.8", "-target", "1.8"),
     headerLicense := Some(HeaderLicense.Custom("""Copyright (C) 2021 Lightbend Inc. <https://www.lightbend.com>""")),
@@ -72,16 +72,19 @@ def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.g
 lazy val core = (project in file("core"))
   .settings(common)
   .settings(name := "akka-persistence-r2dbc", libraryDependencies ++= Dependencies.core)
+  .settings(MetaInfLicenseNoticeCopy.settings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val projection = (project in file("projection"))
   .dependsOn(core)
   .settings(common)
   .settings(name := "akka-projection-r2dbc", libraryDependencies ++= Dependencies.projection)
+  .settings(MetaInfLicenseNoticeCopy.settings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val migration = (project in file("migration"))
   .settings(common)
+  .settings(MetaInfLicenseNoticeCopy.settings)
   .settings(
     name := "akka-persistence-r2dbc-migration",
     libraryDependencies ++= Dependencies.migration,
@@ -104,9 +107,10 @@ lazy val docs = project
   .enablePlugins(AkkaParadoxPlugin, ParadoxSitePlugin, PublishRsyncPlugin)
   .dependsOn(core, projection, migration)
   .settings(common)
+  .settings(MetaInfLicenseNoticeCopy.settings)
   .settings(dontPublish)
   .settings(
-    name := "Akka Persistence R2DBC",
+    name := "Apache Pekko Persistence R2DBC",
     libraryDependencies ++= Dependencies.docs,
     previewPath := (Paradox / siteSubdirName).value,
     Paradox / siteSubdirName := s"docs/akka-persistence-r2dbc/${projectInfoVersion.value}",
