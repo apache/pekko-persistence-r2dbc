@@ -1,0 +1,11 @@
+Apache Pekko Persistence R2DBC
+Copyright 2022, 2023 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+This product contains significant parts that were originally based on software from Lightbend (Akka <https://akka.io/>).
+Copyright (C) 2021-2022 Lightbend Inc. <https://www.lightbend.com>
+
+Apache Pekko Persistence R2DBC is derived from Akka Persistence R2DBC 0.7.x, the last version that was distributed under the
+Apache License, Version 2.0 License.
