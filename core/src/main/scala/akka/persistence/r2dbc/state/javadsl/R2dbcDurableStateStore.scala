@@ -9,7 +9,7 @@ import java.util.Optional
 import java.util.concurrent.CompletionStage
 
 import scala.concurrent.ExecutionContext
-import scala.jdk.FutureConverters.FutureOps
+import scala.compat.java8.FutureConverters.FutureOps
 
 import akka.Done
 import akka.NotUsed
@@ -36,13 +36,13 @@ class R2dbcDurableStateStore[A](scalaStore: ScalaR2dbcDurableStateStore[A])(impl
     scalaStore
       .getObject(persistenceId)
       .map(x => GetObjectResult(Optional.ofNullable(x.value.getOrElse(null.asInstanceOf[A])), x.revision))
-      .asJava
+      .toJava
 
   override def upsertObject(persistenceId: String, revision: Long, value: A, tag: String): CompletionStage[Done] =
-    scalaStore.upsertObject(persistenceId, revision, value, tag).asJava
+    scalaStore.upsertObject(persistenceId, revision, value, tag).toJava
 
   override def deleteObject(persistenceId: String): CompletionStage[Done] =
-    scalaStore.deleteObject(persistenceId).asJava
+    scalaStore.deleteObject(persistenceId).toJava
 
   override def currentChangesBySlices(
       entityType: String,

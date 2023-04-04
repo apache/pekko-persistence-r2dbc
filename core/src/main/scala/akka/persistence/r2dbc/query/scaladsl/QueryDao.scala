@@ -197,7 +197,9 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
             metadata = readMetadata(row)))
 
     if (log.isDebugEnabled)
-      result.foreach(rows => log.debug("Read [{}] events from slices [{} - {}]", rows.size, minSlice, maxSlice))
+      result.foreach(rows =>
+        log.debug("Read [{}] events from slices [{} - {}]", rows.size: java.lang.Integer, minSlice: java.lang.Integer,
+          maxSlice: java.lang.Integer))
 
     Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
   }
@@ -235,7 +237,10 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
       })
 
     if (log.isDebugEnabled)
-      result.foreach(rows => log.debug("Read [{}] bucket counts from slices [{} - {}]", rows.size, minSlice, maxSlice))
+      result.foreach(rows =>
+        log.debug("Read [{}] bucket counts from slices [{} - {}]", rows.size: java.lang.Integer,
+          minSlice: java.lang.Integer,
+          maxSlice: java.lang.Integer))
 
     result
   }

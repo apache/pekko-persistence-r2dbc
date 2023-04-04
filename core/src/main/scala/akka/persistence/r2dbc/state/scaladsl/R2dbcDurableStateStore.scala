@@ -139,9 +139,9 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
         if (state.queryCount != 0 && log.isDebugEnabled())
           log.debug(
             "persistenceIds query [{}] after [{}]. Found [{}] rows in previous query.",
-            state.queryCount,
+            state.queryCount: java.lang.Integer,
             state.latestPid,
-            state.rowCount)
+            state.rowCount: java.lang.Integer)
 
         newState -> Some(
           stateDao

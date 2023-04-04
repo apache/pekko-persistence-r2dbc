@@ -76,7 +76,7 @@ object EventSourcedChaosSpec {
           projectionId.key,
           envelope.event,
           envelope.persistenceId,
-          envelope.sequenceNr)
+          envelope.sequenceNr: java.lang.Long)
         throw TestException(s"Fail event [${envelope.event}]")
       } else {
         log.debug(
@@ -84,7 +84,7 @@ object EventSourcedChaosSpec {
           projectionId.key,
           envelope.event,
           envelope.persistenceId,
-          envelope.sequenceNr)
+          envelope.sequenceNr: java.lang.Long)
         probe ! Processed(projectionId, envelope)
         Future.successful(Done)
       }
@@ -275,7 +275,7 @@ class EventSourcedChaosSpec
                 "Persisting events [{}], it will fail [{}] in projection [{}] times",
                 events.mkString(", "),
                 events(i),
-                failCount)
+                failCount: java.lang.Integer)
             } else {
               log.debug("Persisting events [{}]", events.mkString(", "))
             }

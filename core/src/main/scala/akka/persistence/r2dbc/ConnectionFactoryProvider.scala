@@ -9,7 +9,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.jdk.CollectionConverters.ConcurrentMapHasAsScala
 
 import akka.Done
 import akka.actor.CoordinatedShutdown
@@ -17,6 +16,7 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.Extension
 import akka.actor.typed.ExtensionId
 import akka.persistence.r2dbc.internal.R2dbcExecutor
+import akka.util.ccompat.JavaConverters._
 import io.r2dbc.pool.ConnectionPool
 import io.r2dbc.pool.ConnectionPoolConfiguration
 import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider

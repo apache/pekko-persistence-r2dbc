@@ -5,8 +5,6 @@
 package akka.persistence.r2dbc.migration
 
 import java.time.Instant
-
-import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
@@ -17,6 +15,7 @@ import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
+import akka.dispatch.ExecutionContexts
 import akka.pattern.ask
 import akka.persistence.Persistence
 import akka.persistence.SelectedSnapshot
@@ -155,18 +154,18 @@ class MigrationTool(system: ActorSystem[_]) {
           log.debug(
             "Migrated persistenceId [{}] with [{}] events{}.",
             pid,
-            events,
+            events: java.lang.Long,
             if (snapshots == 0) "" else " and snapshot")
           result
         }
-        .runWith(Sink.fold(Result.empty) { case (acc, Result(_, events, snapshots)) =>
+        .runWith(Sink.fold(Result.empty) { case (acc: Result, Result(_, events, snapshots)) =>
           val result = Result(acc.persistenceIds + 1, acc.events + events, acc.snapshots + snapshots)
           if (result.persistenceIds % 100 == 0)
             log.info(
               "Migrated [{}] persistenceIds with [{}] events and [{}] snapshots.",
-              result.persistenceIds,
-              result.events,
-              result.snapshots)
+              result.persistenceIds: java.lang.Long,
+              result.events: java.lang.Long,
+              result.snapshots: java.lang.Long)
           result
         })
 
@@ -174,9 +173,9 @@ class MigrationTool(system: ActorSystem[_]) {
       case s @ Success(Result(persistenceIds, events, snapshots)) =>
         log.info(
           "Migration successful. Migrated [{}] persistenceIds with [{}] events and [{}] snapshots.",
-          persistenceIds,
-          events,
-          snapshots)
+          persistenceIds: java.lang.Long,
+          events: java.lang.Long,
+          snapshots: java.lang.Long)
         s
       case f @ Failure(exc) =>
         log.error("Migration failed.", exc)
@@ -282,7 +281,7 @@ class MigrationTool(system: ActorSystem[_]) {
             val serializedRow = serializedSnapotRow(selectedSnapshot)
             targetSnapshotDao
               .store(serializedRow)
-              .map(_ => snapshotMetadata.sequenceNr)(ExecutionContext.parasitic)
+              .map(_ => snapshotMetadata.sequenceNr)(ExecutionContexts.parasitic)
           }
           _ <- migrationDao.updateSnapshotProgress(persistenceId, seqNr)
         } yield 1

@@ -15,6 +15,7 @@ import akka.Done
 import akka.NotUsed
 import akka.actor.typed.ActorSystem
 import akka.annotation.InternalApi
+import akka.dispatch.ExecutionContexts
 import akka.persistence.Persistence
 import akka.persistence.r2dbc.Dialect
 import akka.persistence.r2dbc.R2dbcSettings
@@ -267,7 +268,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     if (log.isDebugEnabled())
       result.foreach(_ => log.debug("Deleted durable state for persistenceId [{}]", persistenceId))
 
-    result.map(_ => Done)(ExecutionContext.parasitic)
+    result.map(_ => Done)(ExecutionContexts.parasitic)
   }
 
   override def currentDbTimestamp(): Future[Instant] = {
@@ -335,7 +336,10 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
           ))
 
     if (log.isDebugEnabled)
-      result.foreach(rows => log.debug("Read [{}] durable states from slices [{} - {}]", rows.size, minSlice, maxSlice))
+      result.foreach(rows =>
+        log.debug("Read [{}] durable states from slices [{} - {}]", rows.size: java.lang.Integer,
+          minSlice: java.lang.Integer,
+          maxSlice: java.lang.Integer))
 
     Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
   }
@@ -401,7 +405,10 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
       })
 
     if (log.isDebugEnabled)
-      result.foreach(rows => log.debug("Read [{}] bucket counts from slices [{} - {}]", rows.size, minSlice, maxSlice))
+      result.foreach(rows =>
+        log.debug("Read [{}] bucket counts from slices [{} - {}]", rows.size: java.lang.Integer,
+          minSlice: java.lang.Integer,
+          maxSlice: java.lang.Integer))
 
     result
 

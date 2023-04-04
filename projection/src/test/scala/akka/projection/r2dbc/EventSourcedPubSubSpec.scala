@@ -69,8 +69,8 @@ object EventSourcedPubSubSpec {
           projectionId.key,
           envelope.event,
           envelope.persistenceId,
-          envelope.sequenceNr,
-          directReplication)
+          envelope.sequenceNr: java.lang.Long,
+          directReplication: java.lang.Boolean)
         probe ! Processed(projectionId, envelope)
         Done
       }
@@ -191,13 +191,13 @@ class EventSourcedPubSubSpec
       }
 
       var processed = Vector.empty[Processed]
-      processed :++= expectProcessed(processedProbe, 1, 20)
+      processed ++= expectProcessed(processedProbe, 1, 20)
 
       (21 to 30).foreach { n =>
         val p = n % numberOfEntities
         entities(p) ! Persister.Persist(mkEvent(n))
       }
-      processed :++= expectProcessed(processedProbe, 21, 30)
+      processed ++= expectProcessed(processedProbe, 21, 30)
 
       // Processing of 31 is slow in the handler, see whenDone above.
       // This will overflow the buffer for the subscribers, simulating lost messages,
@@ -206,14 +206,14 @@ class EventSourcedPubSubSpec
         val p = n % numberOfEntities
         entities(p) ! Persister.Persist(mkEvent(n))
       }
-      processed :++= expectProcessed(processedProbe, 31, numberOfEvents - 10)
+      processed ++= expectProcessed(processedProbe, 31, numberOfEvents - 10)
 
       (numberOfEvents - 10 + 1 to numberOfEvents).foreach { n =>
         val p = n % numberOfEntities
         entities(p) ! Persister.Persist(mkEvent(n))
       }
 
-      processed :++= expectProcessed(processedProbe, numberOfEvents - 10 + 1, numberOfEvents)
+      processed ++= expectProcessed(processedProbe, numberOfEvents - 10 + 1, numberOfEvents)
 
       val byPid = processed.groupBy(_.envelope.persistenceId)
       byPid.foreach { case (pid, processedByPid) =>
@@ -227,7 +227,7 @@ class EventSourcedPubSubSpec
             p.envelope.offset.asInstanceOf[TimestampOffset].timestamp == p.envelope.offset
               .asInstanceOf[TimestampOffset]
               .readTimestamp)
-        log.info("via pub-sub {}: {}", pid, viaPubSub.map(_.envelope.sequenceNr).mkString(", "))
+        log.info("via pub-sub {}: {}", pid: Any, viaPubSub.map(_.envelope.sequenceNr).mkString(", "): Any)
       }
 
       val countViaPubSub = processed.count(p =>

@@ -15,6 +15,7 @@ import akka.NotUsed
 import akka.annotation.InternalApi
 import akka.projection.javadsl
 import akka.projection.scaladsl
+import akka.dispatch.ExecutionContexts
 import akka.stream.scaladsl.Source
 import scala.compat.java8.FutureConverters._
 
@@ -60,7 +61,7 @@ import akka.projection.BySlicesSourceProvider
   override def timestampOf(persistenceId: String, sequenceNr: Long): Future[Option[Instant]] =
     delegate match {
       case timestampQuery: akka.persistence.query.typed.javadsl.EventTimestampQuery =>
-        timestampQuery.timestampOf(persistenceId, sequenceNr).toScala.map(_.asScala)(ExecutionContext.parasitic)
+        timestampQuery.timestampOf(persistenceId, sequenceNr).toScala.map(_.asScala)(ExecutionContexts.parasitic)
       case _ =>
         Future.failed(
           new IllegalArgumentException(
