@@ -20,6 +20,7 @@ import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.LoggerOps
 import akka.annotation.InternalApi
+import akka.dispatch.ExecutionContexts
 import akka.persistence.Persistence
 import akka.persistence.query.DurableStateChange
 import akka.persistence.query.Offset
@@ -134,7 +135,7 @@ object R2dbcOffsetStore {
         State(
           sorted
             .take(size - keepNumberOfEntries)
-            .filterNot(_.timestamp.isBefore(until)) :++ sorted.takeRight(keepNumberOfEntries))
+            .filterNot(_.timestamp.isBefore(until)) ++ sorted.takeRight(keepNumberOfEntries))
       } else
         this
     }
@@ -326,7 +327,7 @@ private[projection] class R2dbcOffsetStore(
       val newState = State(records)
       logger.debug(
         "readTimestampOffset state with [{}] persistenceIds, oldest [{}], latest [{}]",
-        newState.byPid.size,
+        newState.byPid.size: java.lang.Integer,
         newState.oldestTimestamp,
         newState.latestTimestamp)
       if (!state.compareAndSet(oldState, newState))
@@ -387,7 +388,7 @@ private[projection] class R2dbcOffsetStore(
       .withConnection("save offset") { conn =>
         saveOffsetInTx(conn, offset)
       }
-      .map(_ => Done)(ExecutionContext.parasitic)
+      .map(_ => Done)(ExecutionContexts.parasitic)
   }
 
   /**
@@ -409,7 +410,7 @@ private[projection] class R2dbcOffsetStore(
       .withConnection("save offsets") { conn =>
         saveOffsetsInTx(conn, offsets)
       }
-      .map(_ => Done)(ExecutionContext.parasitic)
+      .map(_ => Done)(ExecutionContexts.parasitic)
   }
 
   def saveOffsetsInTx[Offset](conn: Connection, offsets: immutable.IndexedSeq[Offset]): Future[Done] = {
@@ -455,9 +456,9 @@ private[projection] class R2dbcOffsetStore(
           val s = newState.evict(evictUntil, settings.keepNumberOfEntries)
           logger.debug(
             "Evicted [{}] records until [{}], keeping [{}] records. Latest [{}].",
-            newState.size - s.size,
+            newState.size - s.size: java.lang.Integer,
             evictUntil,
-            s.size,
+            s.size: java.lang.Integer,
             newState.latestTimestamp)
           s
         } else
@@ -497,7 +498,7 @@ private[projection] class R2dbcOffsetStore(
     require(records.nonEmpty)
 
     // FIXME change to trace
-    logger.debug("saving timestamp offset [{}], {}", records.last.timestamp, records)
+    logger.debug("saving timestamp offset [{}], {}", records.last.timestamp: Any, records: Any)
 
     val statement = conn.createStatement(insertTimestampOffsetSql)
 
@@ -571,7 +572,7 @@ private[projection] class R2dbcOffsetStore(
       case MultipleOffsets(many) => many.map(upsertStmt).toVector
     }
 
-    R2dbcExecutor.updateInTx(statements).map(_ => Done)(ExecutionContext.parasitic)
+    R2dbcExecutor.updateInTx(statements).map(_ => Done)(ExecutionContexts.parasitic)
   }
 
   def isDuplicate(record: Record): Boolean =
@@ -628,23 +629,23 @@ private[projection] class R2dbcOffsetStore(
         if (viaPubSub(recordWithOffset.offset))
           logger.debug(
             "Rejecting pub-sub envelope, unexpected sequence number [{}] for pid [{}], previous sequence number [{}]. Offset: {}",
-            seqNr,
+            seqNr: java.lang.Long,
             pid,
-            prevSeqNr,
+            prevSeqNr: java.lang.Long,
             recordWithOffset.offset)
         else if (recordWithOffset.envelopeLoaded)
           logger.debug(
             "Rejecting unexpected sequence number [{}] for pid [{}], previous sequence number [{}]. Offset: {}",
-            seqNr,
+            seqNr: java.lang.Long,
             pid,
-            prevSeqNr,
+            prevSeqNr: java.lang.Long,
             recordWithOffset.offset)
         else
           logger.warn(
             "Rejecting unexpected sequence number [{}] for pid [{}], previous sequence number [{}]. Offset: {}",
-            seqNr,
+            seqNr: java.lang.Long,
             pid,
-            prevSeqNr,
+            prevSeqNr: java.lang.Long,
             recordWithOffset.offset)
       }
 
@@ -652,20 +653,20 @@ private[projection] class R2dbcOffsetStore(
         if (viaPubSub(recordWithOffset.offset)) {
           logger.debug(
             "Rejecting pub-sub envelope, unknown sequence number [{}] for pid [{}] (might be accepted later): {}",
-            seqNr,
+            seqNr: java.lang.Long,
             pid,
             recordWithOffset.offset)
         } else if (recordWithOffset.envelopeLoaded) {
           // This may happen rather frequently when using `publish-events`, after reconnecting and such.
           logger.debug(
             "Rejecting unknown sequence number [{}] for pid [{}] (might be accepted later): {}",
-            seqNr,
+            seqNr: java.lang.Long,
             pid,
             recordWithOffset.offset)
         } else {
           logger.warn(
             "Rejecting unknown sequence number [{}] for pid [{}]. Offset: {}",
-            seqNr,
+            seqNr: java.lang.Long,
             pid,
             recordWithOffset.offset)
         }
@@ -708,7 +709,7 @@ private[projection] class R2dbcOffsetStore(
                 "Accepting envelope with pid [{}], seqNr [{}], where previous event timestamp [{}] " +
                 "is before time window [{}].",
                 pid,
-                seqNr,
+                seqNr: java.lang.Long,
                 previousTimestamp,
                 before)
               true
@@ -736,7 +737,9 @@ private[projection] class R2dbcOffsetStore(
       if (ok) {
         FutureTrue
       } else {
-        logger.trace("Filtering out earlier revision [{}] for pid [{}], previous revision [{}]", seqNr, pid, prevSeqNr)
+        logger.trace("Filtering out earlier revision [{}] for pid [{}], previous revision [{}]", seqNr: java.lang.Long,
+          pid,
+          prevSeqNr: java.lang.Long)
         FutureFalse
       }
     }
@@ -820,7 +823,7 @@ private[projection] class R2dbcOffsetStore(
           result.foreach { rows =>
             logger.debug(
               "Deleted [{}] timestamp offset rows until [{}] for projection [{}].",
-              rows,
+              rows: java.lang.Integer,
               until,
               projectionId.id)
           }
@@ -849,14 +852,14 @@ private[projection] class R2dbcOffsetStore(
               insertTimestampOffsetInTx(conn, records)
             }
           }
-          .map(_ => Done)(ExecutionContext.parasitic)
+          .map(_ => Done)(ExecutionContexts.parasitic)
 
       case _ =>
         r2dbcExecutor
           .withConnection("set offset") { conn =>
             savePrimitiveOffsetInTx(conn, offset)
           }
-          .map(_ => Done)(ExecutionContext.parasitic)
+          .map(_ => Done)(ExecutionContexts.parasitic)
     }
   }
 
@@ -883,7 +886,7 @@ private[projection] class R2dbcOffsetStore(
         result.foreach { rows =>
           logger.debug(
             "Deleted [{}] timestamp offset rows >= [{}] for projection [{}].",
-            rows,
+            rows: java.lang.Integer,
             timestamp,
             projectionId.id)
         }

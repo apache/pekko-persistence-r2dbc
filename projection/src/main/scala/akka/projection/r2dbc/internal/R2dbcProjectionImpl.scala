@@ -101,9 +101,12 @@ private[projection] object R2dbcProjectionImpl {
         }).map { loadedEnv =>
           val count = loadEnvelopeCounter.incrementAndGet()
           if (count % 1000 == 0)
-            log.info("Loaded event lazily, persistenceId [{}], seqNr [{}]. Load count [{}]", pid, seqNr, count)
+            log.info("Loaded event lazily, persistenceId [{}], seqNr [{}]. Load count [{}]", pid, seqNr: java.lang.Long,
+              count: java.lang.Long)
           else
-            log.debug("Loaded event lazily, persistenceId [{}], seqNr [{}]. Load count [{}]", pid, seqNr, count)
+            log.debug("Loaded event lazily, persistenceId [{}], seqNr [{}]. Load count [{}]", pid,
+              seqNr: java.lang.Long,
+              count: java.lang.Long)
           loadedEnv.asInstanceOf[Envelope]
         }
 
@@ -123,14 +126,14 @@ private[projection] object R2dbcProjectionImpl {
               log.info(
                 "Loaded durable state lazily, persistenceId [{}], revision [{}]. Load count [{}]",
                 pid,
-                loadedRevision,
-                count)
+                loadedRevision: java.lang.Long,
+                count: java.lang.Long)
             else
               log.debug(
                 "Loaded durable state lazily, persistenceId [{}], revision [{}]. Load count [{}]",
                 pid,
-                loadedRevision,
-                count)
+                loadedRevision: java.lang.Long,
+                count: java.lang.Long)
             new UpdatedDurableState(pid, loadedRevision, loadedValue, upd.offset, upd.timestamp)
               .asInstanceOf[Envelope]
           case GetObjectResult(None, _) =>
@@ -524,7 +527,7 @@ private[projection] class R2dbcProjectionImpl[Offset, Envelope](
 
     override protected def saveOffsetsAndReport(
         projectionId: ProjectionId,
-        batch: Seq[ProjectionContextImpl[Offset, Envelope]]): Future[Done] = {
+        batch: immutable.Seq[ProjectionContextImpl[Offset, Envelope]]): Future[Done] = {
       import R2dbcProjectionImpl.FutureDone
 
       val acceptedContexts =

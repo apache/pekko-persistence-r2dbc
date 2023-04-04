@@ -68,16 +68,16 @@ object DurableStateEndToEndSpec {
               case command: Persist =>
                 context.log.debug(
                   "Persist [{}], pid [{}], seqNr [{}]",
-                  command.payload,
+                  command.payload.toString,
                   pid.id,
-                  DurableStateBehavior.lastSequenceNumber(context) + 1)
+                  DurableStateBehavior.lastSequenceNumber(context) + 1: java.lang.Long)
                 Effect.persist(command.payload)
               case command: PersistWithAck =>
                 context.log.debug(
                   "Persist [{}], pid [{}], seqNr [{}]",
-                  command.payload,
+                  command.payload.toString,
                   pid.id,
-                  DurableStateBehavior.lastSequenceNumber(context) + 1)
+                  DurableStateBehavior.lastSequenceNumber(context) + 1: java.lang.Long)
                 Effect.persist(command.payload).thenRun(_ => command.replyTo ! Done)
               case Ping(replyTo) =>
                 replyTo ! Done
@@ -100,7 +100,7 @@ object DurableStateEndToEndSpec {
     override def process(session: R2dbcSession, envelope: DurableStateChange[String]): Future[Done] = {
       envelope match {
         case upd: UpdatedDurableState[String] =>
-          log.debug("{} Processed {} revision {}", projectionId.key, upd.value, upd.revision)
+          log.debug("{} Processed {} revision {}", projectionId.key, upd.value, upd.revision: java.lang.Long)
         case _ =>
       }
       processed :+= envelope

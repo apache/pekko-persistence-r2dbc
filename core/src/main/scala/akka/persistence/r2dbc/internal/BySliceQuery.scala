@@ -219,12 +219,12 @@ import org.slf4j.Logger
           log.debug(
             "{} next query [{}] from slices [{} - {}], between time [{} - {}]. Found [{}] rows in previous query.",
             logPrefix,
-            state.queryCount,
-            minSlice,
-            maxSlice,
+            state.queryCount: java.lang.Long,
+            minSlice: java.lang.Integer,
+            maxSlice: java.lang.Integer,
             state.latest.timestamp,
             toTimestamp,
-            state.rowCount)
+            state.rowCount: java.lang.Integer)
 
         newState -> Some(
           dao
@@ -242,10 +242,10 @@ import org.slf4j.Logger
           log.debug(
             "{} query [{}] from slices [{} - {}] completed. Found [{}] rows in previous query.",
             logPrefix,
-            state.queryCount,
-            minSlice,
-            maxSlice,
-            state.rowCount)
+            state.queryCount: java.lang.Long,
+            minSlice: java.lang.Integer,
+            maxSlice: java.lang.Integer,
+            state.rowCount: java.lang.Integer)
 
         state -> None
       }
@@ -258,8 +258,8 @@ import org.slf4j.Logger
             log.debug(
               "{} query slices [{} - {}], from time [{}] until now [{}].",
               logPrefix,
-              minSlice,
-              maxSlice,
+              minSlice: java.lang.Integer,
+              maxSlice: java.lang.Integer,
               initialOffset.timestamp,
               currentDbTime)
 
@@ -286,8 +286,8 @@ import org.slf4j.Logger
       log.debug(
         "Starting {} query from slices [{} - {}], from time [{}].",
         logPrefix,
-        minSlice,
-        maxSlice,
+        minSlice: java.lang.Integer,
+        maxSlice: java.lang.Integer,
         initialOffset.timestamp)
 
     def nextOffset(state: QueryState, envelope: Envelope): QueryState = {
@@ -321,10 +321,10 @@ import org.slf4j.Logger
             log.debug(
               "{} query [{}] from slices [{} - {}] delay next [{}] ms.",
               logPrefix,
-              state.queryCount,
-              minSlice,
-              maxSlice,
-              d.toMillis)
+              state.queryCount: java.lang.Long,
+              minSlice: java.lang.Integer,
+              maxSlice: java.lang.Integer,
+              d.toMillis: java.lang.Long)
           }
 
         delay
@@ -376,12 +376,12 @@ import org.slf4j.Logger
         log.debug(
           "{} next query [{}]{} from slices [{} - {}], between time [{} - {}]. {}",
           logPrefix,
-          newState.queryCount,
+          newState.queryCount: java.lang.Long,
           if (newState.backtracking) " in backtracking mode" else "",
-          minSlice,
-          maxSlice,
+          minSlice: java.lang.Integer,
+          maxSlice: java.lang.Integer,
           fromTimestamp,
-          toTimestamp.getOrElse("None"),
+          toTimestamp.getOrElse(None),
           if (newIdleCount >= 3) s"Idle in [$newIdleCount] queries."
           else if (state.backtracking) s"Found [${state.rowCount}] rows in previous backtracking query."
           else s"Found [${state.rowCount}] rows in previous query.")
@@ -441,10 +441,10 @@ import org.slf4j.Logger
             log.debug(
               "{} retrieved [{}] event count buckets, with a total of [{}], from slices [{} - {}], from time [{}]",
               logPrefix,
-              counts.size,
-              sum,
-              minSlice,
-              maxSlice,
+              counts.size: java.lang.Integer,
+              sum: java.lang.Long,
+              minSlice: java.lang.Integer,
+              maxSlice: java.lang.Integer,
               fromTimestamp)
           }
           newState
@@ -472,7 +472,7 @@ import org.slf4j.Logger
             log.trace(
               "filtering [{}] [{}] as db timestamp is the same as last offset and is in seen [{}]",
               row.persistenceId,
-              row.seqNr,
+              row.seqNr: java.lang.Long,
               currentSequenceNrs)
             Nil
           } else {

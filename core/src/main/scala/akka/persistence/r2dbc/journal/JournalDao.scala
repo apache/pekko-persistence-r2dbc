@@ -11,6 +11,7 @@ import scala.concurrent.Future
 
 import akka.actor.typed.ActorSystem
 import akka.annotation.InternalApi
+import akka.dispatch.ExecutionContexts
 import akka.persistence.Persistence
 import akka.persistence.r2dbc.R2dbcSettings
 import akka.persistence.r2dbc.internal.Sql.Interpolation
@@ -219,7 +220,7 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
         result.foreach { _ =>
           log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
         }
-      result.map(_.head)(ExecutionContext.parasitic)
+      result.map(_.head)(ExecutionContexts.parasitic)
     }
   }
 
@@ -235,7 +236,7 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
           val seqNr = row.get(0, classOf[java.lang.Long])
           if (seqNr eq null) 0L else seqNr.longValue
         })
-      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContext.parasitic)
+      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContexts.parasitic)
 
     if (log.isDebugEnabled)
       result.foreach(seqNr => log.debug("Highest sequence nr for persistenceId [{}]: [{}]", persistenceId, seqNr))
@@ -281,7 +282,7 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
         result.foreach(updatedRows =>
           log.debug("Deleted [{}] events for persistenceId [{}]", updatedRows.head, persistenceId))
 
-      result.map(_ => ())(ExecutionContext.parasitic)
+      result.map(_ => ())(ExecutionContexts.parasitic)
     }
   }
 

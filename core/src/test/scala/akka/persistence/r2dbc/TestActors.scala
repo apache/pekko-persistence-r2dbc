@@ -66,17 +66,17 @@ object TestActors {
           command match {
             case command: Persist =>
               context.log.debug(
-                "Persist [{}], pid [{}], seqNr [{}]",
-                command.payload,
-                pid.id,
-                EventSourcedBehavior.lastSequenceNumber(context) + 1)
+                "Persist [{}], pid [{}], seqNr [{}]": String,
+                command.payload.toString,
+                pid.id: Object,
+                EventSourcedBehavior.lastSequenceNumber(context) + 1: java.lang.Long)
               Effect.persist(command.payload)
             case command: PersistWithAck =>
               context.log.debug(
                 "Persist [{}], pid [{}], seqNr [{}]",
-                command.payload,
+                command.payload.toString,
                 pid.id,
-                EventSourcedBehavior.lastSequenceNumber(context) + 1)
+                EventSourcedBehavior.lastSequenceNumber(context) + 1: java.lang.Long)
               Effect.persist(command.payload).thenRun(_ => command.replyTo ! Done)
             case command: PersistAll =>
               if (context.log.isDebugEnabled)
@@ -84,7 +84,7 @@ object TestActors {
                   "PersistAll [{}], pid [{}], seqNr [{}]",
                   command.payloads.mkString(","),
                   pid.id,
-                  EventSourcedBehavior.lastSequenceNumber(context) + 1)
+                  EventSourcedBehavior.lastSequenceNumber(context) + 1: java.lang.Long)
               Effect.persist(command.payloads)
             case Ping(replyTo) =>
               replyTo ! Done
@@ -123,16 +123,16 @@ object TestActors {
               case command: Persist =>
                 context.log.debug(
                   "Persist [{}], pid [{}], seqNr [{}]",
-                  command.payload,
-                  pid.id,
-                  DurableStateBehavior.lastSequenceNumber(context) + 1)
+                  command.payload.toString,
+                  pid.id: Object,
+                  (DurableStateBehavior.lastSequenceNumber(context) + 1: java.lang.Long): Object)
                 Effect.persist(command.payload)
               case command: PersistWithAck =>
                 context.log.debug(
                   "Persist [{}], pid [{}], seqNr [{}]",
-                  command.payload,
-                  pid.id,
-                  DurableStateBehavior.lastSequenceNumber(context) + 1)
+                  command.payload.toString,
+                  pid.id: Object,
+                  (DurableStateBehavior.lastSequenceNumber(context) + 1: java.lang.Long): Object)
                 Effect.persist(command.payload).thenRun(_ => command.replyTo ! Done)
               case Ping(replyTo) =>
                 replyTo ! Done
