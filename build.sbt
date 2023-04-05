@@ -32,7 +32,6 @@ def common: Seq[Setting[_]] =
     crossScalaVersions := Seq(Dependencies.Scala212, Dependencies.Scala213),
     scalaVersion := Dependencies.Scala213,
     crossVersion := CrossVersion.binary,
-    scalafmtOnCompile := true,
     sonatypeProfileName := "org.apache.pekko",
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.8", "-target", "1.8"),
