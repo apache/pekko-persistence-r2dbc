@@ -1,3 +1,5 @@
+ThisBuild / resolvers += "Apache Nexus Snapshots".at("https://repository.apache.org/content/repositories/snapshots/")
+
 import sbt.Keys.parallelExecution
 import xerial.sbt.Sonatype.autoImport.sonatypeProfileName
 
@@ -23,8 +25,8 @@ inThisBuild(
     description := "An Apache Pekko Persistence backed by SQL database with R2DBC",
     // add snapshot repo when Pekko version overridden
     resolvers ++=
-      (if (System.getProperty("override.akka.version") != null)
-         Seq("Akka Snapshots".at("https://oss.sonatype.org/content/repositories/snapshots/"))
+      (if (System.getProperty("override.pekko.version") != null)
+         Seq("Apache Nexus Snapshots".at("https://repository.apache.org/content/repositories/snapshots/"))
        else Seq.empty)))
 
 def common: Seq[Setting[_]] =
@@ -46,12 +48,12 @@ def common: Seq[Setting[_]] =
     Test / fork := true, // some non-heap memory is leaking
     Test / javaOptions ++= {
       import scala.collection.JavaConverters._
-      // include all passed -Dakka. properties to the javaOptions for forked tests
+      // include all passed -Dpekko. properties to the javaOptions for forked tests
       // useful to switch DB dialects for example
-      val akkaProperties = System.getProperties.stringPropertyNames.asScala.toList.collect {
-        case key: String if key.startsWith("akka.") => "-D" + key + "=" + System.getProperty(key)
+      val pekkoProperties = System.getProperties.stringPropertyNames.asScala.toList.collect {
+        case key: String if key.startsWith("pekko.") => "-D" + key + "=" + System.getProperty(key)
       }
-      "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" :: akkaProperties
+      "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" :: pekkoProperties
     },
     projectInfoVersion := (if (isSnapshot.value) "snapshot" else version.value),
     Global / excludeLintKeys += projectInfoVersion)
@@ -62,7 +64,7 @@ lazy val root = (project in file("."))
   .settings(common)
   .settings(dontPublish)
   .settings(
-    name := "akka-persistence-r2dbc-root",
+    name := "pekko-persistence-r2dbc-root",
     publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))))
   .aggregate(core, projection, migration, docs)
 
@@ -70,14 +72,14 @@ def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.g
 
 lazy val core = (project in file("core"))
   .settings(common)
-  .settings(name := "akka-persistence-r2dbc", libraryDependencies ++= Dependencies.core)
+  .settings(name := "pekko-persistence-r2dbc", libraryDependencies ++= Dependencies.core)
   .settings(MetaInfLicenseNoticeCopy.settings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val projection = (project in file("projection"))
   .dependsOn(core)
   .settings(common)
-  .settings(name := "akka-projection-r2dbc", libraryDependencies ++= Dependencies.projection)
+  .settings(name := "pekko-projection-r2dbc", libraryDependencies ++= Dependencies.projection)
   .settings(MetaInfLicenseNoticeCopy.settings)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -85,18 +87,18 @@ lazy val migration = (project in file("migration"))
   .settings(common)
   .settings(MetaInfLicenseNoticeCopy.settings)
   .settings(
-    name := "akka-persistence-r2dbc-migration",
+    name := "pekko-persistence-r2dbc-migration",
     libraryDependencies ++= Dependencies.migration,
-    Test / mainClass := Some("akka.persistence.r2dbc.migration.MigrationTool"),
+    Test / mainClass := Some("org.apache.pekko.persistence.r2dbc.migration.MigrationTool"),
     Test / run / fork := true,
     Test / run / javaOptions ++= {
       import scala.collection.JavaConverters._
-      // include all passed -Dakka. properties to the javaOptions for forked tests
+      // include all passed -Dpekko. properties to the javaOptions for forked tests
       // useful to switch DB dialects for example
-      val akkaProperties = System.getProperties.stringPropertyNames.asScala.toList.collect {
-        case key: String if key.startsWith("akka.") => "-D" + key + "=" + System.getProperty(key)
+      val pekkoProperties = System.getProperties.stringPropertyNames.asScala.toList.collect {
+        case key: String if key.startsWith("pekko.") => "-D" + key + "=" + System.getProperty(key)
       }
-      "-Dlogback.configurationFile=logback-main.xml" :: "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" :: akkaProperties
+      "-Dlogback.configurationFile=logback-main.xml" :: "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" :: pekkoProperties
     })
   .dependsOn(core % "compile->compile;test->test")
   .enablePlugins(AutomateHeaderPlugin)
@@ -117,18 +119,17 @@ lazy val docs = project
     Compile / paradoxProperties ++= Map(
       "project.url" -> "https://doc.akka.io/docs/akka-persistence-r2dbc/current/",
       "canonical.base_url" -> "https://doc.akka.io/docs/akka-persistence-r2dbc/current",
-      "akka.version" -> Dependencies.AkkaVersion,
+      "pekko.version" -> Dependencies.PekkoVersion,
       "scala.version" -> scalaVersion.value,
       "scala.binary.version" -> scalaBinaryVersion.value,
-      "extref.akka.base_url" -> s"https://doc.akka.io/docs/akka/${Dependencies.AkkaVersionInDocs}/%s",
-      "extref.akka-docs.base_url" -> s"https://doc.akka.io/docs/akka/${Dependencies.AkkaVersionInDocs}/%s",
-      "extref.akka-projection.base_url" -> s"https://doc.akka.io/docs/akka-projection/${Dependencies.AkkaProjectionVersionInDocs}/%s",
+      "extref.pekko.base_url" -> s"https://doc.akka.io/docs/akka/${Dependencies.PekkoVersionInDocs}/%s",
+      "extref.pekko-docs.base_url" -> s"https://doc.akka.io/docs/akka/${Dependencies.PekkoVersionInDocs}/%s",
+      "extref.pekko-projection.base_url" -> s"https://doc.akka.io/docs/akka-projection/${Dependencies.PekkoProjectionVersionInDocs}/%s",
       "extref.java-docs.base_url" -> "https://docs.oracle.com/en/java/javase/11/%s",
       "scaladoc.scala.base_url" -> s"https://www.scala-lang.org/api/current/",
-      "scaladoc.akka.base_url" -> s"https://doc.akka.io/api/akka/${Dependencies.AkkaVersion}",
+      "scaladoc.org.apache.pekko.base_url" -> s"https://doc.akka.io/api/akka/${Dependencies.PekkoVersion}",
       "scaladoc.com.typesafe.config.base_url" -> s"https://lightbend.github.io/config/latest/api/"),
-    ApidocPlugin.autoImport.apidocRootPackage := "akka",
-    apidocRootPackage := "akka",
+    apidocRootPackage := "org.apache.pekko",
     resolvers += Resolver.jcenterRepo,
     publishRsyncArtifacts += makeSite.value -> "www/",
     publishRsyncHost := "akkarepo@gustav.akka.io")

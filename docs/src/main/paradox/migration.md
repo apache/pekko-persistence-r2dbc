@@ -1,7 +1,7 @@
 # Migration tool
 
-There is a migration tool that is useful if you would like to migrate from another Akka Persistence plugin
-to the R2DBC plugin. It has been tested with Akka Persistence JDBC as source plugin, but it should work with
+There is a migration tool that is useful if you would like to migrate from another Pekko Persistence plugin
+to the R2DBC plugin. It has been tested with Pekko Persistence JDBC as source plugin, but it should work with
 any plugin that has support for `CurrentPersistenceIdsQuery` and `CurrentEventsByPersistenceIdQuery`.
 
 The migration tool can be run while the source system is still active, and it can be run multiple times with
@@ -12,8 +12,8 @@ migrating the remaining data that was written after the previous online migratio
 ## Dependencies
 
 @@dependency [Maven,sbt,Gradle] {
-  group=com.lightbend.akka
-  artifact=akka-persistence-r2dbc-migration_$scala.binary.version$
+  group=org.apache.pekko
+  artifact=pekko-persistence-r2dbc-migration_$scala.binary.version$
   version=$project.version$
 }
 
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS migration_progress(
 
 ## Configuration
 
-The migration tool can be run as main class `akka.persistence.r2dbc.migration.MigrationTool` provided by the above
-`akka-persistence-r2dbc-migration` dependency.
+The migration tool can be run as main class `org.apache.pekko.persistence.r2dbc.migration.MigrationTool` provided by the above
+`pekko-persistence-r2dbc-migration` dependency.
 
-You need to provide configuration for the source persistence plugin and the target Rd2BC plugin in your `application.conf`. An example of such configuration for migration from Akka Persistence JDBC: 
+You need to provide configuration for the source persistence plugin and the target Rd2BC plugin in your `application.conf`. An example of such configuration for migration from Pekko Persistence JDBC: 
 
 @@snip [docker-compose.yml](/migration/src/test/resources/application.conf)
 

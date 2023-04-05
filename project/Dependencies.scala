@@ -7,18 +7,18 @@ import sbt._
 object Dependencies {
   val Scala212 = "2.12.17"
   val Scala213 = "2.13.10"
-  val AkkaVersion = System.getProperty("override.akka.version", "2.6.19")
-  val AkkaVersionInDocs = AkkaVersion.take(3)
-  val AkkaProjectionVersion = "1.2.4"
-  val AkkaProjectionVersionInDocs = "current"
+  val PekkoVersion = System.getProperty("override.pekko.version", "0.0.0+26623-85c2a469-SNAPSHOT")
+  val PekkoVersionInDocs = PekkoVersion.take(3)
+  val PekkoProjectionVersion = "0.0.0+25-0a0709de-SNAPSHOT"
+  val PekkoProjectionVersionInDocs = "current"
 
   object Compile {
-    val akkaActorTyped = "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion
-    val akkaStream = "com.typesafe.akka" %% "akka-stream" % AkkaVersion
-    val akkaPersistence = "com.typesafe.akka" %% "akka-persistence-typed" % AkkaVersion
-    val akkaPersistenceQuery = "com.typesafe.akka" %% "akka-persistence-query" % AkkaVersion
+    val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
+    val pekkoStream = "org.apache.pekko" %% "pekko-stream" % PekkoVersion
+    val pekkoPersistence = "org.apache.pekko" %% "pekko-persistence-typed" % PekkoVersion
+    val pekkoPersistenceQuery = "org.apache.pekko" %% "pekko-persistence-query" % PekkoVersion
 
-    val akkaProjectionCore = "com.lightbend.akka" %% "akka-projection-core" % AkkaProjectionVersion
+    val pekkoProjectionCore = "org.apache.pekko" %% "pekko-projection-core" % PekkoProjectionVersion
 
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "0.9.1.RELEASE"
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "0.9.1.RELEASE"
@@ -26,18 +26,18 @@ object Dependencies {
   }
 
   object TestDeps {
-    val akkaPersistenceTyped = "com.typesafe.akka" %% "akka-persistence-typed" % AkkaVersion % Test
-    val akkaShardingTyped = "com.typesafe.akka" %% "akka-cluster-sharding-typed" % AkkaVersion % Test
-    val akkaPersistenceTck = "com.typesafe.akka" %% "akka-persistence-tck" % AkkaVersion % Test
-    val akkaTestkit = "com.typesafe.akka" %% "akka-actor-testkit-typed" % AkkaVersion % Test
-    val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit" % AkkaVersion % Test
-    val akkaJackson = "com.typesafe.akka" %% "akka-serialization-jackson" % AkkaVersion % Test
+    val pekkoPersistenceTyped = "org.apache.pekko" %% "pekko-persistence-typed" % PekkoVersion % Test
+    val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
+    val pekkoPersistenceTck = "org.apache.pekko" %% "pekko-persistence-tck" % PekkoVersion % Test
+    val pekkoTestkit = "org.apache.pekko" %% "pekko-actor-testkit-typed" % PekkoVersion % Test
+    val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
+    val pekkoJackson = "org.apache.pekko" %% "pekko-serialization-jackson" % PekkoVersion % Test
 
-    val akkaProjectionEventSourced =
-      "com.lightbend.akka" %% "akka-projection-eventsourced" % AkkaProjectionVersion % Test
-    val akkaProjectionDurableState =
-      "com.lightbend.akka" %% "akka-projection-durable-state" % AkkaProjectionVersion % Test
-    val akkaProjectionTestKit = "com.lightbend.akka" %% "akka-projection-testkit" % AkkaProjectionVersion % Test
+    val pekkoProjectionEventSourced =
+      "org.apache.pekko" %% "pekko-projection-eventsourced" % PekkoProjectionVersion % Test
+    val pekkoProjectionDurableState =
+      "org.apache.pekko" %% "pekko-projection-durable-state" % PekkoProjectionVersion % Test
+    val pekkoProjectionTestKit = "org.apache.pekko" %% "pekko-projection-testkit" % PekkoProjectionVersion % Test
 
     val postgresql = "org.postgresql" % "postgresql" % "42.3.4" % Test
 
@@ -50,44 +50,44 @@ object Dependencies {
   import Compile._
 
   val core = Seq(
-    akkaPersistence,
-    akkaPersistenceQuery,
+    pekkoPersistence,
+    pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
     r2dbcPostgres,
-    TestDeps.akkaPersistenceTck,
-    TestDeps.akkaStreamTestkit,
-    TestDeps.akkaTestkit,
-    TestDeps.akkaJackson,
+    TestDeps.pekkoPersistenceTck,
+    TestDeps.pekkoStreamTestkit,
+    TestDeps.pekkoTestkit,
+    TestDeps.pekkoJackson,
     TestDeps.logback,
     TestDeps.scalaTest)
 
   val projection = Seq(
-    akkaPersistenceQuery,
+    pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
     r2dbcPostgres,
-    akkaProjectionCore,
-    TestDeps.akkaProjectionEventSourced,
-    TestDeps.akkaProjectionDurableState,
-    TestDeps.akkaStreamTestkit,
-    TestDeps.akkaTestkit,
-    TestDeps.akkaProjectionTestKit,
-    TestDeps.akkaJackson,
+    pekkoProjectionCore,
+    TestDeps.pekkoProjectionEventSourced,
+    TestDeps.pekkoProjectionDurableState,
+    TestDeps.pekkoStreamTestkit,
+    TestDeps.pekkoTestkit,
+    TestDeps.pekkoProjectionTestKit,
+    TestDeps.pekkoJackson,
     TestDeps.logback,
     TestDeps.scalaTest)
 
   val migration =
     Seq(
-      "com.lightbend.akka" %% "akka-persistence-jdbc" % "5.0.4" % Test,
+      "org.apache.pekko" %% "pekko-persistence-jdbc" % "0.0.0+960-7c83f376-SNAPSHOT" % Test,
       TestDeps.postgresql,
       TestDeps.logback,
       TestDeps.scalaTest)
 
   val docs =
     Seq(
-      TestDeps.akkaPersistenceTyped,
-      TestDeps.akkaProjectionEventSourced,
-      TestDeps.akkaProjectionDurableState,
-      TestDeps.akkaShardingTyped)
+      TestDeps.pekkoPersistenceTyped,
+      TestDeps.pekkoProjectionEventSourced,
+      TestDeps.pekkoProjectionDurableState,
+      TestDeps.pekkoShardingTyped)
 }

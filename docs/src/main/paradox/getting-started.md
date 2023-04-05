@@ -3,12 +3,12 @@
 ## Dependencies
 
 @@dependency [Maven,sbt,Gradle] {
-  group=com.lightbend.akka
-  artifact=akka-persistence-r2dbc_$scala.binary.version$
+  group=org.apache.pekko
+  artifact=pekko-persistence-r2dbc_$scala.binary.version$
   version=$project.version$
 }
 
-This plugin depends on Akka $akka.version$ or later, and note that it is important that all `akka-*` 
+This plugin depends on Pekko $pekko.version$ or later, and note that it is important that all `pekko-*` 
 dependencies are in the same version, so it is recommended to depend on them explicitly to avoid problems 
 with transient dependencies causing an unlucky mix of versions.
 
@@ -16,12 +16,12 @@ The plugin is published for Scala 2.13.
 
 ## Enabling
 
-To enable the plugins to be used by default, add the following line to your Akka `application.conf`:
+To enable the plugins to be used by default, add the following line to your Pekko `application.conf`:
 
 ```
-akka.persistence.journal.plugin = "akka.persistence.r2dbc.journal"
-akka.persistence.snapshot-store.plugin = "akka.persistence.r2dbc.snapshot"
-akka.persistence.state.plugin = "akka.persistence.r2dbc.state"
+pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
+pekko.persistence.snapshot-store.plugin = "pekko.persistence.r2dbc.snapshot"
+pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
 ```
 
 More information in:

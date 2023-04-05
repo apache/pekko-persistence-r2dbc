@@ -3,14 +3,14 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>[%date{ISO8601}] [%level] [%logger] [%X{akkaAddress}] [%marker] [%thread] - %msg%n</pattern>
+            <pattern>[%date{ISO8601}] [%level] [%logger] [%X{pekkoAddress}] [%marker] [%thread] - %msg%n</pattern>
         </encoder>
     </appender>
 
 
-<!--    <logger name="akka.persistence.r2dbc.migration.MigrationTool" level="DEBUG" />-->
+<!--    <logger name="org.apache.pekko.persistence.r2dbc.migration.MigrationTool" level="DEBUG" />-->
 
-<!--    <logger name="akka.persistence.r2dbc" level="DEBUG" />-->
+<!--    <logger name="org.apache.pekko.persistence.r2dbc" level="DEBUG" />-->
 <!--    <logger name="io.r2dbc.postgresql.QUERY" level="DEBUG" />-->
 <!--    <logger name="io.r2dbc.pool" level="DEBUG" />-->
 

@@ -1,6 +1,6 @@
 # Connection configuration
 
-Shared configuration for the connection pool is located under `akka.persistence.r2dbc.connection-factory`.
+Shared configuration for the connection pool is located under `pekko.persistence.r2dbc.connection-factory`.
 You have to set at least:
 
 Postgres:

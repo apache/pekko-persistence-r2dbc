@@ -1,35 +1,35 @@
 package jdocs.home.query;
 
-import akka.NotUsed;
-import akka.actor.typed.ActorSystem;
-import akka.actor.typed.javadsl.Behaviors;
-import akka.japi.Pair;
-import akka.persistence.query.NoOffset;
-import akka.persistence.typed.PersistenceId;
-import akka.stream.javadsl.Sink;
+import org.apache.pekko.NotUsed;
+import org.apache.pekko.actor.typed.ActorSystem;
+import org.apache.pekko.actor.typed.javadsl.Behaviors;
+import org.apache.pekko.japi.Pair;
+import org.apache.pekko.persistence.query.NoOffset;
+import org.apache.pekko.persistence.typed.PersistenceId;
+import org.apache.pekko.stream.javadsl.Sink;
 import java.util.List;
 
 // #readJournalFor
-import akka.persistence.query.PersistenceQuery;
-import akka.persistence.r2dbc.query.javadsl.R2dbcReadJournal;
+import org.apache.pekko.persistence.query.PersistenceQuery;
+import org.apache.pekko.persistence.r2dbc.query.javadsl.R2dbcReadJournal;
 
 // #readJournalFor
 
 // #durableStateStoreFor
-import akka.persistence.r2dbc.state.javadsl.R2dbcDurableStateStore;
-import akka.persistence.state.DurableStateStoreRegistry;
+import org.apache.pekko.persistence.r2dbc.state.javadsl.R2dbcDurableStateStore;
+import org.apache.pekko.persistence.state.DurableStateStoreRegistry;
 
 // #durableStateStoreFor
 
 // #currentEventsBySlices
-import akka.stream.javadsl.Source;
-import akka.persistence.query.typed.EventEnvelope;
+import org.apache.pekko.stream.javadsl.Source;
+import org.apache.pekko.persistence.query.typed.EventEnvelope;
 
 // #currentEventsBySlices
 
 // #currentChangesBySlices
-import akka.persistence.query.DurableStateChange;
-import akka.persistence.query.UpdatedDurableState;
+import org.apache.pekko.persistence.query.DurableStateChange;
+import org.apache.pekko.persistence.query.UpdatedDurableState;
 
 // #currentChangesBySlices
 

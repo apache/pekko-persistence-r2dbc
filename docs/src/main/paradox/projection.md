@@ -4,8 +4,8 @@ The @apidoc[R2dbcProjection$] has support for storing the offset in a relational
 
 The source of the envelopes is from a `SourceProvider`, which can be:
 
-* events from Event Sourced entities via the @extref:[SourceProvider for eventsBySlices](akka-projection:eventsourced.html#sourceprovider-for-eventsbyslices) with the @ref:[eventsBySlices query](query.md#eventsbyslices)
-* state changes for Durable State entities via the @extref:[SourceProvider for changesBySlices](akka-projection:durable-state.html#sourceprovider-for-changesbyslices) with the @ref:[changesBySlices query](query.md#changesbyslices)
+* events from Event Sourced entities via the @extref:[SourceProvider for eventsBySlices](pekko-projection:eventsourced.html#sourceprovider-for-eventsbyslices) with the @ref:[eventsBySlices query](query.md#eventsbyslices)
+* state changes for Durable State entities via the @extref:[SourceProvider for changesBySlices](pekko-projection:durable-state.html#sourceprovider-for-changesbyslices) with the @ref:[changesBySlices query](query.md#changesbyslices)
 * any other `SourceProvider` with supported @ref:[offset types](#offset-types)
 
 A @apidoc[R2dbcHandler] receives a @apidoc[R2dbcSession] instance and an envelope. The 
@@ -16,15 +16,15 @@ that @ref:[exactly-once](#exactly-once) processing semantics is supported. It al
 
 ## Dependencies
 
-To use the R2DBC module of Akka Projections add the following dependency in your project:
+To use the R2DBC module of Pekko Projections add the following dependency in your project:
 
 @@dependency [Maven,sbt,Gradle] {
-  group=com.lightbend.akka
-  artifact=akka-projection-r2dbc_$scala.binary.version$
+  group=org.apache.pekko
+  artifact=pekko-projection-r2dbc_$scala.binary.version$
   version=$project.version$
 }
 
-Akka Projections R2DBC depends on Akka $akka.version$ or later, and note that it is important that all `akka-*`
+Pekko Projections R2DBC depends on Pekko $pekko.version$ or later, and note that it is important that all `pekko-*`
 dependencies are in the same version, so it is recommended to depend on them explicitly to avoid problems
 with transient dependencies causing an unlucky mix of versions.
 
@@ -33,18 +33,18 @@ with transient dependencies causing an unlucky mix of versions.
 
 ### Transitive dependencies
 
-The table below shows `akka-projection-r2dbc`'s direct dependencies, and the second tab shows all libraries it depends on transitively.
+The table below shows `pekko-projection-r2dbc`'s direct dependencies, and the second tab shows all libraries it depends on transitively.
 
 @@dependencies{ projectId="projection" }
 
 ## Schema
 
-The `akka_projection_offset_store`, `akka_projection_timestamp_offset_store` and `akka_projection_management` tables
+The `pekko_projection_offset_store`, `pekko_projection_timestamp_offset_store` and `pekko_projection_management` tables
 need to be created in the configured database, see schema definition in @ref:[Creating the schema](getting-started.md#schema).
 
 ## Configuration
 
-By default, `akka-projection-r2dbc` uses the same connection pool and `dialect` as `akka-persistence-r2dbc`, see
+By default, `pekko-projection-r2dbc` uses the same connection pool and `dialect` as `pekko-persistence-r2dbc`, see
 @ref:[Connection configuration](connection-config.md).
 
 ### Reference configuration
@@ -68,7 +68,7 @@ Java
 
 The @ref:[`ShoppingCartHandler` is shown below](#handler).
 
-There are alternative ways of running the `ProjectionBehavior` as described in @extref:[Running a Projection](akka-projection:running.html), but note that when using the R2DBC plugin as `SourceProvider` it is recommended to use `eventsBySlices` and not `eventsByTag`.
+There are alternative ways of running the `ProjectionBehavior` as described in @extref:[Running a Projection](pekko-projection:running.html), but note that when using the R2DBC plugin as `SourceProvider` it is recommended to use `eventsBySlices` and not `eventsByTag`.
 
 ## Slices
 
@@ -77,9 +77,9 @@ instead providing `eventsBySlices` as an improved solution.
 
 The usage of `eventsByTag` for Projections has the drawback that the number of tags must be decided
 up-front and can't easily be changed afterwards. Starting with too many tags means much overhead since
-many projection instances would be running on each node in a small Akka Cluster. Each projection instance
+many projection instances would be running on each node in a small Pekko Cluster. Each projection instance
 polling the database periodically. Starting with too few tags means that it can't be scaled later to more
-Akka nodes.
+Pekko nodes.
 
 With `eventsBySlices` more Projection instances can be added when needed and still reuse the offsets
 for the previous slice distributions.
@@ -91,7 +91,7 @@ Changing to 8 slice ranges means that the ranges would be 0-127, 128-255, 256-38
 
 However, when changing the number of slices the projections with the old slice distribution must be
 stopped before starting new projections. That can be done with a full shutdown before deploying the
-new slice distribution or pause (stop) the projections with @extref:[the management API](akka-projection:management.html).
+new slice distribution or pause (stop) the projections with @extref:[the management API](pekko-projection:management.html).
 
 When using `R2dbcProjection` together with the `EventSourcedProvider.eventsBySlices` the events will be delivered in
 sequence number order without duplicates.
@@ -126,7 +126,7 @@ Java
 
 The offset is stored after a time window, or limited by a number of envelopes, whatever happens first.
 This window can be defined with `withSaveOffset` of the returned `AtLeastOnceProjection`.
-The default settings for the window is defined in configuration section `akka.projection.at-least-once`.
+The default settings for the window is defined in configuration section `pekko.projection.at-least-once`.
 There is a performance benefit of not storing the offset too often, but the drawback is that there can be more
 duplicates when the projection that will be processed again when the projection is restarted.
 
@@ -144,7 +144,7 @@ Java
 
 The envelopes are grouped within a time window, or limited by a number of envelopes, whatever happens first.
 This window can be defined with `withGroup` of the returned `GroupedProjection`. The default settings for
-the window is defined in configuration section `akka.projection.grouped`.
+the window is defined in configuration section `pekko.projection.grouped`.
 
 When using `groupedWithin` the handler is a @scala[`R2dbcHandler[immutable.Seq[EventEnvelope[ShoppingCart.Event]]]`]@java[`R2dbcHandler<List<EventEnvelope<ShoppingCart.Event>>>`].
 The @ref:[`GroupedShoppingCartHandler` is shown below](#grouped-handler).
@@ -200,19 +200,19 @@ The @apidoc[Handler] can be used with `R2dbcProjection.atLeastOnceAsync` and
 `R2dbcProjection.groupedWithinAsync` if the handler is not storing the projection result in the database.
 The handler could send to a Kafka topic or integrate with something else.
 
-There are several examples of such `Handler` in the @extref:[documentation for Cassandra Projections](akka-projection:cassandra.html#handler).
+There are several examples of such `Handler` in the @extref:[documentation for Cassandra Projections](pekko-projection:cassandra.html#handler).
 Same type of handlers can be used with `R2dbcProjection` instead of `CassandraProjection`.
 
 ### Actor handler
 
 A good alternative for advanced state management is to implement the handler as an 
-@extref:[actor](akka:typed/typed/actors.html) which is described in 
-@extref:[Processing with Actor](akka-projection:actor.html).
+@extref:[actor](pekko:typed/typed/actors.html) which is described in 
+@extref:[Processing with Actor](pekko-projection:actor.html).
 
 ### Flow handler
 
-An Akka Streams `FlowWithContext` can be used instead of a handler for processing the envelopes,
-which is described in @extref:[Processing with Akka Streams](akka-projection:flow.html).
+A Pekko Streams `FlowWithContext` can be used instead of a handler for processing the envelopes,
+which is described in @extref:[Processing with Pekko Streams](pekko-projection:flow.html).
 
 ### Handler lifecycle
 
@@ -220,19 +220,19 @@ You can override the `start` and `stop` methods of the `R2dbcHandler` to impleme
 before first envelope is processed and resource cleanup when the projection is stopped.
 Those methods are also called when the `Projection` is restarted after failure.
 
-See also @extref:[error handling](akka-projection:error.html).
+See also @extref:[error handling](pekko-projection:error.html).
 
 ## Offset types
 
 The supported offset types of the `R2dbcProjection` are:
 
-* @apidoc[akka.persistence.query.TimestampOffset] that is used for @extref:[SourceProvider for eventsBySlices](akka-projection:eventsourced.html#sourceprovider-for-eventsbyslices) and @extref:[SourceProvider for changesBySlices](akka-projection:durable-state.html#sourceprovider-for-changesbyslices)
-* other @apidoc[akka.persistence.query.Offset] types
-* @apidoc[MergeableOffset] that is used for @extref:[messages from Kafka](akka-projection:kafka.md#mergeable-offset)
+* @apidoc[pekko.persistence.query.TimestampOffset] that is used for @extref:[SourceProvider for eventsBySlices](pekko-projection:eventsourced.html#sourceprovider-for-eventsbyslices) and @extref:[SourceProvider for changesBySlices](pekko-projection:durable-state.html#sourceprovider-for-changesbyslices)
+* other @apidoc[pekko.persistence.query.Offset] types
+* @apidoc[MergeableOffset] that is used for @extref:[messages from Kafka](pekko-projection:kafka.md#mergeable-offset)
 * `String`
 * `Int`
 * `Long`
-* Any other type that has a configured Akka Serializer is stored with base64 encoding of the serialized bytes.
+* Any other type that has a configured Pekko Serializer is stored with base64 encoding of the serialized bytes.
 
 ## Publish events for lower latency
 
