@@ -1,6 +1,6 @@
-# Akka Persistence R2DBC Documentation
+# Pekko Persistence R2DBC Documentation
 
-The Akka Persistence R2DBC plugin allows for using SQL database with R2DBC as a backend for Akka Persistence.
+The Pekko Persistence R2DBC plugin allows for using SQL database with R2DBC as a backend for Pekko Persistence.
 
 @@toc { depth=2 }
 

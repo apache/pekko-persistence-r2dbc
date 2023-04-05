@@ -1,6 +1,6 @@
 # Journal plugin
 
-The journal plugin enables storing and loading events for @extref:[event sourced persistent actors](akka:typed/persistence.html).
+The journal plugin enables storing and loading events for @extref:[event sourced persistent actors](pekko:typed/persistence.html).
 
 ## Schema
 
@@ -10,10 +10,10 @@ The `event_journal_slice_idx` index is only needed if the slice based @ref:[quer
 
 ## Configuration
 
-To enable the journal plugin to be used by default, add the following line to your Akka `application.conf`:
+To enable the journal plugin to be used by default, add the following line to your Pekko `application.conf`:
 
 ```
-akka.persistence.journal.plugin = "akka.persistence.r2dbc.journal"
+pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
 ```
 
 It can also be enabled with the `journalPluginId` for a specific `EventSourcedBehavior` and multiple

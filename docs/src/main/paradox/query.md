@@ -2,7 +2,7 @@
 
 ## Event sourced queries
 
-@apidoc[R2dbcReadJournal] implements the following @extref:[Persistence Queries](akka:persistence-query.html):
+@apidoc[R2dbcReadJournal] implements the following @extref:[Persistence Queries](pekko:persistence-query.html):
 
 * `eventsByPersistenceId`, `currentEventsByPersistenceId`
 * `eventsBySlices`, `currentEventsBySlices`
@@ -32,7 +32,7 @@ Scala
 ### eventsBySlices
 
 The `eventsBySlices` and `currentEventsBySlices` queries are useful for retrieving all events for a given entity type.
-`eventsBySlices` should be used via Akka Projection.
+`eventsBySlices` should be used via Pekko Projection.
 
 @@@ note
 
@@ -41,9 +41,9 @@ as an improved solution.
 
 The usage of `eventsByTag` for Projections has the drawback that the number of tags must be decided
 up-front and can't easily be changed afterwards. Starting with too many tags means much overhead since
-many projection instances would be running on each node in a small Akka Cluster. Each projection instance
+many projection instances would be running on each node in a small Pekko Cluster. Each projection instance
 polling the database periodically. Starting with too few tags means that it can't be scaled later to more
-Akka nodes.
+Pekko nodes.
 
 With `eventsBySlices` more Projection instances can be added when needed and still reuse the offsets
 for the previous slice distributions.
@@ -91,11 +91,11 @@ event payload is always full loaded.
 ## Publish events for lower latency of eventsBySlices
 
 The `eventsBySlices` query polls the database periodically to find new events. By default, this interval is a
-few seconds, see `akka.persistence.r2dbc.query.refresh-interval` in the @ref:[Configuration](#configuration).
+few seconds, see `pekko.persistence.r2dbc.query.refresh-interval` in the @ref:[Configuration](#configuration).
 This interval can be reduced for lower latency, with the drawback of querying the database more frequently.
 
 If you need latency below a few 100 milliseconds you can enable a feature that will publish the events within
-the Akka Cluster instead of reducing `refresh-interval`. Running `eventsBySlices` will subscribe to the events
+the Pekko Cluster instead of reducing `refresh-interval`. Running `eventsBySlices` will subscribe to the events
 and emit them directly without waiting for next query poll. The tradeoff is that more CPU and network resources
 are used. The events must still be retrieved from the database, but at a lower polling frequency,
 because delivery of published messages are not guaranteed.
@@ -103,12 +103,12 @@ because delivery of published messages are not guaranteed.
 Enable publishing of events with configuration:
 
 ```
-akka.persistence.r2dbc.journal.publish-events = on
+pekko.persistence.r2dbc.journal.publish-events = on
 ```
 
 ## Durable state queries
 
-@apidoc[R2dbcDurableStateStore] implements the following @extref:[Persistence Queries](akka:durable-state/persistence-query.html):
+@apidoc[R2dbcDurableStateStore] implements the following @extref:[Persistence Queries](pekko:durable-state/persistence-query.html):
 
 * `getObject`
 * `changesBySlices`, `currentChangesBySlices`
@@ -148,7 +148,7 @@ will be delivered in revision number order without duplicates.
 
 ## Configuration
 
-Query configuration is under `akka.persistence.r2dbc.query`. Here's the default configuration values for the query plugin:
+Query configuration is under `pekko.persistence.r2dbc.query`. Here's the default configuration values for the query plugin:
 
 @@snip [reference.conf](/core/src/main/resources/reference.conf) { #query-settings }
 

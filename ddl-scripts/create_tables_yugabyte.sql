@@ -62,8 +62,8 @@ CREATE INDEX IF NOT EXISTS durable_state_slice_idx ON durable_state(slice ASC, e
 
 -- Primitive offset types are stored in this table.
 -- If only timestamp based offsets are used this table is optional.
--- Configure akka.projection.r2dbc.offset-store.offset-table="" if the table is not created.
-CREATE TABLE IF NOT EXISTS akka_projection_offset_store (
+-- Configure pekko.projection.r2dbc.offset-store.offset-table="" if the table is not created.
+CREATE TABLE IF NOT EXISTS pekko_projection_offset_store (
   projection_name VARCHAR(255) NOT NULL,
   projection_key VARCHAR(255) NOT NULL,
   current_offset VARCHAR(255) NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS akka_projection_offset_store (
 
 -- Timestamp based offsets are stored in this table.
 
-CREATE TABLE IF NOT EXISTS akka_projection_timestamp_offset_store (
+CREATE TABLE IF NOT EXISTS pekko_projection_timestamp_offset_store (
   projection_name VARCHAR(255) NOT NULL,
   projection_key VARCHAR(255) NOT NULL,
   slice INT NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS akka_projection_timestamp_offset_store (
   PRIMARY KEY(slice ASC, projection_name ASC, timestamp_offset ASC, persistence_id ASC, seq_nr ASC)
 ) SPLIT AT VALUES ((127), (255), (383), (511), (639), (767), (895));
 
-CREATE TABLE IF NOT EXISTS akka_projection_management (
+CREATE TABLE IF NOT EXISTS pekko_projection_management (
   projection_name VARCHAR(255) NOT NULL,
   projection_key VARCHAR(255) NOT NULL,
   paused BOOLEAN NOT NULL,

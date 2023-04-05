@@ -4,15 +4,15 @@
 
 package jdocs.home.projection;
 
-import akka.Done;
-import akka.actor.typed.ActorSystem;
-import akka.actor.typed.javadsl.Behaviors;
-import akka.cluster.sharding.typed.javadsl.EntityTypeKey;
-import akka.japi.Pair;
-import akka.persistence.query.Offset;
-import akka.persistence.r2dbc.query.javadsl.R2dbcReadJournal;
-import akka.projection.eventsourced.javadsl.EventSourcedProvider;
-import akka.projection.javadsl.SourceProvider;
+import org.apache.pekko.Done;
+import org.apache.pekko.actor.typed.ActorSystem;
+import org.apache.pekko.actor.typed.javadsl.Behaviors;
+import org.apache.pekko.cluster.sharding.typed.javadsl.EntityTypeKey;
+import org.apache.pekko.japi.Pair;
+import org.apache.pekko.persistence.query.Offset;
+import org.apache.pekko.persistence.r2dbc.query.javadsl.R2dbcReadJournal;
+import org.apache.pekko.projection.eventsourced.javadsl.EventSourcedProvider;
+import org.apache.pekko.projection.javadsl.SourceProvider;
 
 import docs.home.CborSerializable;
 
@@ -24,8 +24,8 @@ import java.util.Optional;
 
 // #handler
 // #grouped-handler
-import akka.projection.r2dbc.javadsl.R2dbcHandler;
-import akka.projection.r2dbc.javadsl.R2dbcSession;
+import org.apache.pekko.projection.r2dbc.javadsl.R2dbcHandler;
+import org.apache.pekko.projection.r2dbc.javadsl.R2dbcSession;
 import io.r2dbc.spi.Statement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,19 +36,19 @@ import java.util.concurrent.CompletionStage;
 // #handler
 
 // #initProjections
-import akka.cluster.sharding.typed.javadsl.ShardedDaemonProcess;
-import akka.projection.ProjectionBehavior;
-import akka.persistence.query.typed.EventEnvelope;
-import akka.projection.Projection;
+import org.apache.pekko.cluster.sharding.typed.javadsl.ShardedDaemonProcess;
+import org.apache.pekko.projection.ProjectionBehavior;
+import org.apache.pekko.persistence.query.typed.EventEnvelope;
+import org.apache.pekko.projection.Projection;
 // #initProjections
 
 // #exactlyOnce
 // #atLeastOnce
 // #grouped
 // #initProjections
-import akka.projection.ProjectionId;
-import akka.projection.r2dbc.R2dbcProjectionSettings;
-import akka.projection.r2dbc.javadsl.R2dbcProjection;
+import org.apache.pekko.projection.ProjectionId;
+import org.apache.pekko.projection.r2dbc.R2dbcProjectionSettings;
+import org.apache.pekko.projection.r2dbc.javadsl.R2dbcProjection;
 
 // #initProjections
 // #grouped

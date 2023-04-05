@@ -10,19 +10,21 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-import akka.Done
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.Behaviors
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
-import akka.persistence.query.Offset
+import org.apache.pekko
+import pekko.Done
+import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.scaladsl.Behaviors
+import pekko.cluster.sharding.typed.scaladsl.EntityTypeKey
+import pekko.persistence.query.Offset
 import docs.home.CborSerializable
 import org.slf4j.LoggerFactory
 
 //#handler
 //#grouped-handler
-import akka.projection.r2dbc.scaladsl.R2dbcHandler
-import akka.projection.r2dbc.scaladsl.R2dbcSession
-import akka.persistence.query.typed.EventEnvelope
+import org.apache.pekko
+import pekko.projection.r2dbc.scaladsl.R2dbcHandler
+import pekko.projection.r2dbc.scaladsl.R2dbcSession
+import pekko.persistence.query.typed.EventEnvelope
 
 //#grouped-handler
 //#handler
@@ -103,15 +105,16 @@ object R2dbcProjectionDocExample {
 
   object IllustrateInit {
     // #initProjections
-    import akka.cluster.sharding.typed.scaladsl.ShardedDaemonProcess
-    import akka.projection.r2dbc.scaladsl.R2dbcProjection
-    import akka.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
-    import akka.projection.ProjectionId
-    import akka.projection.eventsourced.scaladsl.EventSourcedProvider
-    import akka.projection.Projection
-    import akka.projection.ProjectionBehavior
-    import akka.projection.scaladsl.SourceProvider
-    import akka.persistence.query.typed.EventEnvelope
+    import org.apache.pekko
+    import pekko.cluster.sharding.typed.scaladsl.ShardedDaemonProcess
+    import pekko.projection.r2dbc.scaladsl.R2dbcProjection
+    import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+    import pekko.projection.ProjectionId
+    import pekko.projection.eventsourced.scaladsl.EventSourcedProvider
+    import pekko.projection.Projection
+    import pekko.projection.ProjectionBehavior
+    import pekko.projection.scaladsl.SourceProvider
+    import pekko.persistence.query.typed.EventEnvelope
 
     def initProjections(): Unit = {
       def sourceProvider(sliceRange: Range): SourceProvider[Offset, EventEnvelope[ShoppingCart.Event]] =
@@ -150,9 +153,10 @@ object R2dbcProjectionDocExample {
   }
 
   // #sourceProvider
-  import akka.projection.eventsourced.scaladsl.EventSourcedProvider
-  import akka.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
-  import akka.projection.scaladsl.SourceProvider
+  import org.apache.pekko
+  import pekko.projection.eventsourced.scaladsl.EventSourcedProvider
+  import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+  import pekko.projection.scaladsl.SourceProvider
 
   // Slit the slices into 4 ranges
   val numberOfSliceRanges: Int = 4
@@ -175,8 +179,9 @@ object R2dbcProjectionDocExample {
 
   object IllustrateExactlyOnce {
     // #exactlyOnce
-    import akka.projection.r2dbc.scaladsl.R2dbcProjection
-    import akka.projection.ProjectionId
+    import org.apache.pekko
+    import pekko.projection.r2dbc.scaladsl.R2dbcProjection
+    import pekko.projection.ProjectionId
 
     val projectionId = ProjectionId("ShoppingCarts", s"carts-$minSlice-$maxSlice")
 
@@ -188,8 +193,9 @@ object R2dbcProjectionDocExample {
 
   object IllustrateAtLeastOnce {
     // #atLeastOnce
-    import akka.projection.r2dbc.scaladsl.R2dbcProjection
-    import akka.projection.ProjectionId
+    import org.apache.pekko
+    import pekko.projection.r2dbc.scaladsl.R2dbcProjection
+    import pekko.projection.ProjectionId
 
     val projectionId = ProjectionId("ShoppingCarts", s"carts-$minSlice-$maxSlice")
 
@@ -202,8 +208,9 @@ object R2dbcProjectionDocExample {
 
   object IllustrateGrouped {
     // #grouped
-    import akka.projection.r2dbc.scaladsl.R2dbcProjection
-    import akka.projection.ProjectionId
+    import org.apache.pekko
+    import pekko.projection.r2dbc.scaladsl.R2dbcProjection
+    import pekko.projection.ProjectionId
 
     val projectionId = ProjectionId("ShoppingCarts", s"carts-$minSlice-$maxSlice")
 

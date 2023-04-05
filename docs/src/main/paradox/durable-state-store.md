@@ -1,6 +1,6 @@
 # Durable state store plugin
 
-The durable state plugin enables storing and loading key-value entries for @extref:[durable state actors](akka:typed/durable-state/persistence.html).
+The durable state plugin enables storing and loading key-value entries for @extref:[durable state actors](pekko:typed/durable-state/persistence.html).
 
 ## Schema
 
@@ -10,10 +10,10 @@ The `durable_state_slice_idx` index is only needed if the slice based @ref:[quer
 
 ## Configuration
 
-To enable the journal plugin to be used by default, add the following line to your Akka `application.conf`:
+To enable the journal plugin to be used by default, add the following line to your Pekko `application.conf`:
 
 ```
-akka.persistence.state.plugin = "akka.persistence.r2dbc.state"
+pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
 ```
 
 It can also be enabled with the `durableStateStorePluginId` for a specific `DurableStateBehavior` and multiple

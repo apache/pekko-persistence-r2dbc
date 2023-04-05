@@ -1,10 +1,10 @@
 # Design notes
 
-One of the primary goals with this Akka Persistence plugin is to have a design that is efficient for Postgres compatible distributed SQL databases like Yugabyte or Cockroach. It should also work well with ordinary Postgres.
+One of the primary goals with this Pekko Persistence plugin is to have a design that is efficient for Postgres compatible distributed SQL databases like Yugabyte or Cockroach. It should also work well with ordinary Postgres.
 
 ## Problems with eventsByTag
 
-The usage of `eventsByTag` for Projections has the major drawback that the number of tags must be decided up-front and can't easily be changed afterwards. Starting with too many tags means much overhead since many projection instances would be running on each node in a small Akka Cluster. Each projection instance polling the database periodically. Starting with too few tags means that it can't be scaled later to more Akka nodes.
+The usage of `eventsByTag` for Projections has the major drawback that the number of tags must be decided up-front and can't easily be changed afterwards. Starting with too many tags means much overhead since many projection instances would be running on each node in a small Pekko Cluster. Each projection instance polling the database periodically. Starting with too few tags means that it can't be scaled later to more Pekko nodes.
 
 ## Introducing event slicing
 
@@ -16,7 +16,7 @@ Then the Projection query can be a range query of the slices. For example if usi
 
 What offset shall be used for the Projection queries? A database sequence is not good because it becomes a single point of bottleneck on the write path, and it doesn't have much guarantees for monotonically increasing without gaps anyway.
 
-A rich offset that tracked sequence numbers for persistence id would be very useful for deduplication. Then the offset itself doesn't have to be very exact since we can scan back in time for potentially missed events. That would also make it easier to have a live feed with Akka messages of the events directly from the write-side to the Projection, which would reduce the need for frequently polling the database.
+A rich offset that tracked sequence numbers for persistence id would be very useful for deduplication. Then the offset itself doesn't have to be very exact since we can scan back in time for potentially missed events. That would also make it easier to have a live feed with Pekko messages of the events directly from the write-side to the Projection, which would reduce the need for frequently polling the database.
 
 That rich offset can be stored in a database table with one row per persistence id. It can be capped to a time window. For quick deduplication it would also have a cache in memory of all or part of that time window.
 

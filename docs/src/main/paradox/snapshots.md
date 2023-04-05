@@ -1,6 +1,6 @@
 # Snapshot store plugin
 
-The snapshot plugin enables storing and loading snapshots for @extref:[event sourced persistent actors](akka:typed/persistence.html).
+The snapshot plugin enables storing and loading snapshots for @extref:[event sourced persistent actors](pekko:typed/persistence.html).
 
 ## Schema
 
@@ -8,10 +8,10 @@ The `snapshot` table need to be created in the configured database, see schema d
 
 ## Configuration
 
-To enable the snapshot plugin to be used by default, add the following line to your Akka `application.conf`:
+To enable the snapshot plugin to be used by default, add the following line to your Pekko `application.conf`:
 
 ```
-akka.persistence.snapshot-store.plugin = "akka.persistence.r2dbc.snapshot"
+pekko.persistence.snapshot-store.plugin = "pekko.persistence.r2dbc.snapshot"
 ```
 
 It can also be enabled with the `snapshotPluginId` for a specific `EventSourcedBehavior` and multiple
@@ -28,4 +28,4 @@ The following can be overridden in your `application.conf` for the snapshot spec
 ## Usage
 
 The snapshot plugin is used whenever a snapshot write is triggered through the
-@extref:[Akka Persistence APIs](akka:typed/persistence-snapshot.html).
+@extref:[Pekko Persistence APIs](pekko:typed/persistence-snapshot.html).

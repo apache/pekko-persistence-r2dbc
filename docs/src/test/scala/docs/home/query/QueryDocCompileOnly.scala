@@ -1,9 +1,10 @@
 package docs.home.query
 
-import akka.actor.typed.ActorSystem
-import akka.persistence.query.NoOffset
-import akka.persistence.typed.PersistenceId
-import akka.stream.scaladsl.Sink
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.query.NoOffset
+import pekko.persistence.typed.PersistenceId
+import pekko.stream.scaladsl.Sink
 
 object QueryDocCompileOnly {
   implicit val system: ActorSystem[_] = ???
@@ -11,16 +12,18 @@ object QueryDocCompileOnly {
   trait MyState
 
   // #readJournalFor
-  import akka.persistence.query.PersistenceQuery
-  import akka.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+  import org.apache.pekko
+  import pekko.persistence.query.PersistenceQuery
+  import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 
   val eventQueries = PersistenceQuery(system)
     .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
   // #readJournalFor
 
   // #durableStateStoreFor
-  import akka.persistence.state.DurableStateStoreRegistry
-  import akka.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
+  import org.apache.pekko
+  import pekko.persistence.state.DurableStateStoreRegistry
+  import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 
   val stateQueries = DurableStateStoreRegistry(system)
     .durableStateStoreFor[R2dbcDurableStateStore[MyState]](R2dbcDurableStateStore.Identifier)
@@ -38,7 +41,7 @@ object QueryDocCompileOnly {
 
   {
     // #currentEventsBySlices
-    import akka.persistence.query.typed.EventEnvelope
+    import org.apache.pekko.persistence.query.typed.EventEnvelope
 
     // Slit the slices into 4 ranges
     val numberOfSliceRanges: Int = 4
@@ -59,7 +62,7 @@ object QueryDocCompileOnly {
 
   {
     // #currentChangesBySlices
-    import akka.persistence.query.UpdatedDurableState
+    import org.apache.pekko.persistence.query.UpdatedDurableState
 
     // Slit the slices into 4 ranges
     val numberOfSliceRanges: Int = 4
