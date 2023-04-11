@@ -37,7 +37,6 @@ def common: Seq[Setting[_]] =
     sonatypeProfileName := "org.apache.pekko",
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.8", "-target", "1.8"),
-    headerLicense := Some(HeaderLicense.Custom("""Copyright (C) 2021 Lightbend Inc. <https://www.lightbend.com>""")),
     Test / logBuffered := false,
     Test / parallelExecution := false,
     // show full stack traces and test case durations
@@ -74,14 +73,12 @@ lazy val core = (project in file("core"))
   .settings(common)
   .settings(name := "pekko-persistence-r2dbc", libraryDependencies ++= Dependencies.core)
   .settings(MetaInfLicenseNoticeCopy.settings)
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val projection = (project in file("projection"))
   .dependsOn(core)
   .settings(common)
   .settings(name := "pekko-projection-r2dbc", libraryDependencies ++= Dependencies.projection)
   .settings(MetaInfLicenseNoticeCopy.settings)
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val migration = (project in file("migration"))
   .settings(common)
@@ -101,7 +98,6 @@ lazy val migration = (project in file("migration"))
       "-Dlogback.configurationFile=logback-main.xml" :: "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" :: pekkoProperties
     })
   .dependsOn(core % "compile->compile;test->test")
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val docs = project
   .in(file("docs"))
