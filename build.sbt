@@ -105,7 +105,7 @@ lazy val migration = (project in file("migration"))
 
 lazy val docs = project
   .in(file("docs"))
-  .enablePlugins(AkkaParadoxPlugin, ParadoxSitePlugin, PublishRsyncPlugin)
+  .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, PublishRsyncPlugin)
   .dependsOn(core, projection, migration)
   .settings(common)
   .settings(MetaInfLicenseNoticeCopy.settings)
@@ -115,6 +115,7 @@ lazy val docs = project
     libraryDependencies ++= Dependencies.docs,
     previewPath := (Paradox / siteSubdirName).value,
     Paradox / siteSubdirName := s"docs/akka-persistence-r2dbc/${projectInfoVersion.value}",
+    pekkoParadoxGithub := Some("https://github.com/apache/incubator-pekko-persistence-r2dbc"),
     paradoxGroups := Map("Language" -> Seq("Java", "Scala")),
     Compile / paradoxProperties ++= Map(
       "project.url" -> "https://doc.akka.io/docs/akka-persistence-r2dbc/current/",
@@ -123,11 +124,11 @@ lazy val docs = project
       "scala.version" -> scalaVersion.value,
       "scala.binary.version" -> scalaBinaryVersion.value,
       "extref.pekko.base_url" -> s"https://doc.akka.io/docs/akka/${Dependencies.PekkoVersionInDocs}/%s",
-      "extref.pekko-docs.base_url" -> s"https://doc.akka.io/docs/akka/${Dependencies.PekkoVersionInDocs}/%s",
-      "extref.pekko-projection.base_url" -> s"https://doc.akka.io/docs/akka-projection/${Dependencies.PekkoProjectionVersionInDocs}/%s",
+      "extref.pekko-docs.base_url" -> s"https://pekko.apache.org/docs/pekko/${Dependencies.PekkoVersionInDocs}/%s",
+      "extref.pekko-projection.base_url" -> s"https://pekko.apache.org/docs/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}/%s",
       "extref.java-docs.base_url" -> "https://docs.oracle.com/en/java/javase/11/%s",
       "scaladoc.scala.base_url" -> s"https://www.scala-lang.org/api/current/",
-      "scaladoc.org.apache.pekko.base_url" -> s"https://doc.akka.io/api/akka/${Dependencies.PekkoVersion}",
+      "scaladoc.org.apache.pekko.base_url" -> s"https://pekko.apache.org/api/pekko/${Dependencies.PekkoVersion}",
       "scaladoc.com.typesafe.config.base_url" -> s"https://lightbend.github.io/config/latest/api/"),
     apidocRootPackage := "org.apache.pekko",
     resolvers += Resolver.jcenterRepo,
