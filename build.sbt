@@ -1,5 +1,6 @@
 ThisBuild / resolvers += "Apache Nexus Snapshots".at("https://repository.apache.org/content/repositories/snapshots/")
 ThisBuild / apacheSonatypeProjectProfile := "pekko"
+sourceDistName := "incubating-pekko-persistence-r2dbc"
 
 import sbt.Keys.parallelExecution
 
