@@ -3,7 +3,8 @@ addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.0")
 addSbtPlugin("com.lightbend.sbt" % "sbt-java-formatter" % "0.7.0")
 
 // for releasing
-addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.5.10")
+addSbtPlugin("org.mdedetrich" % "sbt-apache-sonatype" % "0.1.6")
+addSbtPlugin("com.dwijnand" % "sbt-dynver" % "4.1.1")
 
 //// docs
 // allow access to snapshots for pekko-sbt-paradox
