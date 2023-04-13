@@ -8,7 +8,7 @@ on:
 jobs:
   publish:
     # runs on main repo only
-    if: github.repository == 'apache/incubator-pekko-persistence-r2dbc
+    if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     name: Publish
     runs-on: ubuntu-20.04
     env:
