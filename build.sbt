@@ -1,4 +1,4 @@
-ThisBuild / resolvers += "Apache Nexus Snapshots".at("https://repository.apache.org/content/repositories/snapshots/")
+ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
 ThisBuild / apacheSonatypeProjectProfile := "pekko"
 sourceDistName := "incubating-pekko-persistence-r2dbc"
 
@@ -23,7 +23,7 @@ inThisBuild(
     // add snapshot repo when Pekko version overridden
     resolvers ++=
       (if (System.getProperty("override.pekko.version") != null)
-         Seq("Apache Nexus Snapshots".at("https://repository.apache.org/content/repositories/snapshots/"))
+         Seq(Resolver.ApacheMavenSnapshotsRepo)
        else Seq.empty)))
 
 lazy val dontPublish = Seq(publish / skip := true, Compile / publishArtifact := false)
