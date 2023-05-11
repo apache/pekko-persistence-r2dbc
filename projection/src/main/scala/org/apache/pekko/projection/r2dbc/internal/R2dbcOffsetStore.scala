@@ -271,9 +271,9 @@ private[projection] class R2dbcOffsetStore(
       case timestampQuery: EventTimestampQuery =>
         timestampQuery.timestampOf(persistenceId, sequenceNr)
       case timestampQuery: pekko.persistence.query.typed.javadsl.EventTimestampQuery =>
-        import scala.compat.java8.FutureConverters._
-        import scala.compat.java8.OptionConverters._
-        timestampQuery.timestampOf(persistenceId, sequenceNr).toScala.map(_.asScala)
+        import pekko.util.FutureConverters._
+        import pekko.util.OptionConverters._
+        timestampQuery.timestampOf(persistenceId, sequenceNr).asScala.map(_.toScala)
       case _ =>
         throw new IllegalArgumentException(
           s"Expected BySlicesSourceProvider to implement EventTimestampQuery when TimestampOffset is used.")
