@@ -18,9 +18,6 @@ import java.util
 import java.util.Optional
 import java.util.concurrent.CompletionStage
 
-import scala.compat.java8.OptionConverters._
-import scala.compat.java8.FutureConverters._
-
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.dispatch.ExecutionContexts
@@ -35,6 +32,8 @@ import pekko.persistence.query.typed.javadsl.EventsBySliceQuery
 import pekko.persistence.query.typed.javadsl.LoadEventQuery
 import pekko.persistence.r2dbc.query.scaladsl
 import pekko.stream.javadsl.Source
+import pekko.util.OptionConverters._
+import pekko.util.FutureConverters._
 
 object R2dbcReadJournal {
   val Identifier: String = scaladsl.R2dbcReadJournal.Identifier
@@ -92,12 +91,12 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
     delegate.currentPersistenceIds().asJava
 
   override def currentPersistenceIds(afterId: Optional[String], limit: Long): Source[String, NotUsed] =
-    delegate.currentPersistenceIds(afterId.asScala, limit).asJava
+    delegate.currentPersistenceIds(afterId.toScala, limit).asJava
 
   override def timestampOf(persistenceId: String, sequenceNr: Long): CompletionStage[Optional[Instant]] =
-    delegate.timestampOf(persistenceId, sequenceNr).map(_.asJava)(ExecutionContexts.parasitic).toJava
+    delegate.timestampOf(persistenceId, sequenceNr).map(_.toJava)(ExecutionContexts.parasitic).asJava
 
   override def loadEnvelope[Event](persistenceId: String, sequenceNr: Long): CompletionStage[EventEnvelope[Event]] =
-    delegate.loadEnvelope[Event](persistenceId, sequenceNr).toJava
+    delegate.loadEnvelope[Event](persistenceId, sequenceNr).asJava
 
 }

@@ -17,7 +17,6 @@ import java.util.function.BiConsumer
 
 import scala.collection.immutable
 import scala.collection.mutable
-import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -28,6 +27,7 @@ import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalStableApi
 import pekko.dispatch.ExecutionContexts
+import pekko.util.FutureConverters._
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Result
@@ -44,11 +44,11 @@ import reactor.core.publisher.Mono
 @InternalStableApi object R2dbcExecutor {
   final implicit class PublisherOps[T](val publisher: Publisher[T]) extends AnyVal {
     def asFuture(): Future[T] =
-      Mono.from(publisher).toFuture.toScala
+      Mono.from(publisher).toFuture.asScala
 
     def asFutureDone(): Future[Done] = {
       val mono: Mono[Done] = Mono.from(publisher).map(_ => Done)
-      mono.defaultIfEmpty(Done).toFuture.toScala
+      mono.defaultIfEmpty(Done).toFuture.asScala
     }
   }
 

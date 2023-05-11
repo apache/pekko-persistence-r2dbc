@@ -16,8 +16,6 @@ package org.apache.pekko.projection.r2dbc.javadsl
 import java.util.Optional
 import java.util.function.Supplier
 
-import scala.compat.java8.OptionConverters._
-
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
@@ -40,6 +38,7 @@ import pekko.projection.r2dbc.internal.R2dbcGroupedHandlerAdapter
 import pekko.projection.r2dbc.internal.R2dbcHandlerAdapter
 import pekko.projection.r2dbc.scaladsl
 import pekko.stream.javadsl.FlowWithContext
+import pekko.util.OptionConverters._
 
 @ApiMayChange
 object R2dbcProjection {
@@ -59,7 +58,7 @@ object R2dbcProjection {
     scaladsl.R2dbcProjection
       .exactlyOnce[Offset, Envelope](
         projectionId,
-        settings.asScala,
+        settings.toScala,
         adaptSourceProvider(sourceProvider),
         () => new R2dbcHandlerAdapter(handler.get()))(system)
       .asInstanceOf[ExactlyOnceProjection[Offset, Envelope]]
@@ -88,7 +87,7 @@ object R2dbcProjection {
     scaladsl.R2dbcProjection
       .atLeastOnce[Offset, Envelope](
         projectionId,
-        settings.asScala,
+        settings.toScala,
         adaptSourceProvider(sourceProvider),
         () => new R2dbcHandlerAdapter(handler.get()))(system)
       .asInstanceOf[AtLeastOnceProjection[Offset, Envelope]]
@@ -118,7 +117,7 @@ object R2dbcProjection {
     scaladsl.R2dbcProjection
       .atLeastOnceAsync[Offset, Envelope](
         projectionId,
-        settings.asScala,
+        settings.toScala,
         adaptSourceProvider(sourceProvider),
         () => HandlerAdapter(handler.get()))(system)
       .asInstanceOf[AtLeastOnceProjection[Offset, Envelope]]
@@ -142,7 +141,7 @@ object R2dbcProjection {
     scaladsl.R2dbcProjection
       .groupedWithin[Offset, Envelope](
         projectionId,
-        settings.asScala,
+        settings.toScala,
         adaptSourceProvider(sourceProvider),
         () => new R2dbcGroupedHandlerAdapter(handler.get()))(system)
       .asInstanceOf[GroupedProjection[Offset, Envelope]]
@@ -170,7 +169,7 @@ object R2dbcProjection {
     scaladsl.R2dbcProjection
       .groupedWithinAsync[Offset, Envelope](
         projectionId,
-        settings.asScala,
+        settings.toScala,
         adaptSourceProvider(sourceProvider),
         () => new GroupedHandlerAdapter(handler.get()))(system)
       .asInstanceOf[GroupedProjection[Offset, Envelope]]
@@ -206,7 +205,7 @@ object R2dbcProjection {
     scaladsl.R2dbcProjection
       .atLeastOnceFlow[Offset, Envelope](
         projectionId,
-        settings.asScala,
+        settings.toScala,
         adaptSourceProvider(sourceProvider),
         handler.asScala)(system)
       .asInstanceOf[AtLeastOnceFlowProjection[Offset, Envelope]]
