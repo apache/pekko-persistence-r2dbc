@@ -8,7 +8,7 @@
  */
 
 import com.lightbend.paradox.projectinfo.ParadoxProjectInfoPlugin.autoImport.projectInfoVersion
-import org.mdedetrich.apache.sonatype.SonatypeApachePlugin
+import org.mdedetrich.apache.sonatype.ApacheSonatypePlugin
 import sbt.Keys._
 import sbt.{ AutoPlugin, Compile, CrossVersion, Global, Test, TestFrameworks, Tests }
 import sbt.plugins.JvmPlugin
@@ -18,7 +18,7 @@ import sbtdynver.DynVerPlugin.autoImport.dynverSonatypeSnapshots
 object CommonSettings extends AutoPlugin {
   override def trigger = allRequirements
 
-  override def requires = JvmPlugin && SonatypeApachePlugin && DynVerPlugin
+  override def requires = JvmPlugin && ApacheSonatypePlugin && DynVerPlugin
 
   override lazy val projectSettings = Seq(
     crossScalaVersions := Seq(Dependencies.Scala212, Dependencies.Scala213),
