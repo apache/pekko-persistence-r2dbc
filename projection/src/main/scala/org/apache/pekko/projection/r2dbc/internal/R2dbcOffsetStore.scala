@@ -540,7 +540,7 @@ private[projection] class R2dbcOffsetStore(
     if (newInflight.size >= 10000) {
       throw new IllegalStateException(
         s"Too many envelopes in-flight [${newInflight.size}]. " +
-        "Please report this issue at https://github.com/akka/akka-persistence-r2dbc")
+        "Please report this issue at https://github.com/apache/incubator-pekko-persistence-r2dbc")
     }
     if (!inflight.compareAndSet(currentInflight, newInflight))
       cleanupInflight(newState) // CAS retry, concurrent update of inflight
@@ -701,7 +701,7 @@ private[projection] class R2dbcOffsetStore(
             new IllegalStateException(
               s"Rejected envelope from backtracking, persistenceId [$pid], seqNr [$seqNr] " +
               "due to unexpected sequence number. " +
-              "Please report this issue at https://github.com/akka/akka-persistence-r2dbc"))
+              "Please report this issue at https://github.com/apache/incubator-pekko-persistence-r2dbc"))
         }
       } else if (seqNr == 1) {
         // always accept first event if no other event for that pid has been seen
@@ -732,7 +732,7 @@ private[projection] class R2dbcOffsetStore(
               throw new IllegalStateException(
                 s"Rejected envelope from backtracking, persistenceId [$pid], seqNr [$seqNr], " +
                 "due to unknown sequence number. " +
-                "Please report this issue at https://github.com/akka/akka-persistence-r2dbc")
+                "Please report this issue at https://github.com/apache/incubator-pekko-persistence-r2dbc")
             }
           case None =>
             // previous not found, could have been deleted
