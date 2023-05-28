@@ -1,5 +1,6 @@
 ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
 ThisBuild / apacheSonatypeProjectProfile := "pekko"
+ThisBuild / versionScheme := Some("semver-spec")
 sourceDistName := "incubating-pekko-persistence-r2dbc"
 
 import sbt.Keys.parallelExecution
