@@ -8,7 +8,10 @@ github:
     - pekko-persistence
     - r2dbc
     - journal
-  
+
+  protected_tags:
+    - "v*.*.*"
+
   features:
     # Enable wiki for documentation
     wiki: false
