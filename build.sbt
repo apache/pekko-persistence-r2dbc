@@ -1,4 +1,7 @@
+// TODO: Remove when Pekko has a proper release
 ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
+ThisBuild / updateOptions := updateOptions.value.withLatestSnapshots(false)
+
 ThisBuild / apacheSonatypeProjectProfile := "pekko"
 ThisBuild / versionScheme := Some(VersionScheme.SemVerSpec)
 sourceDistName := "incubating-pekko-persistence-r2dbc"
