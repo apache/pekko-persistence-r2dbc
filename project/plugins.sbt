@@ -1,10 +1,10 @@
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.6.5") // for maintenance of copyright file header
+addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.9.0") // for maintenance of copyright file header
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.0")
 addSbtPlugin("com.lightbend.sbt" % "sbt-java-formatter" % "0.7.0")
 addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 
 // for releasing
-addSbtPlugin("org.mdedetrich" % "sbt-apache-sonatype" % "0.1.9")
+addSbtPlugin("org.mdedetrich" % "sbt-apache-sonatype" % "0.1.10")
 addSbtPlugin("com.dwijnand" % "sbt-dynver" % "4.1.1")
 addSbtPlugin("com.github.pjfanning" % "sbt-source-dist" % "0.1.5")
 
