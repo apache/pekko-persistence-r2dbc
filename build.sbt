@@ -13,7 +13,8 @@ ThisBuild / updateOptions := updateOptions.value.withLatestSnapshots(false)
 
 ThisBuild / apacheSonatypeProjectProfile := "pekko"
 ThisBuild / versionScheme := Some(VersionScheme.SemVerSpec)
-sourceDistName := "incubating-pekko-persistence-r2dbc"
+sourceDistName := "apache-pekko-persistence-r2dbc"
+sourceDistIncubating := true
 
 import sbt.Keys.parallelExecution
 
@@ -26,7 +27,7 @@ inThisBuild(
       ScmInfo(
         url("https://github.com/apache/incubator-pekko-persistence-r2dbc"),
         "https://github.com/apache/incubator-pekko-persistence-r2dbc.git")),
-    startYear := Some(2021),
+    startYear := Some(2022),
     developers += Developer(
       "contributors",
       "Contributors",
