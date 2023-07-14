@@ -34,6 +34,7 @@ inThisBuild(
       "dev@pekko.apache.org",
       url("https://github.com/apache/incubator-pekko-persistence-r2dbc/graphs/contributors")),
     description := "An Apache Pekko Persistence backed by SQL database with R2DBC",
+    enablePlugins(ReproducibleBuildsPlugin),
     // add snapshot repo when Pekko version overridden
     resolvers ++=
       (if (System.getProperty("override.pekko.version") != null)
