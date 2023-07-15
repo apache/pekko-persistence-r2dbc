@@ -51,13 +51,16 @@ lazy val root = (project in file("."))
 def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.getAbsolutePath.endsWith(suffix))
 
 lazy val core = (project in file("core"))
+  .enablePlugins(ReproducibleBuildsPlugin)
   .settings(name := "pekko-persistence-r2dbc", libraryDependencies ++= Dependencies.core)
 
 lazy val projection = (project in file("projection"))
   .dependsOn(core)
+  .enablePlugins(ReproducibleBuildsPlugin)
   .settings(name := "pekko-projection-r2dbc", libraryDependencies ++= Dependencies.projection)
 
 lazy val migration = (project in file("migration"))
+  .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-persistence-r2dbc-migration",
     libraryDependencies ++= Dependencies.migration,
