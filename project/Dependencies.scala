@@ -16,9 +16,10 @@ import sbt._
 object Dependencies {
   val Scala212 = "2.12.18"
   val Scala213 = "2.13.11"
-  val PekkoVersion = System.getProperty("override.pekko.version", "0.0.0+26656-898c6970-SNAPSHOT")
+  val PekkoVersion = System.getProperty("override.pekko.version", "1.0.0")
   val PekkoVersionInDocs = "current"
-  val PekkoProjectionVersion = "0.0.0+32-a55714ec-SNAPSHOT"
+  val PekkoPersistenceJdbcVersion = "0.0.0+993-1f987f87-SNAPSHOT"
+  val PekkoProjectionVersion = "0.0.0+60-7f13444a-SNAPSHOT"
   val PekkoProjectionVersionInDocs = "current"
 
   object Compile {
@@ -88,7 +89,7 @@ object Dependencies {
 
   val migration =
     Seq(
-      "org.apache.pekko" %% "pekko-persistence-jdbc" % "0.0.0+966-e6f717eb-SNAPSHOT" % Test,
+      "org.apache.pekko" %% "pekko-persistence-jdbc" % PekkoPersistenceJdbcVersion % Test,
       TestDeps.postgresql,
       TestDeps.logback,
       TestDeps.scalaTest)
