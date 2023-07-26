@@ -16,6 +16,12 @@ ThisBuild / versionScheme := Some(VersionScheme.SemVerSpec)
 sourceDistName := "apache-pekko-persistence-r2dbc"
 sourceDistIncubating := true
 
+commands := commands.value.filterNot { command =>
+  command.nameOption.exists { name =>
+    name.contains("sonatypeRelease") || name.contains("sonatypeBundleRelease")
+  }
+}
+
 import sbt.Keys.parallelExecution
 
 GlobalScope / parallelExecution := false
