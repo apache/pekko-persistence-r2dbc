@@ -7,6 +7,9 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
+import net.bzzt.reproduciblebuilds.ReproducibleBuildsPlugin.reproducibleBuildsCheckResolver
+import sbt.Keys.parallelExecution
+
 // TODO: Remove when Pekko has a proper release
 ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
 ThisBuild / updateOptions := updateOptions.value.withLatestSnapshots(false)
@@ -22,7 +25,8 @@ commands := commands.value.filterNot { command =>
   }
 }
 
-import sbt.Keys.parallelExecution
+ThisBuild / reproducibleBuildsCheckResolver :=
+  "Apache Pekko Staging".at("https://repository.apache.org/content/groups/staging/")
 
 GlobalScope / parallelExecution := false
 Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)

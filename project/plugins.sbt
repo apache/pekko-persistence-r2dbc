@@ -15,8 +15,8 @@ addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 // for releasing
 addSbtPlugin("org.mdedetrich" % "sbt-apache-sonatype" % "0.1.10")
 addSbtPlugin("com.dwijnand" % "sbt-dynver" % "4.1.1")
-addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.30")
-addSbtPlugin("com.github.pjfanning" % "sbt-source-dist" % "0.1.8")
+addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.31")
+addSbtPlugin("com.github.pjfanning" % "sbt-source-dist" % "0.1.10")
 
 //// docs
 // allow access to snapshots for pekko-sbt-paradox
