@@ -9,7 +9,7 @@ on:
 
 jobs:
   compile:
-    name: Test and compile
+    name: Test and compile (scala 2.12/2.13)
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -35,6 +35,30 @@ jobs:
 
       - name: Compile and test for JDK ${{ matrix.JAVA_VERSION }}, Scala ${{ matrix.SCALA_VERSION }}
         run: sbt ++${{ matrix.SCALA_VERSION }} test:compile
+
+  compile3:
+    name: Test and compile (scala 3)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 8
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@v6
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Compile
+        run: sbt ++3.3.0 core/Test/compile
 
   test-postgres:
     name: Run test with Postgres
@@ -77,6 +101,44 @@ jobs:
 
       - name: test
         run: sbt ++${{ matrix.SCALA_VERSION }} test
+
+  test-postgres-scala3:
+    name: Run test with Postgres (Scala 3)
+    runs-on: ubuntu-latest
+    if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Checkout GitHub merge
+        if: github.event.pull_request
+        run: |-
+          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
+          git checkout scratch
+
+      - name: Setup Java 8
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@v6.4.0
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Start DB
+        run: |-
+          docker-compose -f docker/docker-compose-postgres.yml up -d
+          # TODO: could we poll the port instead of sleep?
+          sleep 10
+          docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
+
+      - name: test
+        run: sbt ++3.3.0 core/test
 
   test-yugabyte:
     name: Run tests with Yugabyte

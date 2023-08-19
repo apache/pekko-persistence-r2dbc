@@ -57,7 +57,7 @@ class CurrentPersistenceIdsQuerySpec
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
-    val probe = createTestProbe[Done]
+    val probe = createTestProbe[Done]()
     pids.foreach { pid =>
       val persister = spawn(TestActors.Persister(pid))
       persister ! Persister.PersistWithAck("e-1", probe.ref)
