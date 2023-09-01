@@ -58,7 +58,7 @@ jobs:
         run: cp .jvmopts-ci .jvmopts
 
       - name: Compile
-        run: sbt ++3.3.0 core/Test/compile
+        run: sbt ++3.3 core/Test/compile
 
   test-postgres:
     name: Run test with Postgres
@@ -138,7 +138,7 @@ jobs:
           docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
-        run: sbt ++3.3.0 core/test
+        run: sbt ++3.3 core/test
 
   test-yugabyte:
     name: Run tests with Yugabyte
