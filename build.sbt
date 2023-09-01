@@ -62,12 +62,17 @@ def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.g
 
 lazy val core = (project in file("core"))
   .enablePlugins(ReproducibleBuildsPlugin)
-  .settings(name := "pekko-persistence-r2dbc", libraryDependencies ++= Dependencies.core)
+  .settings(
+    name := "pekko-persistence-r2dbc",
+    crossScalaVersions += Dependencies.Scala3,
+    libraryDependencies ++= Dependencies.core)
 
 lazy val projection = (project in file("projection"))
   .dependsOn(core)
   .enablePlugins(ReproducibleBuildsPlugin)
-  .settings(name := "pekko-projection-r2dbc", libraryDependencies ++= Dependencies.projection)
+  .settings(
+    name := "pekko-projection-r2dbc",
+    libraryDependencies ++= Dependencies.projection)
 
 lazy val migration = (project in file("migration"))
   .enablePlugins(ReproducibleBuildsPlugin)

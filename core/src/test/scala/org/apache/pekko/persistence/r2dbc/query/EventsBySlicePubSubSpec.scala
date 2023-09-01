@@ -67,11 +67,11 @@ class EventsBySlicePubSubSpec
   private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
 
   private class Setup {
-    val entityType = nextEntityType()
-    val persistenceId = nextPid(entityType)
+    val setupEntityType = nextEntityType()
+    val persistenceId = nextPid(setupEntityType)
     val slice = query.sliceForPersistenceId(persistenceId)
     val persister = spawn(TestActors.Persister(persistenceId))
-    val probe = createTestProbe[Done]
+    val probe = createTestProbe[Done]()
     val sinkProbe = TestSink.probe[EventEnvelope[String]](system.classicSystem)
   }
 
@@ -101,11 +101,11 @@ class EventsBySlicePubSubSpec
     "publish new events" in new Setup {
 
       val result: TestSubscriber.Probe[EventEnvelope[String]] =
-        query.eventsBySlices[String](entityType, slice, slice, NoOffset).runWith(sinkProbe).request(10)
+        query.eventsBySlices[String](setupEntityType, slice, slice, NoOffset).runWith(sinkProbe).request(10)
 
       val topicStatsProbe = createTestProbe[TopicImpl.TopicStats]()
       eventually {
-        PubSub(typedSystem).eventTopic[String](entityType, slice) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
+        PubSub(typedSystem).eventTopic[String](setupEntityType, slice) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
         topicStatsProbe.receiveMessage().localSubscriberCount shouldBe 1
       }
 

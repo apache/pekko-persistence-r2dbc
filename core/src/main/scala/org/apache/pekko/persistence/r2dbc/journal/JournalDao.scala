@@ -65,7 +65,7 @@ private[r2dbc] object JournalDao {
       case metaPayload =>
         Some(
           SerializedEventMetadata(
-            serId = row.get("meta_ser_id", classOf[Integer]),
+            serId = row.get[Integer]("meta_ser_id", classOf[Integer]),
             serManifest = row.get("meta_ser_manifest", classOf[String]),
             metaPayload))
     }
@@ -243,7 +243,7 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
             .bind(0, persistenceId)
             .bind(1, fromSequenceNr),
         row => {
-          val seqNr = row.get(0, classOf[java.lang.Long])
+          val seqNr = row.get[java.lang.Long](0, classOf[java.lang.Long])
           if (seqNr eq null) 0L else seqNr.longValue
         })
       .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContexts.parasitic)

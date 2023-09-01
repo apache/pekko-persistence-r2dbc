@@ -178,11 +178,11 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
       row =>
         SerializedStateRow(
           persistenceId = persistenceId,
-          revision = row.get("revision", classOf[java.lang.Long]),
+          revision = row.get[java.lang.Long]("revision", classOf[java.lang.Long]),
           dbTimestamp = row.get("db_timestamp", classOf[Instant]),
           readDbTimestamp = Instant.EPOCH, // not needed here
           payload = row.get("state_payload", classOf[Array[Byte]]),
-          serId = row.get("state_ser_id", classOf[Integer]),
+          serId = row.get[Integer]("state_ser_id", classOf[Integer]),
           serManifest = row.get("state_ser_manifest", classOf[String]),
           tags = Set.empty // tags not fetched in queries (yet)
         ))
@@ -325,7 +325,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
         if (backtracking)
           SerializedStateRow(
             persistenceId = row.get("persistence_id", classOf[String]),
-            revision = row.get("revision", classOf[java.lang.Long]),
+            revision = row.get[java.lang.Long]("revision", classOf[java.lang.Long]),
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             payload = null, // lazy loaded for backtracking
@@ -336,11 +336,11 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
         else
           SerializedStateRow(
             persistenceId = row.get("persistence_id", classOf[String]),
-            revision = row.get("revision", classOf[java.lang.Long]),
+            revision = row.get[java.lang.Long]("revision", classOf[java.lang.Long]),
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             payload = row.get("state_payload", classOf[Array[Byte]]),
-            serId = row.get("state_ser_id", classOf[Integer]),
+            serId = row.get[Integer]("state_ser_id", classOf[Integer]),
             serManifest = row.get("state_ser_manifest", classOf[String]),
             tags = Set.empty // tags not fetched in queries (yet)
           ))
@@ -409,8 +409,8 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
           .bind(2, toTimestamp)
           .bind(3, limit),
       row => {
-        val bucketStartEpochSeconds = row.get("bucket", classOf[java.lang.Long]).toLong * 10
-        val count = row.get("count", classOf[java.lang.Long]).toLong
+        val bucketStartEpochSeconds = row.get[java.lang.Long]("bucket", classOf[java.lang.Long]) * 10
+        val count = row.get[java.lang.Long]("count", classOf[java.lang.Long])
         Bucket(bucketStartEpochSeconds, count)
       })
 

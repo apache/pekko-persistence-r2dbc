@@ -81,13 +81,13 @@ class PersistTimestampSpec
               val event = serialization
                 .deserialize(
                   row.get("event_payload", classOf[Array[Byte]]),
-                  row.get("event_ser_id", classOf[Integer]),
+                  row.get[Integer]("event_ser_id", classOf[Integer]),
                   row.get("event_ser_manifest", classOf[String]))
                 .get
                 .asInstanceOf[String]
               Row(
                 pid = row.get("persistence_id", classOf[String]),
-                seqNr = row.get("seq_nr", classOf[java.lang.Long]),
+                seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
                 dbTimestamp = row.get("db_timestamp", classOf[Instant]),
                 event)
             })
