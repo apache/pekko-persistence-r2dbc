@@ -19,8 +19,8 @@ object Dependencies {
   val Scala3 = "3.3.0"
   val PekkoVersion = System.getProperty("override.pekko.version", "1.0.1")
   val PekkoVersionInDocs = "current"
-  val PekkoPersistenceJdbcVersion = "0.0.0+998-6a9e5841-SNAPSHOT"
-  val PekkoProjectionVersion = "0.0.0+69-a10738b0-SNAPSHOT"
+  val PekkoPersistenceJdbcVersion = "1.0.0"
+  val PekkoProjectionVersion = "0.0.0+75-1d3f6fab-SNAPSHOT"
   val PekkoProjectionVersionInDocs = "current"
 
   object Compile {
