@@ -363,7 +363,7 @@ private[projection] class R2dbcOffsetStore(
         row => {
           val offsetStr = row.get("current_offset", classOf[String])
           val manifest = row.get("manifest", classOf[String])
-          val mergeable = row.get("mergeable", classOf[java.lang.Boolean])
+          val mergeable = row.get[java.lang.Boolean]("mergeable", classOf[java.lang.Boolean])
           val key = row.get("projection_key", classOf[String])
 
           val adaptedProjectionId = ProjectionId(projectionId.name, key)
@@ -966,7 +966,7 @@ private[projection] class R2dbcOffsetStore(
     r2dbcExecutor
       .selectOne("read management state")(
         conn => createStatement(conn),
-        row => ManagementState(row.get("paused", classOf[java.lang.Boolean])))
+        row => ManagementState(row.get[java.lang.Boolean]("paused", classOf[java.lang.Boolean])))
   }
 
   def savePaused(paused: Boolean): Future[Done] = {
