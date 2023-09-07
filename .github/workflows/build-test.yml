@@ -17,9 +17,10 @@ jobs:
         JAVA_VERSION: [ 8, 11, 17 ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Java ${{ matrix.JAVA_VERSION }}
         uses: actions/setup-java@v3
@@ -41,9 +42,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Java 8
         uses: actions/setup-java@v3
@@ -70,9 +72,10 @@ jobs:
     if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Checkout GitHub merge
         if: github.event.pull_request
@@ -108,9 +111,10 @@ jobs:
     if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Checkout GitHub merge
         if: github.event.pull_request
@@ -150,9 +154,10 @@ jobs:
     if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Checkout GitHub merge
         if: github.event.pull_request
@@ -188,9 +193,10 @@ jobs:
     if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Checkout GitHub merge
         if: github.event.pull_request
