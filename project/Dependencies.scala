@@ -33,7 +33,15 @@ object Dependencies {
 
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "0.9.1.RELEASE"
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "0.9.2.RELEASE"
-    val r2dbcPostgres = "org.postgresql" % "r2dbc-postgresql" % "0.9.3.RELEASE"
+
+    // This is here because sbt's ivy resolver doesn't properly support packaging.type when
+    // resolving via sbt-license-report, see https://github.com/sbt/sbt-license-report/issues/87
+    val r2dbcPostgres = Seq(
+      ("org.postgresql" % "r2dbc-postgresql" % "0.9.3.RELEASE").excludeAll(
+        "io.netty.incubator", "netty-incubator-codec-native-quic"),
+      ("io.netty.incubator" % "netty-incubator-codec-native-quic" % "0.0.33.Final")
+        .artifacts(Artifact("netty-incubator-codec-native-quic",
+          url("https://repo1.maven.org/maven2/io/netty/incubator/netty-incubator-codec-native-quic/0.0.33.Final/netty-incubator-codec-native-quic-0.0.33.Final.jar"))))
   }
 
   object TestDeps {
@@ -52,10 +60,10 @@ object Dependencies {
 
     val postgresql = "org.postgresql" % "postgresql" % "42.3.8" % Test
 
-    val logback = "ch.qos.logback" % "logback-classic" % "1.2.11" % Test // EPL 1.0 / LGPL 2.1
-    val scalaTest = "org.scalatest" %% "scalatest" % "3.2.14" % Test // ApacheV2
-    val junit = "junit" % "junit" % "4.12" % Test // Eclipse Public License 1.0
-    val junitInterface = "com.novocode" % "junit-interface" % "0.11" % Test // "BSD 2-Clause"
+    val logback = "ch.qos.logback" % "logback-classic" % "1.2.11" % Test
+    val scalaTest = "org.scalatest" %% "scalatest" % "3.2.14" % Test
+    val junit = "junit" % "junit" % "4.12" % Test
+    val junitInterface = "com.novocode" % "junit-interface" % "0.11" % Test
   }
 
   import Compile._
@@ -65,19 +73,17 @@ object Dependencies {
     pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
-    r2dbcPostgres,
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoTestkit,
     TestDeps.pekkoJackson,
     TestDeps.logback,
-    TestDeps.scalaTest)
+    TestDeps.scalaTest) ++ r2dbcPostgres
 
   val projection = Seq(
     pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
-    r2dbcPostgres,
     pekkoProjectionCore,
     TestDeps.pekkoProjectionEventSourced,
     TestDeps.pekkoProjectionDurableState,
@@ -86,7 +92,7 @@ object Dependencies {
     TestDeps.pekkoProjectionTestKit,
     TestDeps.pekkoJackson,
     TestDeps.logback,
-    TestDeps.scalaTest)
+    TestDeps.scalaTest) ++ r2dbcPostgres
 
   val migration =
     Seq(

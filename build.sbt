@@ -110,4 +110,11 @@ lazy val docs = project
       "scaladoc.scala.base_url" -> s"https://www.scala-lang.org/api/current/",
       "scaladoc.org.apache.pekko.base_url" -> s"https://pekko.apache.org/api/pekko/${Dependencies.PekkoVersion}",
       "scaladoc.com.typesafe.config.base_url" -> s"https://lightbend.github.io/config/latest/api/"),
-    apidocRootPackage := "org.apache.pekko")
+    apidocRootPackage := "org.apache.pekko",
+    Compile / paradoxMarkdownToHtml / sourceGenerators += Def.taskDyn {
+      val targetFile = (Compile / paradox / sourceManaged).value / "license-report.md"
+
+      (LocalRootProject / dumpLicenseReportAggregate).map { dir =>
+        IO.copy(List(dir / "pekko-persistence-r2dbc-root-licenses.md" -> targetFile)).toList
+      }
+    }.taskValue)
