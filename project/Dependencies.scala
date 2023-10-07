@@ -20,7 +20,7 @@ object Dependencies {
   val PekkoVersion = System.getProperty("override.pekko.version", "1.0.1")
   val PekkoVersionInDocs = "current"
   val PekkoPersistenceJdbcVersion = "1.0.0"
-  val PekkoProjectionVersion = "0.0.0+75-1d3f6fab-SNAPSHOT"
+  val PekkoProjectionVersion = "0.0.0+80-269ab0a7-SNAPSHOT"
   val PekkoProjectionVersionInDocs = "current"
 
   object Compile {
