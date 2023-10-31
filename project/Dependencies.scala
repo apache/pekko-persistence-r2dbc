@@ -17,11 +17,11 @@ object Dependencies {
   val Scala212 = "2.12.18"
   val Scala213 = "2.13.11"
   val Scala3 = "3.3.0"
-  val PekkoVersion = System.getProperty("override.pekko.version", "1.0.1")
-  val PekkoVersionInDocs = "current"
+  val PekkoVersion = System.getProperty("override.pekko.version", "1.0.0")
+  val PekkoVersionInDocs = "1.0.0"
   val PekkoPersistenceJdbcVersion = "1.0.0"
-  val PekkoProjectionVersion = "0.0.0+80-269ab0a7-SNAPSHOT"
-  val PekkoProjectionVersionInDocs = "current"
+  val PekkoProjectionVersion = "1.0.0"
+  val PekkoProjectionVersionInDocs = "1.0.0"
 
   object Compile {
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
