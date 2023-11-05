@@ -107,7 +107,11 @@ lazy val docs = project
       "extref.pekko-projection.base_url" -> s"https://pekko.apache.org/docs/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}/%s",
       "extref.java-docs.base_url" -> "https://docs.oracle.com/en/java/javase/11/%s",
       "scaladoc.scala.base_url" -> s"https://www.scala-lang.org/api/current/",
-      "scaladoc.org.apache.pekko.base_url" -> s"https://pekko.apache.org/api/pekko/${Dependencies.PekkoVersion}",
+      "scaladoc.org.apache.pekko.persistence.r2dbc.base_url" ->
+        s"https://pekko.apache.org/api/pekko-persistence-r2dbc/${Dependencies.PekkoPersistenceR2dbcVersionInDocs}",
+      "scaladoc.org.apache.pekko.projection.base_url" ->
+        s"https://pekko.apache.org/api/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}",
+      "scaladoc.org.apache.pekko.base_url" -> s"https://pekko.apache.org/api/pekko/${Dependencies.PekkoVersionInDocs}",
       "scaladoc.com.typesafe.config.base_url" -> s"https://lightbend.github.io/config/latest/api/"),
     apidocRootPackage := "org.apache.pekko",
     Compile / paradoxMarkdownToHtml / sourceGenerators += Def.taskDyn {
