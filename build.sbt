@@ -109,6 +109,8 @@ lazy val docs = project
       "scaladoc.scala.base_url" -> s"https://www.scala-lang.org/api/current/",
       "scaladoc.org.apache.pekko.persistence.r2dbc.base_url" ->
       s"https://pekko.apache.org/api/pekko-persistence-r2dbc/${Dependencies.PekkoPersistenceR2dbcVersionInDocs}",
+      "scaladoc.org.apache.pekko.projection.r2dbc.base_url" ->
+      s"https://pekko.apache.org/api/pekko-persistence-r2dbc/${Dependencies.PekkoPersistenceR2dbcVersionInDocs}",
       "scaladoc.org.apache.pekko.projection.base_url" ->
       s"https://pekko.apache.org/api/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}",
       "scaladoc.org.apache.pekko.base_url" -> s"https://pekko.apache.org/api/pekko/${Dependencies.PekkoVersionInDocs}",
