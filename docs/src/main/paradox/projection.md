@@ -206,7 +206,7 @@ Same type of handlers can be used with `R2dbcProjection` instead of `CassandraPr
 ### Actor handler
 
 A good alternative for advanced state management is to implement the handler as an 
-@extref:[actor](pekko:typed/typed/actors.html) which is described in 
+@extref:[actor](pekko:typed/actors.html) which is described in 
 @extref:[Processing with Actor](pekko-projection:actor.html).
 
 ### Flow handler
@@ -228,7 +228,7 @@ The supported offset types of the `R2dbcProjection` are:
 
 * @apidoc[pekko.persistence.query.TimestampOffset] that is used for @extref:[SourceProvider for eventsBySlices](pekko-projection:eventsourced.html#sourceprovider-for-eventsbyslices) and @extref:[SourceProvider for changesBySlices](pekko-projection:durable-state.html#sourceprovider-for-changesbyslices)
 * other @apidoc[pekko.persistence.query.Offset] types
-* @apidoc[MergeableOffset] that is used for @extref:[messages from Kafka](pekko-projection:kafka.md#mergeable-offset)
+* @apidoc[MergeableOffset] that is used for @extref:[messages from Kafka](pekko-projection:kafka.html#mergeable-offset)
 * `String`
 * `Int`
 * `Long`
