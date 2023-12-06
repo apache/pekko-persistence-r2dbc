@@ -39,7 +39,7 @@ The table below shows `pekko-projection-r2dbc`'s direct dependencies, and the se
 
 ## Schema
 
-The `pekko_projection_offset_store`, `pekko_projection_timestamp_offset_store` and `pekko_projection_management` tables
+The `projection_offset_store`, `projection_timestamp_offset_store` and `projection_management` tables
 need to be created in the configured database, see schema definition in @ref:[Creating the schema](getting-started.md#schema).
 
 ## Configuration
