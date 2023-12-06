@@ -8,6 +8,10 @@ The `event_journal` table and `event_journal_slice_idx` index need to be created
 
 The `event_journal_slice_idx` index is only needed if the slice based @ref:[queries](query.md) are used.
 
+## Relation to Pekko JDBC plugin
+
+Pekko Persistence R2DBC plugin tables are not compatible with the tables of Pekko Persistence JDBC. JDBC data must be migrated using the @ref:[migration tool](migration.md) and a different schema/database must be used (or the table names overridden). 
+
 ## Configuration
 
 To enable the journal plugin to be used by default, add the following line to your Pekko `application.conf`:
