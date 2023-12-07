@@ -17,6 +17,7 @@ The Pekko Persistence R2DBC plugin allows for using SQL database with R2DBC as a
 * [Projection](projection.md)
 * [Migration tool](migration.md)
 * [Contributing](contributing.md)
+* [Release Notes](release-notes.md)
 
 @@@
 

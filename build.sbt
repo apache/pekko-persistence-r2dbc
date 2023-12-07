@@ -10,10 +10,6 @@
 import net.bzzt.reproduciblebuilds.ReproducibleBuildsPlugin.reproducibleBuildsCheckResolver
 import sbt.Keys.parallelExecution
 
-// TODO: Remove when Pekko-Connectors has a proper release
-ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
-ThisBuild / updateOptions := updateOptions.value.withLatestSnapshots(false)
-
 ThisBuild / apacheSonatypeProjectProfile := "pekko"
 ThisBuild / versionScheme := Some(VersionScheme.SemVerSpec)
 sourceDistName := "apache-pekko-persistence-r2dbc"
