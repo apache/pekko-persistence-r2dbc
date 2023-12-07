@@ -1,6 +1,7 @@
 # Release Notes
 
 ## 1.0.0
+
 Apache Pekko Persistence R2DBC 1.0.0 is based on Akka Persistence R2DBC 0.7.7. Pekko came about as a result of Lightbend's
 decision to make future Akka releases under a [Business Software License](https://www.lightbend.com/blog/why-we-are-changing-the-license-for-akka),
 a license that is not compatible with Open Source usage.
