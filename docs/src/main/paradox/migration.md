@@ -1,4 +1,4 @@
-# Migration tool
+# Migration Tool
 
 There is a migration tool that is useful if you would like to migrate from another Pekko Persistence plugin
 to the R2DBC plugin. It has been tested with Pekko Persistence JDBC as source plugin, but it should work with
