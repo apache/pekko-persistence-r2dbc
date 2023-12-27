@@ -9,7 +9,7 @@ Version 1.0.0 has been released. Any contributions are welcome. Please observe t
 
 ## Documentation
 
-* [Current Apache Pekko PersistenceR2JDBC documentation](https://pekko.apache.org/docs/pekko-persistence-r2dbc/current/)
+* [Current Apache Pekko Persistence R2DBC documentation](https://pekko.apache.org/docs/pekko-persistence-r2dbc/current/)
 
 ## Community
 
