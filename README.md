@@ -5,7 +5,7 @@ store for SQL databases with RD2BC connectivity.
 
 ## Project status
 
-Version 1.0.0 has been released. Code contributions are welcome. Please observe the [Code of Conduct](https://github.com/apache/incubator-pekko-persistence-r2dbc?tab=coc-ov-file#readme).
+Version 1.0.0 has been released. Any contributions are welcome. Please observe the [Code of Conduct](https://github.com/apache/incubator-pekko-persistence-r2dbc?tab=coc-ov-file#readme).
 
 ## Documentation
 
