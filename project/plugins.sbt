@@ -7,15 +7,15 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.9.0") // for maintenance of copyright file header
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.0")
+addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.10.0") // for maintenance of copyright file header
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.2")
 addSbtPlugin("com.lightbend.sbt" % "sbt-java-formatter" % "0.7.0")
 addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 
 // for releasing
-addSbtPlugin("org.mdedetrich" % "sbt-apache-sonatype" % "0.1.10")
 addSbtPlugin("com.dwijnand" % "sbt-dynver" % "4.1.1")
 addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.31")
+addSbtPlugin("com.github.pjfanning" % "sbt-pekko-build" % "0.3.2")
 addSbtPlugin("com.github.pjfanning" % "sbt-source-dist" % "0.1.11")
 addSbtPlugin("com.github.sbt" % "sbt-license-report" % "1.6.1")
 
