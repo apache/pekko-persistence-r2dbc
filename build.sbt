@@ -10,17 +10,11 @@
 import net.bzzt.reproduciblebuilds.ReproducibleBuildsPlugin.reproducibleBuildsCheckResolver
 import sbt.Keys.parallelExecution
 
-ThisBuild / apacheSonatypeProjectProfile := "pekko"
 ThisBuild / versionScheme := Some(VersionScheme.SemVerSpec)
 sourceDistName := "apache-pekko-persistence-r2dbc"
 sourceDistIncubating := true
 
-commands := commands.value.filterNot { command =>
-  command.nameOption.exists { name =>
-    name.contains("sonatypeRelease") || name.contains("sonatypeBundleRelease")
-  }
-}
-
+ThisBuild / pekkoInlineEnabled := false
 ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
 
 GlobalScope / parallelExecution := false
