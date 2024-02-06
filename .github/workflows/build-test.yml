@@ -23,7 +23,7 @@ jobs:
           fetch-tags: true
 
       - name: Setup Java ${{ matrix.JAVA_VERSION }}
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.JAVA_VERSION }}
@@ -48,7 +48,7 @@ jobs:
           fetch-tags: true
 
       - name: Setup Java 8
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 8
@@ -84,13 +84,13 @@ jobs:
           git checkout scratch
 
       - name: Setup Java ${{ matrix.JAVA_VERSION }}
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.JAVA_VERSION }}
 
       - name: Cache Coursier cache
-        uses: coursier/cache-action@v6.4.0
+        uses: coursier/cache-action@v6
 
       - name: Enable jvm-opts
         run: cp .jvmopts-ci .jvmopts
@@ -123,13 +123,13 @@ jobs:
           git checkout scratch
 
       - name: Setup Java 8
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 8
 
       - name: Cache Coursier cache
-        uses: coursier/cache-action@v6.4.0
+        uses: coursier/cache-action@v6
 
       - name: Enable jvm-opts
         run: cp .jvmopts-ci .jvmopts
@@ -166,13 +166,13 @@ jobs:
           git checkout scratch
 
       - name: Setup Java ${{ matrix.JAVA_VERSION }}
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.JAVA_VERSION }}
 
       - name: Cache Coursier cache
-        uses: coursier/cache-action@v6.4.0
+        uses: coursier/cache-action@v6
 
       - name: Enable jvm-opts
         run: cp .jvmopts-ci .jvmopts
@@ -205,13 +205,13 @@ jobs:
           git checkout scratch
 
       - name: Set up JDK 11
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 11
 
       - name: Cache Coursier cache
-        uses: coursier/cache-action@v6.4.0
+        uses: coursier/cache-action@v6
 
       - name: Enable jvm-opts
         run: cp .jvmopts-ci .jvmopts
