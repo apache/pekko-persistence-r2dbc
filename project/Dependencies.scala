@@ -34,15 +34,8 @@ object Dependencies {
 
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "1.0.0.RELEASE"
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.1.RELEASE"
-
-    // This is here because sbt's ivy resolver doesn't properly support packaging.type when
-    // resolving via sbt-license-report, see https://github.com/sbt/sbt-license-report/issues/87
     val r2dbcPostgres = Seq(
-      ("org.postgresql" % "r2dbc-postgresql" % "1.0.4.RELEASE").excludeAll(
-        "io.netty.incubator", "netty-incubator-codec-native-quic"),
-      ("io.netty.incubator" % "netty-incubator-codec-native-quic" % "0.0.33.Final")
-        .artifacts(Artifact("netty-incubator-codec-native-quic",
-          url("https://repo1.maven.org/maven2/io/netty/incubator/netty-incubator-codec-native-quic/0.0.33.Final/netty-incubator-codec-native-quic-0.0.33.Final.jar"))))
+      "org.postgresql" % "r2dbc-postgresql" % "1.0.4.RELEASE")
   }
 
   object TestDeps {
