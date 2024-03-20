@@ -129,6 +129,9 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
   private val deleteStateSql: String =
     sql"DELETE from $stateTable WHERE persistence_id = ?"
 
+  private val deleteStateWithRevisionSql: String =
+    sql"DELETE from $stateTable WHERE persistence_id = ? AND revision = ?"
+
   private val currentDbTimestampSql =
     sql"SELECT transaction_timestamp() AS db_timestamp"
 
@@ -277,6 +280,25 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
 
     if (log.isDebugEnabled())
       result.foreach(_ => log.debug("Deleted durable state for persistenceId [{}]", persistenceId))
+
+    result.map(_ => Done)(ExecutionContexts.parasitic)
+  }
+
+  /**
+   * @since 1.1.0
+   */
+  def deleteState(persistenceId: String, revision: Long): Future[Done] = {
+    val result =
+      r2dbcExecutor.updateOne(s"delete [$persistenceId, $revision]") { connection =>
+        connection
+          .createStatement(deleteStateWithRevisionSql)
+          .bind(0, persistenceId)
+          .bind(1, revision)
+      }
+
+    if (log.isDebugEnabled())
+      result.foreach(_ =>
+        log.debug("Deleted durable state for persistenceId [{}]; revision [{}]", persistenceId, revision))
 
     result.map(_ => Done)(ExecutionContexts.parasitic)
   }

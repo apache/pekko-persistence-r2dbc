@@ -115,7 +115,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
     stateDao.deleteState(persistenceId)
 
   override def deleteObject(persistenceId: String, revision: Long): Future[Done] =
-    stateDao.deleteState(persistenceId)
+    stateDao.deleteState(persistenceId, revision)
 
   override def sliceForPersistenceId(persistenceId: String): Int =
     persistenceExt.sliceForPersistenceId(persistenceId)
