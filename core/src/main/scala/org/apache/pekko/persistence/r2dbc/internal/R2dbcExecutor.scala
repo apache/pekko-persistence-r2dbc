@@ -27,7 +27,6 @@ import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalStableApi
 import pekko.dispatch.ExecutionContexts
-import pekko.util.FutureConverters._
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Result
@@ -44,11 +43,16 @@ import reactor.core.publisher.Mono
 @InternalStableApi object R2dbcExecutor {
   final implicit class PublisherOps[T](val publisher: Publisher[T]) extends AnyVal {
     def asFuture(): Future[T] =
-      Mono.from(publisher).toFuture.asScala
+      Mono.from(publisher)
+        .subscribeWith(new MonoToFuture[T])
+        .future
 
     def asFutureDone(): Future[Done] = {
-      val mono: Mono[Done] = Mono.from(publisher).map(_ => Done)
-      mono.defaultIfEmpty(Done).toFuture.asScala
+      Mono.from(publisher)
+        .map[Done](_ => Done)
+        .defaultIfEmpty(Done)
+        .subscribeWith(new MonoToFuture[Done])
+        .future
     }
   }
 
