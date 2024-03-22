@@ -8,7 +8,7 @@ These migration notes are designed for users migrating from Akka Persistence R2D
 and assume a basic level of Akka experience. Please feel free to submit an issue or a patch if you feel like the notes can be improved.
 
 One of the main differences is that the database tables used by `pekko-projection-r2dbc` have been renamed to
-remove the `akka` prefixes ([PR71](https://github.com/apache/incubator-pekko-persistence-r2dbc/pull/71)).
+remove the `akka` prefixes ([PR71](https://github.com/apache/pekko-persistence-r2dbc/pull/71)).
 
 The table names that `pekko-projection-r2dbc` expects to find can be changed using [configuration settngs](https://github.com/lightbend/config).
 

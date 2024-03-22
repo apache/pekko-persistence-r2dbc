@@ -5,7 +5,7 @@ on:
 
 jobs:
   publish-docs:
-    if: github.repository == 'apache/incubator-pekko-persistence-r2dbc'
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
     name: Publish 1.0 Docs
     runs-on: ubuntu-20.04
     env:

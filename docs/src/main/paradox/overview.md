@@ -5,7 +5,7 @@ The Pekko Persistence R2DBC plugin allows for using SQL database with R2DBC as a
 Currently, the R2DBC plugin has support for [PostgreSQL](https://www.postgresql.org) and [Yugabyte](https://www.yugabyte.com).
 It is specifically designed to work well for distributed SQL databases.
 
-[Create an issue](https://github.com/apache/incubator-pekko-persistence-r2dbc/issues) if you would like to @ref[contribute](contributing.md)
+[Create an issue](https://github.com/apache/pekko-persistence-r2dbc/issues) if you would like to @ref[contribute](contributing.md)
 support for other databases that has a [R2DBC driver](https://r2dbc.io/drivers/).
 
 @@@ warning
