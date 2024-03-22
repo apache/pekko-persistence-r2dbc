@@ -21,7 +21,7 @@ We haven't had to fix any significant bugs that were in Akka Persistence R2DBC 0
 
 ### Changes
 
-* Changed the table names in the DDL schemas to remove the akka/pekko prefixes ([PR71](https://github.com/apache/incubator-pekko-persistence-r2dbc/pull/71))
+* Changed the table names in the DDL schemas to remove the akka/pekko prefixes ([PR71](https://github.com/apache/pekko-persistence-r2dbc/pull/71))
 
 ### Additions
 
