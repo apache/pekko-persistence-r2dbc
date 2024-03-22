@@ -12,7 +12,7 @@ import sbt.Keys.parallelExecution
 
 ThisBuild / versionScheme := Some(VersionScheme.SemVerSpec)
 sourceDistName := "apache-pekko-persistence-r2dbc"
-sourceDistIncubating := true
+sourceDistIncubating := false
 
 ThisBuild / pekkoInlineEnabled := false
 ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
@@ -24,14 +24,14 @@ inThisBuild(
   Seq(
     scmInfo := Some(
       ScmInfo(
-        url("https://github.com/apache/incubator-pekko-persistence-r2dbc"),
-        "https://github.com/apache/incubator-pekko-persistence-r2dbc.git")),
+        url("https://github.com/apache/pekko-persistence-r2dbc"),
+        "https://github.com/apache/pekko-persistence-r2dbc.git")),
     startYear := Some(2022),
     developers += Developer(
       "contributors",
       "Contributors",
       "dev@pekko.apache.org",
-      url("https://github.com/apache/incubator-pekko-persistence-r2dbc/graphs/contributors")),
+      url("https://github.com/apache/pekko-persistence-r2dbc/graphs/contributors")),
     description := "An Apache Pekko Persistence implementation backed by SQL database with R2DBC",
     // add snapshot repo when Pekko version overridden
     resolvers ++=
@@ -84,7 +84,7 @@ lazy val docs = project
     libraryDependencies ++= Dependencies.docs,
     previewPath := (Paradox / siteSubdirName).value,
     Paradox / siteSubdirName := s"docs/pekko-persistence-r2dbc/${projectInfoVersion.value}",
-    pekkoParadoxGithub := Some("https://github.com/apache/incubator-pekko-persistence-r2dbc"),
+    pekkoParadoxGithub := Some("https://github.com/apache/pekko-persistence-r2dbc"),
     paradoxGroups := Map("Language" -> Seq("Java", "Scala")),
     Compile / paradoxProperties ++= Map(
       "project.url" -> "https://pekko.apache.org/docs/pekko-persistence-r2dbc/current/",

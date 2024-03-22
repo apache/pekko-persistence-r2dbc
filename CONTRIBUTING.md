@@ -77,9 +77,9 @@ docker exec -it yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1
 This is the process for committing code into main.
 
 1. For non-trivial changes, you will be asked to sign the [CLA](https://www.apache.org/licenses/contributor-agreements.html) if you have not done so before.
-2. Before starting to work on a feature or a fix, make sure that there is a ticket for your work in the [issue tracker](https://github.com/apache/incubator-pekko-persistence-r2dbc/issues). If not, create it first.
+2. Before starting to work on a feature or a fix, make sure that there is a ticket for your work in the [issue tracker](https://github.com/apache/pekko-persistence-r2dbc/issues). If not, create it first.
 3. Perform your work according to the [pull request requirements](#pull-request-requirements).
-4. When the feature or fix is completed you should open a [Pull Request](https://help.github.com/articles/using-pull-requests) on [GitHub](https://github.com/apache/incubator-pekko-persistence-r2dbc/pulls).
+4. When the feature or fix is completed you should open a [Pull Request](https://help.github.com/articles/using-pull-requests) on [GitHub](https://github.com/apache/pekko-persistence-r2dbc/pulls).
 5. The Pull Request should be reviewed by other maintainers (as many as feasible/practical). Outside contributors are encouraged to participate in the review process, it is not a closed process.
 6. After the review you should fix the issues (review comments, CI failures) by pushing a new commit for new review, iterating until the reviewers give their thumbs up and CI tests pass.
 7. If the branch merge conflicts with its target, rebase your branch onto the target branch.
