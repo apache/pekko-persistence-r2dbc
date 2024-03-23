@@ -64,7 +64,7 @@ import reactor.core.publisher.Mono
       .concatMap(_.getRowsUpdated)
       .collect(() => 0L, consumer)
       .asFuture()
-      .map(_.intValue())
+      .map(_.intValue())(ExecutionContexts.parasitic)
   }
 
   def updateInTx(statements: immutable.IndexedSeq[Statement])(implicit
