@@ -56,28 +56,27 @@ import reactor.core.publisher.Mono
     }
   }
 
-  def updateOneInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Int] =
+  def updateOneInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Long] =
     stmt.execute().asFuture().flatMap { result =>
-      result.getRowsUpdated.asFuture().map(_.intValue())(ExecutionContexts.parasitic)
+      result.getRowsUpdated.asFuture().map(_.longValue())(ExecutionContexts.parasitic)
     }
 
-  def updateBatchInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Int] = {
-    val consumer: BiConsumer[Long, java.lang.Long] = (acc, elem) => acc + elem.intValue()
+  def updateBatchInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Long] = {
+    val consumer: BiConsumer[Long, java.lang.Long] = (acc, elem) => acc + elem
     Flux
       .from[Result](stmt.execute())
       .concatMap(_.getRowsUpdated)
       .collect(() => 0L, consumer)
       .asFuture()
-      .map(_.intValue())(ExecutionContexts.parasitic)
   }
 
   def updateInTx(statements: immutable.IndexedSeq[Statement])(implicit
-      ec: ExecutionContext): Future[immutable.IndexedSeq[Int]] =
+      ec: ExecutionContext): Future[immutable.IndexedSeq[Long]] =
     // connection not intended for concurrent calls, make sure statements are executed one at a time
-    statements.foldLeft(Future.successful(immutable.IndexedSeq.empty[Int])) { (acc, stmt) =>
+    statements.foldLeft(Future.successful(immutable.IndexedSeq.empty[Long])) { (acc, stmt) =>
       acc.flatMap { seq =>
         stmt.execute().asFuture().flatMap { res =>
-          res.getRowsUpdated.asFuture().map(seq :+ _.intValue())(ExecutionContexts.parasitic)
+          res.getRowsUpdated.asFuture().map(seq :+ _.longValue())(ExecutionContexts.parasitic)
         }
       }
     }
@@ -165,7 +164,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
   /**
    * One update statement with auto commit.
    */
-  def updateOne(logPrefix: String)(statementFactory: Connection => Statement): Future[Int] =
+  def updateOne(logPrefix: String)(statementFactory: Connection => Statement): Future[Long] =
     withAutoCommitConnection(logPrefix) { connection =>
       updateOneInTx(statementFactory(connection))
     }
@@ -173,7 +172,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
   /**
    * Update statement that is constructed by several statements combined with `add()`.
    */
-  def updateInBatch(logPrefix: String)(statementFactory: Connection => Statement): Future[Int] =
+  def updateInBatch(logPrefix: String)(statementFactory: Connection => Statement): Future[Long] =
     withConnection(logPrefix) { connection =>
       updateBatchInTx(statementFactory(connection))
     }
@@ -182,7 +181,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
    * Several update statements in the same transaction.
    */
   def update(logPrefix: String)(
-      statementsFactory: Connection => immutable.IndexedSeq[Statement]): Future[immutable.IndexedSeq[Int]] =
+      statementsFactory: Connection => immutable.IndexedSeq[Statement]): Future[immutable.IndexedSeq[Long]] =
     withConnection(logPrefix) { connection =>
       updateInTx(statementsFactory(connection))
     }
