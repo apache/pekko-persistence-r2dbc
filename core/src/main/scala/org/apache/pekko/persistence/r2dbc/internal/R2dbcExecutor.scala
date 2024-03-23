@@ -62,12 +62,13 @@ import reactor.core.publisher.Mono
     }
 
   def updateBatchInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Int] = {
-    val consumer: BiConsumer[Int, Integer] = (acc, elem) => acc + elem.intValue()
+    val consumer: BiConsumer[Long, java.lang.Long] = (acc, elem) => acc + elem.intValue()
     Flux
       .from[Result](stmt.execute())
       .concatMap(_.getRowsUpdated)
-      .collect(() => 0, consumer)
+      .collect(() => 0L, consumer)
       .asFuture()
+      .map(_.intValue())(ExecutionContexts.parasitic)
   }
 
   def updateInTx(statements: immutable.IndexedSeq[Statement])(implicit

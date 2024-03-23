@@ -18,7 +18,7 @@
 import sbt._
 import sbtlicensereport.SbtLicenseReport
 import sbtlicensereport.SbtLicenseReport.autoImportImpl._
-import sbtlicensereport.license.{ DepModuleInfo, LicenseInfo, MarkDown }
+import sbtlicensereport.license.{ DepModuleInfo, MarkDown }
 
 object LicenseReport extends AutoPlugin {
 
@@ -31,11 +31,6 @@ object LicenseReport extends AutoPlugin {
     licenseDepExclusions := {
       case DepModuleInfo("org.apache.pekko", _, _) => true // Inter pekko project dependencies are pointless
       case DepModuleInfo(_, "scala-library", _)    => true // Scala library is part of Scala language
-    },
-    licenseOverrides := {
-      // This is here because of the workaround in project/plugins.sbt, i.e.
-      // https://github.com/sbt/sbt-license-report/issues/87
-      case DepModuleInfo("io.netty.incubator", "netty-incubator-codec-native-quic", _) => LicenseInfo.APACHE2
     },
     licenseReportColumns := Seq(
       Column.Category,
