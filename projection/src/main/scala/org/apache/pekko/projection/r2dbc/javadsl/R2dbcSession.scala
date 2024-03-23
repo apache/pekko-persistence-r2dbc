@@ -40,7 +40,8 @@ final class R2dbcSession(connection: Connection)(implicit ec: ExecutionContext, 
     R2dbcExecutor.updateOneInTx(statement).map(java.lang.Long.valueOf)(ExecutionContexts.parasitic).asJava
 
   def update(statements: java.util.List[Statement]): CompletionStage[java.util.List[java.lang.Long]] =
-    R2dbcExecutor.updateInTx(statements.asScala.toVector).map(results => results.map(java.lang.Long.valueOf).asJava).asJava
+    R2dbcExecutor.updateInTx(statements.asScala.toVector).map(results =>
+      results.map(java.lang.Long.valueOf).asJava).asJava
 
   def selectOne[A](statement: Statement)(mapRow: Row => A): CompletionStage[Optional[A]] =
     R2dbcExecutor.selectOneInTx(statement, mapRow).map(_.toJava)(ExecutionContexts.parasitic).asJava
