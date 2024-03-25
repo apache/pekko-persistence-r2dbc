@@ -84,6 +84,7 @@ lazy val docs = project
     Paradox / siteSubdirName := s"docs/pekko-persistence-r2dbc/${projectInfoVersion.value}",
     pekkoParadoxGithub := Some("https://github.com/apache/pekko-persistence-r2dbc"),
     paradoxGroups := Map("Language" -> Seq("Java", "Scala")),
+    Global / pekkoParadoxIncubatorNotice := None,
     Compile / paradoxProperties ++= Map(
       "project.url" -> "https://pekko.apache.org/docs/pekko-persistence-r2dbc/current/",
       "canonical.base_url" -> "https://pekko.apache.org/docs/pekko-persistence-r2dbc/current",
