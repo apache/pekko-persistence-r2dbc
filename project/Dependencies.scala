@@ -52,7 +52,7 @@ object Dependencies {
       "org.apache.pekko" %% "pekko-projection-durable-state" % PekkoProjectionVersion % Test
     val pekkoProjectionTestKit = "org.apache.pekko" %% "pekko-projection-testkit" % PekkoProjectionVersion % Test
 
-    val postgresql = "org.postgresql" % "postgresql" % "42.3.8" % Test
+    val postgresql = "org.postgresql" % "postgresql" % "42.3.10" % Test
 
     val logback = "ch.qos.logback" % "logback-classic" % "1.2.13" % Test
     val scalaTest = "org.scalatest" %% "scalatest" % "3.2.14" % Test
