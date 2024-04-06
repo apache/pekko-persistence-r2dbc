@@ -9,7 +9,7 @@ jobs:
   scala-steward:
     runs-on: ubuntu-22.04
     name: Launch Scala Steward
-    if: github.repository == 'apache/pekko-grpc'
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Launch Scala Steward
         uses: scala-steward-org/scala-steward-action@v2
