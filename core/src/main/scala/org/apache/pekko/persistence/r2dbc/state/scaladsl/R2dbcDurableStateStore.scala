@@ -16,6 +16,7 @@ package org.apache.pekko.persistence.r2dbc.state.scaladsl
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
