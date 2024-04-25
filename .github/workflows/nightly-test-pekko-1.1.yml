@@ -1,11 +1,9 @@
 name: Validate and test
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-    tags-ignore: [ v.* ]
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
 
 jobs:
   compile:
@@ -14,7 +12,7 @@ jobs:
     strategy:
       matrix:
         SCALA_VERSION: [ 2.12, 2.13. 3.3 ]
-        JAVA_VERSION: [ 8, 11, 17 ]
+        JAVA_VERSION: [ 8 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,7 +33,7 @@ jobs:
         run: cp .jvmopts-ci .jvmopts
 
       - name: Compile and test for JDK ${{ matrix.JAVA_VERSION }}, Scala ${{ matrix.SCALA_VERSION }}
-        run: sbt ++${{ matrix.SCALA_VERSION }} test:compile
+        run: sbt -Dpekko.build.pekko.version=main ++${{ matrix.SCALA_VERSION }} test:compile
 
   test-postgres:
     name: Run test with Postgres
@@ -43,7 +41,7 @@ jobs:
     strategy:
       matrix:
         SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
-        JAVA_VERSION: [ 8, 11, 17 ]
+        JAVA_VERSION: [ 8 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Checkout
@@ -78,7 +76,7 @@ jobs:
           docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
-        run: sbt ++${{ matrix.SCALA_VERSION }} test
+        run: sbt -Dpekko.build.pekko.version=main ++${{ matrix.SCALA_VERSION }} test
 
   test-yugabyte:
     name: Run tests with Yugabyte
@@ -86,7 +84,7 @@ jobs:
     strategy:
       matrix:
         SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
-        JAVA_VERSION: [ 8, 11, 17 ]
+        JAVA_VERSION: [ 8 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Checkout
@@ -121,37 +119,4 @@ jobs:
           docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t < ddl-scripts/create_tables_yugabyte.sql
 
       - name: test
-        run: sbt -Dpekko.persistence.r2dbc.dialect=yugabyte -Dpekko.projection.r2dbc.dialect=yugabyte ++${{ matrix.SCALA_VERSION }} test
-
-  test-docs:
-    name: Docs
-    runs-on: ubuntu-latest
-    if: github.repository == 'apache/pekko-persistence-r2dbc'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Checkout GitHub merge
-        if: github.event.pull_request
-        run: |-
-          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
-          git checkout scratch
-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 11
-
-      - name: Cache Coursier cache
-        uses: coursier/cache-action@v6
-
-      - name: Enable jvm-opts
-        run: cp .jvmopts-ci .jvmopts
-
-      - name: Compile docs
-        run: |-
-          sbt docs/paradox
+        run: sbt -Dpekko.build.pekko.version=main -Dpekko.persistence.r2dbc.dialect=yugabyte -Dpekko.projection.r2dbc.dialect=yugabyte ++${{ matrix.SCALA_VERSION }} test
