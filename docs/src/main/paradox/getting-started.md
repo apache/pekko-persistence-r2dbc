@@ -68,7 +68,7 @@ The ddl script can be run in Docker with:
 
 Postgres:
 : ```
-docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
+docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 ```
 
 Yugabyte:
