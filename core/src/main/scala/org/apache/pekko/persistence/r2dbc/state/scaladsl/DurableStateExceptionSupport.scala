@@ -28,7 +28,7 @@ import scala.util.Try
  * available on the classpath. Pekko 1.0 does not have this class, but
  * it is added in Pekko 1.1.
  */
-private[scaladsl] object DurableStateExceptionSupport {
+private[state] object DurableStateExceptionSupport {
   val DeleteRevisionExceptionClass =
     "org.apache.pekko.persistence.state.exception.DeleteRevisionException"
 
