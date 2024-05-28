@@ -23,6 +23,9 @@ import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
+
 class DurableStateStoreSpec
     extends ScalaTestWithActorTestKit(TestConfig.config)
     with AnyWordSpecLike
@@ -131,7 +134,7 @@ class DurableStateStoreSpec
         store.deleteObject(persistenceId, 2L).futureValue
       } else {
         val ex = intercept[Exception] {
-          store.deleteObject(persistenceId, 2L).futureValue
+          Await.result(store.deleteObject(persistenceId, 2L), 20.seconds) 
         }
         ex.getClass.getName shouldEqual DurableStateExceptionSupport.DeleteRevisionExceptionClass
       }
