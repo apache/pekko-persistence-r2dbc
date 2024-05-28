@@ -279,9 +279,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
       }
 
     if (log.isDebugEnabled())
-      result.foreach(deleteCount =>
-        log.debug("Deleted durable state for persistenceId [{}]; deleted {} rows",
-          persistenceId, deleteCount))
+      result.foreach(_ => log.debug("Deleted durable state for persistenceId [{}]", persistenceId))
 
     result.map(_ => Done)(ExecutionContexts.parasitic)
   }
@@ -302,9 +300,8 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
       }
 
     if (log.isDebugEnabled())
-      result.foreach(deleteCount =>
-        log.debug("Deleted durable state for persistenceId [{}]; revision [{}]; deleted {} rows",
-          persistenceId, revision, deleteCount))
+      result.foreach(_ =>
+        log.debug("Deleted durable state for persistenceId [{}]; revision [{}]", persistenceId, revision))
 
     result
   }
