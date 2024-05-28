@@ -1,4 +1,4 @@
-name: Nightly Tests (Pekko 1.1)
+name: Nightly Tests (Pekko 1.0.x)
 
 on:
   schedule:
@@ -33,7 +33,7 @@ jobs:
         run: cp .jvmopts-ci .jvmopts
 
       - name: Compile and test for JDK ${{ matrix.JAVA_VERSION }}, Scala ${{ matrix.SCALA_VERSION }}
-        run: sbt -Dpekko.build.pekko.version=main ++${{ matrix.SCALA_VERSION }} test:compile
+        run: sbt -Dpekko.build.pekko.version=1.0.x ++${{ matrix.SCALA_VERSION }} test:compile
 
   compile3:
     name: Test and compile (scala 3)
@@ -58,7 +58,7 @@ jobs:
         run: cp .jvmopts-ci .jvmopts
 
       - name: Compile
-        run: sbt -Dpekko.build.pekko.version=main ++3.3 projection/Test/compile
+        run: sbt -Dpekko.build.pekko.version=1.0.x ++3.3 projection/Test/compile
 
   test-postgres:
     name: Run test with Postgres
@@ -101,7 +101,7 @@ jobs:
           docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
-        run: sbt -Dpekko.build.pekko.version=main ++${{ matrix.SCALA_VERSION }} test
+        run: sbt -Dpekko.build.pekko.version=1.0.x ++${{ matrix.SCALA_VERSION }} test
 
   test-postgres-scala3:
     name: Run test with Postgres (Scala 3)
@@ -140,4 +140,4 @@ jobs:
           docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
-        run: sbt -Dpekko.build.pekko.version=main ++3.3 core/test
+        run: sbt -Dpekko.build.pekko.version=1.0.x ++3.3 core/test
