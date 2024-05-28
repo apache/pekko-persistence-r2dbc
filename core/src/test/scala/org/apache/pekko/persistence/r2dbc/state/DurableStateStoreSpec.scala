@@ -114,6 +114,26 @@ class DurableStateStoreSpec
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
+    "support deletions with revision" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
+      val value = "Genuinely Collaborative"
+      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+      store.deleteObject(persistenceId, 1L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
+    }
+
+    "fail deleteObject call when revision is unknown" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
+      val value = "Genuinely Collaborative"
+      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+      store.deleteObject(persistenceId, 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+    }
+
   }
 
 }
