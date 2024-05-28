@@ -98,7 +98,7 @@ jobs:
           docker-compose -f docker/docker-compose-postgres.yml up -d
           # TODO: could we poll the port instead of sleep?
           sleep 10
-          docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
+          docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
         run: sbt -Dpekko.build.pekko.version=main ++${{ matrix.SCALA_VERSION }} test
@@ -137,7 +137,7 @@ jobs:
           docker-compose -f docker/docker-compose-postgres.yml up -d
           # TODO: could we poll the port instead of sleep?
           sleep 10
-          docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
+          docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
         run: sbt -Dpekko.build.pekko.version=main ++3.3 core/test
