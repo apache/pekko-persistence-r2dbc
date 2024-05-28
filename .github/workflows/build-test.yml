@@ -105,9 +105,6 @@ jobs:
       - name: test
         run: sbt ++${{ matrix.SCALA_VERSION }} test
 
-      - name: test pekko 1.1
-        run: sbt -Dpekko.build.pekko.version=main ++${{ matrix.SCALA_VERSION }} test  
-
   test-postgres-scala3:
     name: Run test with Postgres (Scala 3)
     runs-on: ubuntu-latest

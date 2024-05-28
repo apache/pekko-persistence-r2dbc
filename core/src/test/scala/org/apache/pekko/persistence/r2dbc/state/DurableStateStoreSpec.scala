@@ -134,7 +134,7 @@ class DurableStateStoreSpec
         store.deleteObject(persistenceId, 2L).futureValue
       } else {
         val ex = intercept[Exception] {
-          Await.result(store.deleteObject(persistenceId, 2L), 20.seconds) 
+          Await.result(store.deleteObject(persistenceId, 2L), 20.seconds)
         }
         ex.getClass.getName shouldEqual DurableStateExceptionSupport.DeleteRevisionExceptionClass
       }
