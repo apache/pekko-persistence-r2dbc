@@ -22,6 +22,7 @@ import pekko.Done
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
 import pekko.actor.typed.scaladsl.adapter._
+import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.Offset
@@ -114,8 +115,23 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   override def deleteObject(persistenceId: String): Future[Done] =
     stateDao.deleteState(persistenceId)
 
-  override def deleteObject(persistenceId: String, revision: Long): Future[Done] =
-    stateDao.deleteState(persistenceId)
+  override def deleteObject(persistenceId: String, revision: Long): Future[Done] = {
+    stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
+      if (count != 1) {
+        // if you run this code with Pekko 1.0.x, no exception will be thrown here
+        // this matches the behavior of pekko-connectors-jdbc 1.0.x
+        // if you run this code with Pekko 1.1.x, a DeleteRevisionException will be thrown here
+        val msg = if (count == 0) {
+          s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
+        } else {
+          s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
+        }
+        DurableStateExceptionSupport.createDeleteRevisionExceptionIfSupported(msg)
+          .foreach(throw _)
+      }
+      Done
+    }(ExecutionContexts.parasitic)
+  }
 
   override def sliceForPersistenceId(persistenceId: String): Int =
     persistenceExt.sliceForPersistenceId(persistenceId)
