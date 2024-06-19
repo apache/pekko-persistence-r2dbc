@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.12, 2.13 ]
+        SCALA_VERSION: [ "2.12.x", "2.13.x"]
         JAVA_VERSION: [ 8 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -101,7 +101,7 @@ jobs:
           docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
 
       - name: test
-        run: sbt -Dpekko.build.pekko.version=1.0.x ++${{ matrix.SCALA_VERSION }} test
+        run: sbt -Dpekko.build.pekko.version=1.0.x "++ ${{ matrix.SCALA_VERSION }} test"
 
   test-postgres-scala3:
     name: Run test with Postgres (Scala 3)
