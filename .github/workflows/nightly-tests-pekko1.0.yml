@@ -1,6 +1,7 @@
 name: Nightly Tests (Pekko 1.0.x)
 
 on:
+  pull_request:
   schedule:
     - cron: "0 4 * * *"
   workflow_dispatch:
