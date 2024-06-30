@@ -21,7 +21,7 @@ object CommonSettings extends AutoPlugin {
   override def requires = JvmPlugin && ApacheSonatypePlugin && DynVerPlugin
 
   override lazy val projectSettings = Seq(
-    crossScalaVersions := Seq(Dependencies.Scala212, Dependencies.Scala213),
+    crossScalaVersions := Seq(Dependencies.Scala212, Dependencies.Scala213, Dependencies.Scala3),
     scalaVersion := Dependencies.Scala213,
     crossVersion := CrossVersion.binary,
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
