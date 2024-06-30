@@ -39,6 +39,7 @@ object Dependencies {
   }
 
   object TestDeps {
+    val pekkoBom = "org.apache.pekko" %% "pekko-bom" % PekkoVersion % Test
     val pekkoPersistenceTyped = "org.apache.pekko" %% "pekko-persistence-typed" % PekkoVersion % Test
     val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
     val pekkoPersistenceTck = "org.apache.pekko" %% "pekko-persistence-tck" % PekkoVersion % Test
@@ -85,6 +86,7 @@ object Dependencies {
     TestDeps.pekkoTestkit,
     TestDeps.pekkoProjectionTestKit,
     TestDeps.pekkoJackson,
+    TestDeps.pekkoBom,
     TestDeps.logback,
     TestDeps.scalaTest) ++ r2dbcPostgres
 
