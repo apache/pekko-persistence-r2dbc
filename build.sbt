@@ -62,13 +62,14 @@ lazy val projection = (project in file("projection"))
     name := "pekko-projection-r2dbc",
     crossScalaVersions += Dependencies.Scala3,
     libraryDependencies ++= Dependencies.projection,
-    dependencyOverrides ++= Dependencies.projectionTestDependencyOverrides)
+    dependencyOverrides ++= Dependencies.pekkoTestDependencyOverrides)
 
 lazy val migration = (project in file("migration"))
   .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-persistence-r2dbc-migration",
     libraryDependencies ++= Dependencies.migration,
+    dependencyOverrides ++= Dependencies.pekkoTestDependencyOverrides,
     Test / mainClass := Some("org.apache.pekko.persistence.r2dbc.migration.MigrationTool"),
     Test / run / fork := true,
     Test / run / javaOptions += "-Dlogback.configurationFile=logback-main.xml")

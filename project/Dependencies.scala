@@ -96,7 +96,19 @@ object Dependencies {
     TestDeps.logback,
     TestDeps.scalaTest) ++ r2dbcPostgres
 
-  val projectionTestDependencyOverrides = Seq(
+  val migration = Seq(
+    "org.apache.pekko" %% "pekko-persistence-jdbc" % PekkoPersistenceJdbcVersion % Test,
+    TestDeps.postgresql,
+    TestDeps.logback,
+    TestDeps.scalaTest)
+
+  val docs = Seq(
+    TestDeps.pekkoPersistenceTyped,
+    TestDeps.pekkoProjectionEventSourced,
+    TestDeps.pekkoProjectionDurableState,
+    TestDeps.pekkoShardingTyped)
+
+  val pekkoTestDependencyOverrides = Seq(
     TestDeps.pekkoActor,
     TestDeps.pekkoActorTyped,
     TestDeps.pekkoActorTestkitTyped,
@@ -109,17 +121,4 @@ object Dependencies {
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoTestkit)
 
-  val migration =
-    Seq(
-      "org.apache.pekko" %% "pekko-persistence-jdbc" % PekkoPersistenceJdbcVersion % Test,
-      TestDeps.postgresql,
-      TestDeps.logback,
-      TestDeps.scalaTest)
-
-  val docs =
-    Seq(
-      TestDeps.pekkoPersistenceTyped,
-      TestDeps.pekkoProjectionEventSourced,
-      TestDeps.pekkoProjectionDurableState,
-      TestDeps.pekkoShardingTyped)
 }
