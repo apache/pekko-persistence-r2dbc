@@ -61,7 +61,8 @@ lazy val projection = (project in file("projection"))
   .settings(
     name := "pekko-projection-r2dbc",
     crossScalaVersions += Dependencies.Scala3,
-    libraryDependencies ++= Dependencies.projection)
+    libraryDependencies ++= Dependencies.projection,
+    dependencyOverrides ++= Dependencies.projectionTestDependencyOverrides)
 
 lazy val migration = (project in file("migration"))
   .enablePlugins(ReproducibleBuildsPlugin)
