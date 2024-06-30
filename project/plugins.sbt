@@ -15,7 +15,7 @@ addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.5.0")
 // for releasing
 addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.0.1")
 addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.32")
-addSbtPlugin("com.github.pjfanning" % "sbt-pekko-build" % "0.3.3")
+addSbtPlugin("com.github.pjfanning" % "sbt-pekko-build" % "0.3.4")
 addSbtPlugin("com.github.pjfanning" % "sbt-source-dist" % "0.1.12")
 addSbtPlugin("com.github.sbt" % "sbt-license-report" % "1.6.1")
 
