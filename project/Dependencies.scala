@@ -39,13 +39,19 @@ object Dependencies {
   }
 
   object TestDeps {
-    val pekkoBom = "org.apache.pekko" %% "pekko-bom" % PekkoVersion % Test
-    val pekkoPersistenceTyped = "org.apache.pekko" %% "pekko-persistence-typed" % PekkoVersion % Test
-    val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
-    val pekkoPersistenceTck = "org.apache.pekko" %% "pekko-persistence-tck" % PekkoVersion % Test
-    val pekkoTestkit = "org.apache.pekko" %% "pekko-actor-testkit-typed" % PekkoVersion % Test
-    val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
+    val pekkoActor = "org.apache.pekko" %% "pekko-actor" % PekkoVersion % Test
+    val pekkoActorTestkitTyped = "org.apache.pekko" %% "pekko-actor-testkit-typed" % PekkoVersion % Test
     val pekkoJackson = "org.apache.pekko" %% "pekko-serialization-jackson" % PekkoVersion % Test
+    val pekkoPersistence = "org.apache.pekko" %% "pekko-persistence" % PekkoVersion % Test
+    val pekkoPersistenceQuery = "org.apache.pekko" %% "pekko-persistence-query" % PekkoVersion % Test
+    val pekkoPersistenceTyped = "org.apache.pekko" %% "pekko-persistence-typed" % PekkoVersion % Test
+    val pekkoPersistenceTck = "org.apache.pekko" %% "pekko-persistence-tck" % PekkoVersion % Test
+    val pekkoProtobuf = "org.apache.pekko" %% "pekko-protobuf-v3" % PekkoVersion % Test
+    val pekkoSlf4j = "org.apache.pekko" %% "pekko-slf4j" % PekkoVersion % Test
+    val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
+    val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream" % PekkoVersion % Test
+    val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
+    val pekkoTestkit = "org.apache.pekko" %% "pekko-testkit" % PekkoVersion % Test
 
     val pekkoProjectionEventSourced =
       "org.apache.pekko" %% "pekko-projection-eventsourced" % PekkoProjectionVersion % Test
@@ -70,7 +76,7 @@ object Dependencies {
     r2dbcPool,
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
-    TestDeps.pekkoTestkit,
+    TestDeps.pekkoActorTestkitTyped,
     TestDeps.pekkoJackson,
     TestDeps.logback,
     TestDeps.scalaTest) ++ r2dbcPostgres
@@ -82,13 +88,24 @@ object Dependencies {
     pekkoProjectionCore,
     TestDeps.pekkoProjectionEventSourced,
     TestDeps.pekkoProjectionDurableState,
-    TestDeps.pekkoStreamTestkit,
-    TestDeps.pekkoTestkit,
     TestDeps.pekkoProjectionTestKit,
+    TestDeps.pekkoActorTestkitTyped,
     TestDeps.pekkoJackson,
-    TestDeps.pekkoBom,
+    TestDeps.pekkoStreamTestkit,
     TestDeps.logback,
     TestDeps.scalaTest) ++ r2dbcPostgres
+
+  val projectionTestDependencyOverrides = Seq(
+    TestDeps.pekkoActor,
+    TestDeps.pekkoActorTestkitTyped,
+    TestDeps.pekkoJackson,
+    TestDeps.pekkoPersistence,
+    TestDeps.pekkoPersistenceQuery,
+    TestDeps.pekkoProtobuf,
+    TestDeps.pekkoSlf4j,
+    TestDeps.pekkoStream,
+    TestDeps.pekkoStreamTestkit,
+    TestDeps.pekkoTestkit)
 
   val migration =
     Seq(
