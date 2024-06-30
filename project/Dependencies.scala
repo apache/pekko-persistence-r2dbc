@@ -40,6 +40,7 @@ object Dependencies {
 
   object TestDeps {
     val pekkoActor = "org.apache.pekko" %% "pekko-actor" % PekkoVersion % Test
+    val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion % Test
     val pekkoActorTestkitTyped = "org.apache.pekko" %% "pekko-actor-testkit-typed" % PekkoVersion % Test
     val pekkoJackson = "org.apache.pekko" %% "pekko-serialization-jackson" % PekkoVersion % Test
     val pekkoPersistence = "org.apache.pekko" %% "pekko-persistence" % PekkoVersion % Test
@@ -49,7 +50,7 @@ object Dependencies {
     val pekkoProtobuf = "org.apache.pekko" %% "pekko-protobuf-v3" % PekkoVersion % Test
     val pekkoSlf4j = "org.apache.pekko" %% "pekko-slf4j" % PekkoVersion % Test
     val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
-    val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream" % PekkoVersion % Test
+    val pekkoStream = "org.apache.pekko" %% "pekko-stream" % PekkoVersion % Test
     val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
     val pekkoTestkit = "org.apache.pekko" %% "pekko-testkit" % PekkoVersion % Test
 
@@ -97,6 +98,7 @@ object Dependencies {
 
   val projectionTestDependencyOverrides = Seq(
     TestDeps.pekkoActor,
+    TestDeps.pekkoActorTyped,
     TestDeps.pekkoActorTestkitTyped,
     TestDeps.pekkoJackson,
     TestDeps.pekkoPersistence,
