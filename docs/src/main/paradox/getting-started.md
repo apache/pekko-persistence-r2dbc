@@ -45,12 +45,12 @@ Start with:
 
 Postgres:
 : ```
-docker-compose -f docker/docker-compose-postgres.yml up
+docker compose -f docker/docker-compose-postgres.yml up
 ```
 
 Yugabyte:
 : ```
-docker-compose -f docker/docker-compose-yugabyte.yml up
+docker compose -f docker/docker-compose-yugabyte.yml up
 ```
 
 <a id="schema"></a>
