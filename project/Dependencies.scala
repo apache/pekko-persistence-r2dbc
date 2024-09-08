@@ -19,7 +19,7 @@ object Dependencies {
   val Scala3 = "3.3.3"
   val PekkoVersion = PekkoCoreDependency.version
   val PekkoVersionInDocs = "1.1"
-  val PekkoPersistenceJdbcVersion = "1.1.0-M1"
+  val PekkoPersistenceJdbcVersion = "1.1.0"
   val PekkoPersistenceR2dbcVersionInDocs = "1.0"
   val PekkoProjectionVersion = "1.0.0"
   val PekkoProjectionVersionInDocs = "1.0"
