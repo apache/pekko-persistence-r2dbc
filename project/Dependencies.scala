@@ -16,7 +16,7 @@ import sbt._
 object Dependencies {
   val Scala212 = "2.12.20"
   val Scala213 = "2.13.14"
-  val Scala3 = "3.3.3"
+  val Scala3 = "3.3.4"
   val PekkoVersion = PekkoCoreDependency.version
   val PekkoVersionInDocs = "1.1"
   val PekkoPersistenceJdbcVersion = "1.1.0"
