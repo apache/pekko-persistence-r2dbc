@@ -7,7 +7,7 @@ jobs:
   publish-docs:
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     name: Publish 1.0 Docs
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       JAVA_OPTS: -Xms2G -Xmx2G -Xss2M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     steps:

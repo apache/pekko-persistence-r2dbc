@@ -8,7 +8,7 @@ on:
 jobs:
   compile:
     name: Test and compile
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
@@ -37,7 +37,7 @@ jobs:
 
   test-postgres:
     name: Run test with Postgres
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
