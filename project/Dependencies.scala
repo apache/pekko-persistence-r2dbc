@@ -35,7 +35,7 @@ object Dependencies {
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "1.0.0.RELEASE"
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.1.RELEASE"
     val r2dbcPostgres = Seq(
-      "org.postgresql" % "r2dbc-postgresql" % "1.0.5.RELEASE")
+      "org.postgresql" % "r2dbc-postgresql" % "1.0.6.RELEASE")
   }
 
   object TestDeps {
