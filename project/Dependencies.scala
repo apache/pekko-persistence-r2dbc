@@ -33,7 +33,7 @@ object Dependencies {
     val pekkoProjectionCore = "org.apache.pekko" %% "pekko-projection-core" % PekkoProjectionVersion
 
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "1.0.0.RELEASE"
-    val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.1.RELEASE"
+    val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.2.RELEASE"
     val r2dbcPostgres = Seq(
       "org.postgresql" % "r2dbc-postgresql" % "1.0.6.RELEASE")
   }
