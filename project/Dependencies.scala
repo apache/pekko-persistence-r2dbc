@@ -18,11 +18,11 @@ object Dependencies {
   val Scala213 = "2.13.15"
   val Scala3 = "3.3.4"
   val PekkoVersion = PekkoCoreDependency.version
-  val PekkoVersionInDocs = "1.1"
-  val PekkoPersistenceJdbcVersion = "1.1.0"
+  val PekkoVersionInDocs = PekkoCoreDependency.default.link
+  val PekkoPersistenceJdbcVersion = PekkoPersistenceJdbcDependency.version
   val PekkoPersistenceR2dbcVersionInDocs = "1.0"
-  val PekkoProjectionVersion = "1.1.0-M1"
-  val PekkoProjectionVersionInDocs = "1.1"
+  val PekkoProjectionVersion = PekkoProjectionDependency.version
+  val PekkoProjectionVersionInDocs = PekkoProjectionDependency.default.link
 
   object Compile {
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
