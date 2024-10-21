@@ -1,0 +1,11 @@
+services:
+  postgres-db:
+    image: mysql:latest
+    container_name: docker-mysql-db-1
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_DATABASE: mysql
+      MYSQL_USER: mysql
+      MYSQL_PASSWORD: mysql
