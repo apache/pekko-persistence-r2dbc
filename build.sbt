@@ -45,7 +45,7 @@ lazy val root = (project in file("."))
   .settings(dontPublish)
   .settings(
     name := "pekko-persistence-r2dbc-root")
-  .aggregate(core, projection, migration, docs)
+  .aggregate(core, `core-mysql`, projection, migration, docs)
 
 def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.getAbsolutePath.endsWith(suffix))
 
@@ -54,6 +54,13 @@ lazy val core = (project in file("core"))
   .settings(
     name := "pekko-persistence-r2dbc",
     libraryDependencies ++= Dependencies.core)
+
+lazy val `core-mysql` = (project in file("core-mysql"))
+  .dependsOn(core)
+  .enablePlugins(ReproducibleBuildsPlugin)
+  .settings(
+    name := "pekko-persistence-r2dbc-mysql",
+    libraryDependencies ++= Dependencies.`core-mysql`)
 
 lazy val projection = (project in file("projection"))
   .dependsOn(core)
