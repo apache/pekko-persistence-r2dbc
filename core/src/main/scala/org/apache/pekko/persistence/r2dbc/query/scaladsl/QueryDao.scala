@@ -19,7 +19,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
@@ -36,11 +35,31 @@ import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.stream.scaladsl.Source
 import io.r2dbc.spi.ConnectionFactory
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
+import org.apache.pekko.util.Reflect
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 object QueryDao {
   val log: Logger = LoggerFactory.getLogger(classOf[QueryDao])
+
+  def fromConfig(
+      journalSettings: R2dbcSettings,
+      sharedConfigPath: String
+  )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
+    val connectionFactoryProvider =
+      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
+    (journalSettings.dialect, journalSettings.queryDaoClassName) match {
+      case (_: Dialect.Unknown, Some(className)) =>
+        val journalClass = system.dynamicAccess.getClassFor[Any](className).get
+        Reflect.instantiate(journalClass, Seq(journalSettings, connectionFactoryProvider, ec, system))
+          .asInstanceOf[QueryDao]
+      case (_: Dialect.Known, None) =>
+        new QueryDao(journalSettings, connectionFactoryProvider)
+      case invalid =>
+        throw new IllegalArgumentException(s"Invalid config [$invalid] for query dao initialization")
+    }
+  }
 }
 
 /**
@@ -93,7 +112,7 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
   }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    settings.dialect match {
+    settings.dialect.unsafeKnown match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
     }

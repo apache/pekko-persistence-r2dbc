@@ -56,8 +56,19 @@ final class R2dbcSettings(config: Config) {
   val dialect: Dialect = toRootLowerCase(config.getString("dialect")) match {
     case "yugabyte" => Dialect.Yugabyte
     case "postgres" => Dialect.Postgres
-    case other =>
-      throw new IllegalArgumentException(s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres].")
+    case unknown    => Dialect.Unknown(unknown)
+  }
+
+  val journalDaoClassName: Option[String] = if (dialect.isKnown) {
+    None
+  } else {
+    Some(config.getString("journalDaoClass"))
+  }
+
+  val queryDaoClassName: Option[String] = if (dialect.isKnown) {
+    None
+  } else {
+    Some(config.getString("queryDaoClass"))
   }
 
   val querySettings = new QuerySettings(config.getConfig("query"))
@@ -90,8 +101,21 @@ sealed trait Dialect
  */
 @InternalStableApi
 object Dialect {
-  case object Postgres extends Dialect
-  case object Yugabyte extends Dialect
+  sealed trait Known extends Dialect
+  case object Postgres extends Known
+  case object Yugabyte extends Known
+  case class Unknown(value: String) extends Dialect
+
+  implicit class DialectOps(value: Dialect) {
+    def unsafeKnown: Dialect.Known = value match {
+      case Unknown(value) =>
+        throw new IllegalArgumentException(
+          s"Unknown dialect [$value]. Supported dialects are [yugabyte, postgres]. Specify supported dialect or use class-based config.")
+      case known: Known =>
+        known
+    }
+    def isKnown: Boolean = value.isInstanceOf[Known]
+  }
 }
 
 /**

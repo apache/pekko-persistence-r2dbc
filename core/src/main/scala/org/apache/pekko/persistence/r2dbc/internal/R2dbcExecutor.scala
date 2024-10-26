@@ -204,6 +204,21 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
     }
   }
 
+  def updateOneThenSelect[A](logPrefix: String)(
+      updateStatementFactory: Connection => Statement,
+      selectStatementFactory: Connection => Statement,
+      mapRow: Row => A): Future[A] = {
+    withConnection(logPrefix) { connection =>
+      val updateStatement = updateStatementFactory(connection)
+      val selectStatement = selectStatementFactory(connection)
+      Flux.from(updateStatement.execute())
+        .thenMany(selectStatement.execute())
+        .concatMap(_.map((row, _) => mapRow(row)))
+        .last()
+        .asFuture()
+    }
+  }
+
   /**
    * Update statement that is constructed by several statements combined with `add()`. Returns the mapped result of all
    * rows. For example with Postgres:
@@ -223,6 +238,22 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
         .collectList()
         .asFuture()
         .map(_.iterator().asScala.toVector)
+    }
+  }
+
+  def updateInBatchThenSelect[A](logPrefix: String)(
+      updateStatementFactory: Connection => Statement,
+      selectStatementFactory: Connection => Statement,
+      mapRow: Row => A): Future[A] = {
+    withConnection(logPrefix) { connection =>
+      val updateStatement = updateStatementFactory(connection)
+      val selectStatement = selectStatementFactory(connection)
+      Flux
+        .from[Result](updateStatement.execute())
+        .thenMany(selectStatement.execute())
+        .concatMap(_.map((row, _) => mapRow(row)))
+        .last()
+        .asFuture()
     }
   }
 

@@ -96,7 +96,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
   }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    settings.dialect match {
+    settings.dialect.unsafeKnown match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
     }

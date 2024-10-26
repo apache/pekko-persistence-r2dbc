@@ -56,7 +56,7 @@ lazy val core = (project in file("core"))
     libraryDependencies ++= Dependencies.core)
 
 lazy val `core-mysql` = (project in file("core-mysql"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test") // TODO core-testkit would be ideal, though some classes are problematic to move
   .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-persistence-r2dbc-mysql",

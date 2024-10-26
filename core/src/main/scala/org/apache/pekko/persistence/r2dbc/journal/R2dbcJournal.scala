@@ -21,7 +21,6 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.ActorRef
@@ -48,6 +47,8 @@ import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
 import com.typesafe.config.Config
+import org.apache.pekko.persistence.r2dbc.Dialect
+import org.apache.pekko.util.Reflect
 
 /**
  * INTERNAL API
@@ -97,10 +98,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = R2dbcSettings(context.system.settings.config.getConfig(sharedConfigPath))
 
-  private val journalDao =
-    new JournalDao(
-      journalSettings,
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory"))
+  private val journalDao = JournalDao.fromConfig(journalSettings, sharedConfigPath)
   private val query = PersistenceQuery(system).readJournalFor[R2dbcReadJournal](sharedConfigPath + ".query")
 
   private val pubSub: Option[PubSub] =

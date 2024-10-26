@@ -17,7 +17,6 @@ import java.time.Instant
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -31,6 +30,10 @@ import pekko.persistence.typed.PersistenceId
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
+import org.apache.pekko.persistence.r2dbc.Dialect
+import org.apache.pekko.persistence.r2dbc.Dialect
+import org.apache.pekko.util.Reflect
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -71,6 +74,23 @@ private[r2dbc] object JournalDao {
     }
   }
 
+  def fromConfig(
+      journalSettings: R2dbcSettings,
+      sharedConfigPath: String
+  )(implicit system: ActorSystem[_], ec: ExecutionContext): JournalDao = {
+    val connectionFactoryProvider =
+      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
+    (journalSettings.dialect, journalSettings.journalDaoClassName) match {
+      case (_: Dialect.Unknown, Some(className)) =>
+        val journalClass = system.dynamicAccess.getClassFor[Any](className).get
+        Reflect.instantiate(journalClass, Seq(journalSettings, connectionFactoryProvider, ec, system))
+          .asInstanceOf[JournalDao]
+      case (_: Dialect.Known, None) =>
+        new JournalDao(journalSettings, connectionFactoryProvider)
+      case invalid =>
+        throw new IllegalArgumentException(s"Invalid config [$invalid] for journal dao initialization")
+    }
+  }
 }
 
 /**
@@ -88,7 +108,7 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
 
   private val persistenceExt = Persistence(system)
 
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, journalSettings.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, journalSettings.logDbCallsExceeding)
 
   private val journalTable = journalSettings.journalTableWithSchema
 

@@ -19,7 +19,6 @@ import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
@@ -49,6 +48,7 @@ import pekko.stream.OverflowStrategy
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
+import org.apache.pekko.actor.typed.ActorSystem
 import org.slf4j.LoggerFactory
 
 object R2dbcReadJournal {
@@ -76,14 +76,11 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   private val sharedConfigPath = cfgPath.replaceAll("""\.query$""", "")
   private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
 
-  private val typedSystem = system.toTyped
+  private implicit val typedSystem: ActorSystem[_] = system.toTyped
   import typedSystem.executionContext
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val connectionFactory = ConnectionFactoryProvider(typedSystem)
-    .connectionFactoryFor(sharedConfigPath + ".connection-factory")
-  private val queryDao =
-    new QueryDao(settings, connectionFactory)(typedSystem.executionContext, typedSystem)
+  private val queryDao = QueryDao.fromConfig(settings, sharedConfigPath)
 
   private val _bySlice: BySliceQuery[SerializedJournalRow, EventEnvelope[Any]] = {
     val createEnvelope: (TimestampOffset, SerializedJournalRow) => EventEnvelope[Any] = (offset, row) => {
@@ -108,7 +105,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   private def bySlice[Event]: BySliceQuery[SerializedJournalRow, EventEnvelope[Event]] =
     _bySlice.asInstanceOf[BySliceQuery[SerializedJournalRow, EventEnvelope[Event]]]
 
-  private val journalDao = new JournalDao(settings, connectionFactory)(typedSystem.executionContext, typedSystem)
+  private val journalDao = JournalDao.fromConfig(settings, sharedConfigPath)
 
   def extractEntityTypeFromPersistenceId(persistenceId: String): String =
     PersistenceId.extractEntityType(persistenceId)
