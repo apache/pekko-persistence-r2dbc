@@ -9,30 +9,20 @@
 
 package org.apache.pekko.persistence.r2dbc.mysql.journal
 
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter.ClassicActorSystemOps
 import org.apache.pekko.persistence.CapabilityFlag
 import org.apache.pekko.persistence.journal.JournalSpec
-import org.apache.pekko.persistence.r2dbc.TestConfig
 import org.apache.pekko.persistence.r2dbc.TestDbLifecycle
+import org.apache.pekko.persistence.r2dbc.journal.R2dbcJournalSpec
 
-object MySQLR2dbcJournalSpec {
-  val config = testConfig()
-
-  def testConfig(): Config = {
-    ConfigFactory
-      .parseString(s"""
-      # allow java serialization when testing
-      pekko.actor.allow-java-serialization = on
-      pekko.actor.warn-about-java-serializer-usage = off
-      """)
-      .withFallback(TestConfig.config)
-  }
+class MySQLR2dbcJournalSpec extends JournalSpec(R2dbcJournalSpec.config) with TestDbLifecycle {
+  override protected def supportsRejectingNonSerializableObjects: CapabilityFlag = CapabilityFlag.off()
+  override def typedSystem: ActorSystem[_] = system.toTyped
 }
 
-class MySQLR2dbcJournalSpec extends JournalSpec(MySQLR2dbcJournalSpec.config) with TestDbLifecycle {
+class MySQLR2dbcJournalWithMetaSpec extends JournalSpec(R2dbcJournalSpec.configWithMeta) with TestDbLifecycle {
   override protected def supportsRejectingNonSerializableObjects: CapabilityFlag = CapabilityFlag.off()
+  protected override def supportsMetadata: CapabilityFlag = CapabilityFlag.on()
   override def typedSystem: ActorSystem[_] = system.toTyped
 }

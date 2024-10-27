@@ -204,6 +204,10 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
     }
   }
 
+  /**
+   * One update statement with select statement to execute after the update.
+   * Useful for databases that do not support RETURNING.
+   */
   def updateOneThenSelect[A](logPrefix: String)(
       updateStatementFactory: Connection => Statement,
       selectStatementFactory: Connection => Statement,
@@ -212,7 +216,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
       val updateStatement = updateStatementFactory(connection)
       val selectStatement = selectStatementFactory(connection)
       Flux.from(updateStatement.execute())
-        .thenMany(selectStatement.execute())
+        .thenMany(selectStatement.execute()) // FIXME not sure if thenMany is best - does not seem to propagate errors properly
         .concatMap(_.map((row, _) => mapRow(row)))
         .last()
         .asFuture()
@@ -241,6 +245,11 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
     }
   }
 
+  /**
+   * Update statement that is constructed by several statements combined with `add()`
+   * and select statement to execute after the updates.
+   * Useful for databases that do not support RETURNING.
+   */
   def updateInBatchThenSelect[A](logPrefix: String)(
       updateStatementFactory: Connection => Statement,
       selectStatementFactory: Connection => Statement,
@@ -250,7 +259,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
       val selectStatement = selectStatementFactory(connection)
       Flux
         .from[Result](updateStatement.execute())
-        .thenMany(selectStatement.execute())
+        .thenMany(selectStatement.execute()) // FIXME not sure if thenMany is best - does not seem to propagate errors properly
         .concatMap(_.map((row, _) => mapRow(row)))
         .last()
         .asFuture()
