@@ -71,6 +71,12 @@ final class R2dbcSettings(config: Config) {
     Some(config.getString("queryDaoClass"))
   }
 
+  val snapshotDaoClassName: Option[String] = if (dialect.isKnown) {
+    None
+  } else {
+    Some(config.getString("snapshotDaoClass"))
+  }
+
   val querySettings = new QuerySettings(config.getConfig("query"))
 
   val connectionFactorySettings = new ConnectionFactorySettings(config.getConfig("connection-factory"))

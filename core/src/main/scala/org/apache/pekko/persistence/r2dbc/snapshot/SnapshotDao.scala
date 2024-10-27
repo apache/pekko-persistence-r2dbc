@@ -15,7 +15,6 @@ package org.apache.pekko.persistence.r2dbc.snapshot
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -28,6 +27,10 @@ import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.typed.PersistenceId
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Row
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
+import org.apache.pekko.persistence.r2dbc.Dialect
+import org.apache.pekko.persistence.r2dbc.Dialect
+import org.apache.pekko.util.Reflect
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -48,7 +51,7 @@ private[r2dbc] object SnapshotDao {
 
   final case class SerializedSnapshotMetadata(payload: Array[Byte], serializerId: Int, serializerManifest: String)
 
-  private def collectSerializedSnapshot(row: Row): SerializedSnapshotRow =
+  def collectSerializedSnapshot(row: Row): SerializedSnapshotRow =
     SerializedSnapshotRow(
       row.get("persistence_id", classOf[String]),
       row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
@@ -66,6 +69,23 @@ private[r2dbc] object SnapshotDao {
               row.get("meta_ser_manifest", classOf[String])))
       })
 
+  def fromConfig(
+      journalSettings: R2dbcSettings,
+      sharedConfigPath: String
+  )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
+    val connectionFactoryProvider =
+      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
+    (journalSettings.dialect, journalSettings.snapshotDaoClassName) match {
+      case (_: Dialect.Unknown, Some(className)) =>
+        val journalClass = system.dynamicAccess.getClassFor[Any](className).get
+        Reflect.instantiate(journalClass, Seq(journalSettings, connectionFactoryProvider, ec, system))
+          .asInstanceOf[SnapshotDao]
+      case (_: Dialect.Known, None) =>
+        new SnapshotDao(journalSettings, connectionFactoryProvider)
+      case invalid =>
+        throw new IllegalArgumentException(s"Invalid config [$invalid] for journal dao initialization")
+    }
+  }
 }
 
 /**
@@ -74,7 +94,7 @@ private[r2dbc] object SnapshotDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] final class SnapshotDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(implicit
+private[r2dbc] class SnapshotDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(implicit
     ec: ExecutionContext,
     system: ActorSystem[_]) {
   import SnapshotDao._
