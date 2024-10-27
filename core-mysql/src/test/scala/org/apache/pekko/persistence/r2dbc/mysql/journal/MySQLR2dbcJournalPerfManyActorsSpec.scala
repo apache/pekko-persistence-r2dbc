@@ -9,6 +9,6 @@
 
 package org.apache.pekko.persistence.r2dbc.mysql.journal
 
-import org.apache.pekko.persistence.r2dbc.journal.PersistTimestampSpec
+import org.apache.pekko.persistence.r2dbc.journal.R2dbcJournalPerfManyActorsSpec
 
-class MySQLPersistTimestampSpec extends PersistTimestampSpec
+class MySQLR2dbcJournalPerfManyActorsSpec extends R2dbcJournalPerfManyActorsSpec
