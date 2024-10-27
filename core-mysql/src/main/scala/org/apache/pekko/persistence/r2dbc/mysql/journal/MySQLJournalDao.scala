@@ -92,10 +92,8 @@ class MySQLJournalDao(
         .bind(7, write.serManifest)
         .bind(8, write.payload.get)
 
-      if (write.tags.isEmpty)
-        stmt.bindNull(9, classOf[Array[String]])
-      else
-        stmt.bind(9, write.tags.toArray)
+      // TODO tags support
+      stmt.bindNull(9, classOf[Array[String]])
 
       // optional metadata
       write.metadata match {
