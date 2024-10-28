@@ -7,158 +7,94 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
-/*
- * Copyright (C) 2021 Lightbend Inc. <https://www.lightbend.com>
- */
-
-package org.apache.pekko.persistence.r2dbc.state.scaladsl
+package org.apache.pekko.persistence.r2dbc.mysql.state
 
 import java.time.Instant
+
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.Statement
+import org.apache.pekko.Done
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.dispatch.ExecutionContexts
+import org.apache.pekko.persistence.Persistence
+import org.apache.pekko.persistence.r2dbc.R2dbcSettings
+import org.apache.pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
+import org.apache.pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
+import org.apache.pekko.persistence.r2dbc.internal.R2dbcExecutor
+import org.apache.pekko.persistence.r2dbc.mysql.journal.MySQLJournalDao
+import org.apache.pekko.persistence.r2dbc.mysql.state.MySQLDurableStateDao.log
+import org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
+import org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao.SerializedStateRow
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.stream.scaladsl.Source
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-import org.apache.pekko
-import pekko.Done
-import pekko.NotUsed
-import pekko.actor.typed.ActorSystem
-import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
-import pekko.persistence.Persistence
-import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
-import pekko.persistence.r2dbc.internal.BySliceQuery
-import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
-import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
-import pekko.persistence.r2dbc.internal.R2dbcExecutor
-import pekko.persistence.typed.PersistenceId
-import pekko.stream.scaladsl.Source
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import io.r2dbc.spi.Statement
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
-import org.apache.pekko.util.Reflect
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
-/**
- * INTERNAL API
- */
-@InternalApi private[r2dbc] object DurableStateDao {
-  val log: Logger = LoggerFactory.getLogger(classOf[DurableStateDao])
-  val EmptyDbTimestamp: Instant = Instant.EPOCH
-
-  final case class SerializedStateRow(
-      persistenceId: String,
-      revision: Long,
-      dbTimestamp: Instant,
-      readDbTimestamp: Instant,
-      payload: Array[Byte],
-      serId: Int,
-      serManifest: String,
-      tags: Set[String])
-      extends BySliceQuery.SerializedRow {
-    override def seqNr: Long = revision
-  }
-
-  def fromConfig(
-      journalSettings: R2dbcSettings,
-      sharedConfigPath: String
-  )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
-    val connectionFactoryProvider =
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
-    (journalSettings.dialect, journalSettings.durableStateDaoClassName) match {
-      case (_: Dialect.Unknown, Some(className)) =>
-        val daoClassName = system.dynamicAccess.getClassFor[Any](className).get
-        Reflect.instantiate(daoClassName, Seq(journalSettings, connectionFactoryProvider, ec, system))
-          .asInstanceOf[DurableStateDao]
-      case (_: Dialect.Known, None) =>
-        new DurableStateDao(journalSettings, connectionFactoryProvider)
-      case invalid =>
-        throw new IllegalArgumentException(s"Invalid config [$invalid] for durable state dao initialization")
-    }
-  }
+object MySQLDurableStateDao {
+  val log: Logger = LoggerFactory.getLogger(classOf[MySQLDurableStateDao])
 }
 
-/**
- * INTERNAL API
- *
- * Class for encapsulating db interaction.
- */
-@InternalApi
-private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(implicit
-    ec: ExecutionContext,
-    system: ActorSystem[_])
-    extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {
-  import DurableStateDao._
+class MySQLDurableStateDao(
+    settings: R2dbcSettings,
+    connectionFactory: ConnectionFactory
+)(implicit ec: ExecutionContext, system: ActorSystem[_]) extends DurableStateDao(settings, connectionFactory) {
+  MySQLJournalDao.settingRequirements(settings)
 
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
   private val stateTable = settings.durableStateTableWithSchema
 
-  private val selectStateSql: String = sql"""
+  private val selectStateSql: String = s"""
     SELECT revision, state_ser_id, state_ser_manifest, state_payload, db_timestamp
     FROM $stateTable WHERE persistence_id = ?"""
 
   private def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
-    sql"""
-     SELECT extract(EPOCH from db_timestamp)::BIGINT / 10 AS bucket, count(*) AS count
+    s"""
+     SELECT CAST(UNIX_TIMESTAMP(db_timestamp) AS SIGNED) / 10 AS bucket, count(*) AS count
      FROM $stateTable
      WHERE entity_type = ?
-     AND ${sliceCondition(minSlice, maxSlice)}
+     AND slice BETWEEN $minSlice AND $maxSlice
      AND db_timestamp >= ? AND db_timestamp <= ?
      GROUP BY bucket ORDER BY bucket LIMIT ?
      """
   }
 
-  private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    settings.dialect.unsafeKnown match {
-      case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
-      case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
-    }
-  }
-
-  private val insertStateSql: String = sql"""
+  private val insertStateSql: String = s"""
     INSERT INTO $stateTable
     (slice, entity_type, persistence_id, revision, state_ser_id, state_ser_manifest, state_payload, tags, db_timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, transaction_timestamp())"""
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
   private val updateStateSql: String = {
-    val timestamp =
-      if (settings.dbTimestampMonotonicIncreasing)
-        "transaction_timestamp()"
-      else
-        "GREATEST(transaction_timestamp(), " +
-        s"(SELECT db_timestamp + '1 microsecond'::interval FROM $stateTable WHERE persistence_id = ? AND revision = ?))"
-
     val revisionCondition =
       if (settings.durableStateAssertSingleWriter) " AND revision = ?"
       else ""
 
-    sql"""
+    s"""
       UPDATE $stateTable
-      SET revision = ?, state_ser_id = ?, state_ser_manifest = ?, state_payload = ?, tags = ?, db_timestamp = $timestamp
+      SET revision = ?, state_ser_id = ?, state_ser_manifest = ?, state_payload = ?, tags = ?, db_timestamp = ?
       WHERE persistence_id = ?
       $revisionCondition"""
   }
 
   private val deleteStateSql: String =
-    sql"DELETE from $stateTable WHERE persistence_id = ?"
+    s"DELETE from $stateTable WHERE persistence_id = ?"
 
   private val deleteStateWithRevisionSql: String =
-    sql"DELETE from $stateTable WHERE persistence_id = ? AND revision = ?"
-
-  private val currentDbTimestampSql =
-    sql"SELECT transaction_timestamp() AS db_timestamp"
+    s"DELETE from $stateTable WHERE persistence_id = ? AND revision = ?"
 
   private val allPersistenceIdsSql =
-    sql"SELECT persistence_id from $stateTable ORDER BY persistence_id LIMIT ?"
+    s"SELECT persistence_id from $stateTable ORDER BY persistence_id LIMIT ?"
 
   private val allPersistenceIdsAfterSql =
-    sql"SELECT persistence_id from $stateTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
+    s"SELECT persistence_id from $stateTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
   private def stateBySlicesRangeSql(
       maxDbTimestampParam: Boolean,
@@ -172,26 +108,26 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
 
     def behindCurrentTimeIntervalCondition =
       if (behindCurrentTime > Duration.Zero)
-        s"AND db_timestamp < transaction_timestamp() - interval '${behindCurrentTime.toMillis} milliseconds'"
+        s"AND db_timestamp < DATE_SUB(NOW(6), INTERVAL '${behindCurrentTime.toMicros}' MICROSECOND)"
       else ""
 
     val selectColumns =
       if (backtracking)
-        "SELECT persistence_id, revision, db_timestamp, statement_timestamp() AS read_db_timestamp "
+        "SELECT persistence_id, revision, db_timestamp, NOW(6) AS read_db_timestamp "
       else
-        "SELECT persistence_id, revision, db_timestamp, statement_timestamp() AS read_db_timestamp, state_ser_id, state_ser_manifest, state_payload "
+        "SELECT persistence_id, revision, db_timestamp, NOW(6) AS read_db_timestamp, state_ser_id, state_ser_manifest, state_payload "
 
-    sql"""
+    s"""
       $selectColumns
       FROM $stateTable
       WHERE entity_type = ?
-      AND ${sliceCondition(minSlice, maxSlice)}
+      AND slice BETWEEN $minSlice AND $maxSlice
       AND db_timestamp >= ? $maxDbTimestampParamCondition $behindCurrentTimeIntervalCondition
       ORDER BY db_timestamp, revision
       LIMIT ?"""
   }
 
-  def readState(persistenceId: String): Future[Option[SerializedStateRow]] = {
+  override def readState(persistenceId: String): Future[Option[SerializedStateRow]] = {
     r2dbcExecutor.selectOne(s"select [$persistenceId]")(
       connection =>
         connection
@@ -210,17 +146,16 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
         ))
   }
 
-  def writeState(state: SerializedStateRow): Future[Done] = {
+  override def writeState(state: SerializedStateRow): Future[Done] = {
     require(state.revision > 0)
 
     val entityType = PersistenceId.extractEntityType(state.persistenceId)
     val slice = persistenceExt.sliceForPersistenceId(state.persistenceId)
+    val timestamp = Instant.now()
 
     def bindTags(stmt: Statement, i: Int): Statement = {
-      if (state.tags.isEmpty)
-        stmt.bindNull(i, classOf[Array[String]])
-      else
-        stmt.bind(i, state.tags.toArray)
+      // TODO tags support
+      stmt.bindNull(i, classOf[Array[String]])
     }
 
     val result = {
@@ -237,6 +172,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
               .bind(5, state.serManifest)
               .bind(6, state.payload)
             bindTags(stmt, 7)
+            stmt.bind(8, timestamp)
           }
           .recoverWith { case _: R2dbcDataIntegrityViolationException =>
             Future.failed(
@@ -254,26 +190,15 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
             .bind(2, state.serManifest)
             .bind(3, state.payload)
           bindTags(stmt, 4)
+          stmt.bind(5, timestamp)
 
-          if (settings.dbTimestampMonotonicIncreasing) {
-            if (settings.durableStateAssertSingleWriter)
-              stmt
-                .bind(5, state.persistenceId)
-                .bind(6, previousRevision)
-            else
-              stmt
-                .bind(5, state.persistenceId)
-          } else {
+          if (settings.durableStateAssertSingleWriter)
             stmt
-              .bind(5, state.persistenceId)
-              .bind(6, previousRevision)
-              .bind(7, state.persistenceId)
-
-            if (settings.durableStateAssertSingleWriter)
-              stmt.bind(8, previousRevision)
-            else
-              stmt
-          }
+              .bind(6, state.persistenceId)
+              .bind(7, previousRevision)
+          else
+            stmt
+              .bind(6, state.persistenceId)
         }
       }
     }
@@ -289,7 +214,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     }
   }
 
-  def deleteState(persistenceId: String): Future[Done] = {
+  override def deleteState(persistenceId: String): Future[Done] = {
     val result =
       r2dbcExecutor.updateOne(s"delete [$persistenceId]") { connection =>
         connection
@@ -303,13 +228,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     result.map(_ => Done)(ExecutionContexts.parasitic)
   }
 
-  /**
-   * @param persistenceId The persistence id for the object
-   * @param revision The revision to delete
-   * @return The number of rows deleted
-   * @since 1.1.0
-   */
-  def deleteStateForRevision(persistenceId: String, revision: Long): Future[Long] = {
+  override def deleteStateForRevision(persistenceId: String, revision: Long): Future[Long] = {
     val result =
       r2dbcExecutor.updateOne(s"delete [$persistenceId, $revision]") { connection =>
         connection
@@ -325,16 +244,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     result
   }
 
-  override def currentDbTimestamp(): Future[Instant] = {
-    r2dbcExecutor
-      .selectOne("select current db timestamp")(
-        connection => connection.createStatement(currentDbTimestampSql),
-        row => row.get("db_timestamp", classOf[Instant]))
-      .map {
-        case Some(time) => time
-        case None       => throw new IllegalStateException(s"Expected one row for: $currentDbTimestampSql")
-      }
-  }
+  override def currentDbTimestamp(): Future[Instant] = Future.successful(Instant.now())
 
   override def rowsBySlices(
       entityType: String,
@@ -398,7 +308,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
   }
 
-  def persistenceIds(afterId: Option[String], limit: Long): Source[String, NotUsed] = {
+  override def persistenceIds(afterId: Option[String], limit: Long): Source[String, NotUsed] = {
     val result = r2dbcExecutor.select(s"select persistenceIds")(
       connection =>
         afterId match {
@@ -419,12 +329,6 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
 
     Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
   }
-
-  /**
-   * Counts for a bucket may become inaccurate when existing durable state entities are updated since the timestamp is
-   * changed.
-   */
-  def countBucketsMayChange: Boolean = true
 
   override def countBuckets(
       entityType: String,

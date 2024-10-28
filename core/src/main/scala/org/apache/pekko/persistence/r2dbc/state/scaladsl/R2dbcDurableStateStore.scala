@@ -16,7 +16,6 @@ package org.apache.pekko.persistence.r2dbc.state.scaladsl
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -41,6 +40,7 @@ import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
+import org.apache.pekko.actor.typed.ActorSystem
 import org.slf4j.LoggerFactory
 
 object R2dbcDurableStateStore {
@@ -59,15 +59,11 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   private val sharedConfigPath = cfgPath.replaceAll("""\.state$""", "")
   private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
 
-  private val typedSystem = system.toTyped
+  private implicit val typedSystem: ActorSystem[_] = system.toTyped
+  implicit val ec: ExecutionContext = system.dispatcher
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val stateDao =
-    new DurableStateDao(
-      settings,
-      ConnectionFactoryProvider(typedSystem).connectionFactoryFor(sharedConfigPath + ".connection-factory"))(
-      typedSystem.executionContext,
-      typedSystem)
+  private val stateDao = DurableStateDao.fromConfig(settings, sharedConfigPath)
 
   private val bySlice: BySliceQuery[SerializedStateRow, DurableStateChange[A]] = {
     val createEnvelope: (TimestampOffset, SerializedStateRow) => DurableStateChange[A] = (offset, row) => {
