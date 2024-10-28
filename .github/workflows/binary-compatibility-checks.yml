@@ -1,0 +1,47 @@
+name: Binary Compatibility
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  check-binary-compatibility:
+    name: Check / Binary Compatibility
+    runs-on: ubuntu-22.04
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: 0
+
+      - name: Setup Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 11
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@v6
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Compile code
+        run: sbt +compile
+
+      - name: Report MiMa Binary Issues
+        run: |-
+          sbt +mimaReportBinaryIssues
+
+      - name: Check correct MiMa filter directories
+        run: |
+          sbt checkMimaFilterDirectories
