@@ -175,4 +175,20 @@ final class ConnectionFactorySettings(config: Config) {
 
   val connectionFactoryOptionsCustomizer: Option[String] =
     Option(config.getString("connection-factory-options-customizer")).filter(_.trim.nonEmpty)
+
+  val additionalOptions: Map[String, String] = {
+    import pekko.util.ccompat.JavaConverters._
+    val path = "additional-options"
+    if (!config.hasPathOrNull(path)) {
+      Map.empty
+    } else {
+      val additionalOptionsConfig = config.getConfig(path)
+      additionalOptionsConfig.entrySet().asScala
+        .view
+        .map { entry =>
+          entry.getKey -> additionalOptionsConfig.getString(entry.getKey)
+        }
+        .toMap
+    }
+  }
 }

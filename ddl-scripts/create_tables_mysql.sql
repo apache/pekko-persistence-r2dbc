@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS event_journal(
   entity_type VARCHAR(255) NOT NULL,
   persistence_id VARCHAR(255) NOT NULL,
   seq_nr BIGINT NOT NULL,
-  db_timestamp datetime(6) NOT NULL,
+  db_timestamp TIMESTAMP(6) NOT NULL,
 
   event_ser_id INTEGER NOT NULL,
   event_ser_manifest VARCHAR(255) NOT NULL,
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS durable_state (
   entity_type VARCHAR(255) NOT NULL,
   persistence_id VARCHAR(255) NOT NULL,
   revision BIGINT NOT NULL,
-  db_timestamp DATETIME(6) NOT NULL,
+  db_timestamp TIMESTAMP(6) NOT NULL,
 
   state_ser_id INTEGER NOT NULL,
   state_ser_manifest VARCHAR(255),
@@ -79,10 +79,10 @@ CREATE TABLE IF NOT EXISTS projection_timestamp_offset_store (
   persistence_id VARCHAR(255) NOT NULL,
   seq_nr BIGINT NOT NULL,
   -- timestamp_offset is the db_timestamp of the original event
-  timestamp_offset DATETIME(6) NOT NULL,
+  timestamp_offset TIMESTAMP(6) NOT NULL,
   -- timestamp_consumed is when the offset was stored
   -- the consumer lag is timestamp_consumed - timestamp_offset
-  timestamp_consumed DATETIME(6) NOT NULL,
+  timestamp_consumed TIMESTAMP(6) NOT NULL,
   PRIMARY KEY(slice, projection_name, timestamp_offset, persistence_id, seq_nr)
 );
 

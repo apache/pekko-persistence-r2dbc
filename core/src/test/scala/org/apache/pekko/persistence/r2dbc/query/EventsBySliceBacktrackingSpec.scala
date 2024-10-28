@@ -45,20 +45,21 @@ class EventsBySliceBacktrackingSpec
     with LogCapturing {
 
   override def typedSystem: ActorSystem[_] = system
-  private val settings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
+  protected val settings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
 
   private val query = PersistenceQuery(testKit.system)
     .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
   private val stringSerializer = SerializationExtension(system).serializerFor(classOf[String])
   private val log = LoggerFactory.getLogger(getClass)
 
-  // to be able to store events with specific timestamps
-  private def writeEvent(slice: Int, persistenceId: String, seqNr: Long, timestamp: Instant, event: String): Unit = {
-    log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
-    val insertEventSql = sql"""
+  protected val insertEventSql = sql"""
       INSERT INTO ${settings.journalTableWithSchema}
       (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload)
       VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?)"""
+
+  // to be able to store events with specific timestamps
+  private def writeEvent(slice: Int, persistenceId: String, seqNr: Long, timestamp: Instant, event: String): Unit = {
+    log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
     val entityType = PersistenceId.extractEntityType(persistenceId)
 
     val result = r2dbcExecutor.updateOne("test writeEvent") { connection =>
