@@ -40,6 +40,7 @@ inThisBuild(
 lazy val dontPublish = Seq(publish / skip := true, Compile / publishArtifact := false)
 
 lazy val root = (project in file("."))
+  .disablePlugins(MimaPlugin)
   .settings(dontPublish)
   .settings(
     name := "pekko-persistence-r2dbc-root")
@@ -69,12 +70,21 @@ lazy val migration = (project in file("migration"))
     dependencyOverrides ++= Dependencies.pekkoTestDependencyOverrides,
     Test / mainClass := Some("org.apache.pekko.persistence.r2dbc.migration.MigrationTool"),
     Test / run / fork := true,
-    Test / run / javaOptions += "-Dlogback.configurationFile=logback-main.xml")
+    Test / run / javaOptions += "-Dlogback.configurationFile=logback-main.xml",
+    mimaPreviousArtifacts := {
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          Set.empty
+        case _ =>
+          mimaPreviousArtifacts.value
+      }
+    })
   .dependsOn(core % "compile->compile;test->test")
 
 lazy val docs = project
   .in(file("docs"))
   .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, ScalaUnidocPlugin)
+  .disablePlugins(MimaPlugin)
   .dependsOn(core, projection, migration)
   .settings(dontPublish)
   .settings(

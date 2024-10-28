@@ -1,0 +1,2 @@
+ProblemFilters.exclude[IncompatibleSignatureProblem]("org.apache.pekko.projection.r2dbc.javadsl.R2dbcSession.updateOne")
+ProblemFilters.exclude[IncompatibleSignatureProblem]("org.apache.pekko.projection.r2dbc.javadsl.R2dbcSession.update")
