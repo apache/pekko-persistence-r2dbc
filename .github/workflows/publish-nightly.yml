@@ -34,10 +34,6 @@ jobs:
         run: |-
           sudo apt-get install graphviz
 
-      - name: Report MIMA incompatibility issues
-        run: |-
-          sbt +mimaReportBinaryIssues
-
       - name: Publish to Apache Maven repo
         env:
           NEXUS_USER: ${{ secrets.NEXUS_USER }}

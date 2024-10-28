@@ -12,6 +12,7 @@ jobs:
   check-binary-compatibility:
     name: Check / Binary Compatibility
     runs-on: ubuntu-22.04
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
