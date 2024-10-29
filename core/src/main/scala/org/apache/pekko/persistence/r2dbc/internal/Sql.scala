@@ -24,13 +24,49 @@ import org.apache.pekko.annotation.InternalStableApi
 @InternalStableApi
 object Sql {
 
+  trait Replacements {
+    def apply(sql: String): String
+  }
+  object Replacements {
+    object None extends Replacements {
+      def apply(sql: String): String = sql
+    }
+    object Numbered extends Replacements {
+      def apply(sql: String): String = {
+        if (sql.indexOf('?') == -1) {
+          sql
+        } else {
+          val sb = new java.lang.StringBuilder(sql.length + 10)
+          var n = 0
+          var i = 0
+          while (i < sql.length) {
+            val c = sql.charAt(i)
+            if (c == '?') {
+              n += 1
+              sb.append('$').append(n)
+            } else {
+              sb.append(c)
+            }
+            i += 1
+          }
+          sb.toString
+        }
+      }
+    }
+  }
+
   /**
    * Scala string interpolation with `sql` prefix. Replaces `?` with numbered `\$1`, `\$2` for bind parameters. Trims
    * whitespace, including line breaks. Standard string interpolation arguments `$` can be used.
    */
   implicit class Interpolation(val sc: StringContext) extends AnyVal {
     def sql(args: Any*): String =
-      fillInParameterNumbers(trimLineBreaks(sc.s(args: _*)))
+      Replacements.Numbered(trimLineBreaks(sc.s(args: _*)))
+  }
+
+  implicit class ConfigurableInterpolation(val sc: StringContext) extends AnyVal {
+    def sql(args: Any*)(implicit replacements: Replacements = Replacements.Numbered): String =
+      replacements(trimLineBreaks(sc.s(args: _*)))
   }
 
   /**
@@ -39,28 +75,11 @@ object Sql {
    */
   @varargs
   def format(sql: String, args: AnyRef*): String =
-    fillInParameterNumbers(trimLineBreaks(sql.format(args)))
+    Replacements.Numbered(trimLineBreaks(sql.format(args)))
 
-  private def fillInParameterNumbers(sql: String): String = {
-    if (sql.indexOf('?') == -1) {
-      sql
-    } else {
-      val sb = new java.lang.StringBuilder(sql.length + 10)
-      var n = 0
-      var i = 0
-      while (i < sql.length) {
-        val c = sql.charAt(i)
-        if (c == '?') {
-          n += 1
-          sb.append('$').append(n)
-        } else {
-          sb.append(c)
-        }
-        i += 1
-      }
-      sb.toString
-    }
-  }
+  @varargs
+  def format(sql: String, replacements: Replacements, args: AnyRef*): String =
+    replacements(trimLineBreaks(sql.format(args)))
 
   private def trimLineBreaks(sql: String): String = {
     if (sql.indexOf('\n') == -1) {
@@ -69,5 +88,4 @@ object Sql {
       sql.trim.split('\n').map(_.trim).mkString(" ")
     }
   }
-
 }

@@ -17,11 +17,12 @@ import java.time.{ Duration => JDuration }
 import java.util.Locale
 
 import scala.concurrent.duration._
-
 import org.apache.pekko
 import pekko.util.JavaDurationConverters._
 import pekko.actor.typed.ActorSystem
 import com.typesafe.config.Config
+import org.apache.pekko.annotation.InternalStableApi
+import org.apache.pekko.projection.r2dbc.R2dbcProjectionSettings.DefaultConfigPath
 
 object R2dbcProjectionSettings {
 
@@ -68,4 +69,48 @@ final case class R2dbcProjectionSettings(
   val managementTableWithSchema: String = schema.map(_ + ".").getOrElse("") + managementTable
 
   def isOffsetTableDefined: Boolean = offsetTable.nonEmpty
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+final class R2dbcProjectionSettings2(config: Config) { // TODO rename once we can remove the case class above
+
+  val dialect: String = config.getString("dialect")
+
+  val offsetStoreDaoClassName: Option[String] = if (dialect.trim.nonEmpty) {
+    None
+  } else {
+    Some(config.getString("offsetStoreDaoClass"))
+  }
+
+  val schema: Option[String] = Option(config.getString("offset-store.schema")).filterNot(_.trim.isEmpty)
+
+  val offsetTable: String = config.getString("offset-store.offset-table")
+
+  val timestampOffsetTable: String = config.getString("offset-store.timestamp-offset-table")
+
+  val managementTable: String = config.getString("offset-store.management-table")
+
+  val useConnectionFactory: String = config.getString("use-connection-factory")
+
+  val timeWindow: JDuration = config.getDuration("offset-store.time-window")
+
+  val keepNumberOfEntries: Int = config.getInt("offset-store.keep-number-of-entries")
+
+  val evictInterval: JDuration = config.getDuration("offset-store.evict-interval")
+
+  val deleteInterval: JDuration = config.getDuration("offset-store.delete-interval")
+
+  val logDbCallsExceeding: FiniteDuration =
+    config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
+      case "off" => -1.millis
+      case _     => config.getDuration("log-db-calls-exceeding").asScala
+    }
+}
+
+object R2dbcProjectionSettings2 {
+  def apply(system: ActorSystem[_]): R2dbcProjectionSettings2 =
+    new R2dbcProjectionSettings2(system.settings.config.getConfig(DefaultConfigPath))
 }

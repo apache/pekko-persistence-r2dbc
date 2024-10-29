@@ -44,6 +44,8 @@ object TestConfig {
             database = "yugabyte"
           }
           """)
+      case _ =>
+        ConfigFactory.empty()
     }
 
     // using load here so that connection-factory can be overridden

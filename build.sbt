@@ -58,6 +58,7 @@ lazy val core = (project in file("core"))
 lazy val `core-mysql` = (project in file("core-mysql"))
   .dependsOn(core % "compile->compile;test->test") // TODO core-testkit would be ideal, though some classes are problematic to move
   .enablePlugins(ReproducibleBuildsPlugin)
+  .disablePlugins(MimaPlugin) // TODO enable after future release
   .settings(
     name := "pekko-persistence-r2dbc-mysql",
     libraryDependencies ++= Dependencies.`core-mysql`)
@@ -67,6 +68,15 @@ lazy val projection = (project in file("projection"))
   .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-projection-r2dbc",
+    libraryDependencies ++= Dependencies.projection,
+    dependencyOverrides ++= Dependencies.pekkoTestDependencyOverrides)
+
+lazy val `projection-mysql` = (project in file("projection-mysql"))
+  .dependsOn(`core-mysql` % "compile->compile;test->test", projection % "compile->compile;test->test") // TODO projection-testkit would be ideal, though some classes are problematic to move
+  .enablePlugins(ReproducibleBuildsPlugin)
+  .disablePlugins(MimaPlugin) // TODO enable after future release
+  .settings(
+    name := "pekko-projection-r2dbc-mysql",
     libraryDependencies ++= Dependencies.projection,
     dependencyOverrides ++= Dependencies.pekkoTestDependencyOverrides)
 

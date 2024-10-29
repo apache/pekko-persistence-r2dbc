@@ -1,5 +1,5 @@
 services:
-  postgres-db:
+  mysql-db:
     image: mysql:9.1.0
     container_name: docker-mysql-db-1
     ports:

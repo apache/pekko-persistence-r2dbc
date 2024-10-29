@@ -14,6 +14,7 @@
 package org.apache.pekko.projection.r2dbc
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.time.{ Duration => JDuration }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,8 +26,9 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
 import org.apache.pekko
+import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
+import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.testkit.typed.TestException
@@ -146,6 +148,8 @@ class R2dbcTimestampOffsetProjectionSpec
   import R2dbcProjectionSpec.TestRepository
   import R2dbcTimestampOffsetProjectionSpec._
 
+  protected lazy val testRepositoryProvider: TestRepositoryProvider = new TestRepositoryProvider.Default
+
   override def typedSystem: ActorSystem[_] = system
   private implicit val ec: ExecutionContext = system.executionContext
 
@@ -154,7 +158,7 @@ class R2dbcTimestampOffsetProjectionSpec
   private def createOffsetStore(
       projectionId: ProjectionId,
       sourceProvider: TestTimestampSourceProvider): R2dbcOffsetStore =
-    new R2dbcOffsetStore(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
+    R2dbcOffsetStore.fromConfig(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
   private val projectionTestKit = ProjectionTestKit(system)
 
   override protected def beforeAll(): Unit = {
@@ -162,11 +166,11 @@ class R2dbcTimestampOffsetProjectionSpec
 
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll createTable") { conn =>
-        conn.createStatement(TestRepository.createTableSql)
+        conn.createStatement(testRepositoryProvider.createTableSql)
       },
       10.seconds)
     Await.result(
-      r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from ${TestRepository.table}")),
+      r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from ${testRepositoryProvider.table}")),
       10.seconds)
   }
 
@@ -228,7 +232,7 @@ class R2dbcTimestampOffsetProjectionSpec
   private def withRepo[R](fun: TestRepository => Future[R]): Future[R] = {
     r2dbcExecutor.withConnection("test") { conn =>
       val session = new R2dbcSession(conn)
-      fun(TestRepository(session))
+      fun(testRepositoryProvider(session))
     }
   }
 
@@ -245,7 +249,7 @@ class R2dbcTimestampOffsetProjectionSpec
         throw TestException(concatHandlerFail4Msg + s" after $attempts attempts")
       } else {
         logger.debug(s"handling {}", envelope)
-        TestRepository(session).concatToText(envelope.persistenceId, envelope.event)
+        testRepositoryProvider(session).concatToText(envelope.persistenceId, envelope.event)
       }
     }
 
@@ -287,8 +291,13 @@ class R2dbcTimestampOffsetProjectionSpec
     }
   }
 
+  def now(): Instant = {
+    // supported databases do not store more than 6 fractional digits
+    Instant.now().truncatedTo(ChronoUnit.MICROS)
+  }
+
   def createEnvelopesWithDuplicates(pid1: Pid, pid2: Pid): Vector[EventEnvelope[String]] = {
-    val startTime = Instant.now()
+    val startTime = now()
 
     Vector(
       createEnvelope(pid1, 1, startTime, "e1-1"),
@@ -342,7 +351,7 @@ class R2dbcTimestampOffsetProjectionSpec
       if (envelopes.isEmpty)
         Future.successful(Done)
       else {
-        val repo = TestRepository(session)
+        val repo = testRepositoryProvider(session)
         val results = envelopes.groupBy(_.persistenceId).map { case (pid, envs) =>
           repo.findById(pid).flatMap { existing =>
             val newConcatStr = envs.foldLeft(existing.getOrElse(ConcatStr(pid, ""))) { (acc, env) =>
@@ -552,7 +561,7 @@ class R2dbcTimestampOffsetProjectionSpec
       val pid2 = UUID.randomUUID().toString
       val projectionId = genRandomProjectionId()
 
-      val startTime = Instant.now()
+      val startTime = now()
       val envelopes1 = createEnvelopesUnknownSequenceNumbers(startTime, pid1, pid2)
       val sourceProvider1 = createSourceProvider(envelopes1)
       implicit val offsetStore: R2dbcOffsetStore = createOffsetStore(projectionId, sourceProvider1)
@@ -664,7 +673,7 @@ class R2dbcTimestampOffsetProjectionSpec
       val pid2 = UUID.randomUUID().toString
       val projectionId = genRandomProjectionId()
 
-      val startTime = Instant.now()
+      val startTime = now()
       val envelopes1 = createEnvelopesUnknownSequenceNumbers(startTime, pid1, pid2)
       val sourceProvider1 = createBacktrackingSourceProvider(envelopes1)
       implicit val offsetStore: R2dbcOffsetStore = createOffsetStore(projectionId, sourceProvider1)
@@ -813,10 +822,10 @@ class R2dbcTimestampOffsetProjectionSpec
       val pid2 = UUID.randomUUID().toString
       val projectionId = genRandomProjectionId()
 
-      val startTime = Instant.now()
+      val startTime = now()
       val sourceProvider = new TestSourceProviderWithInput()
       implicit val offsetStore: R2dbcOffsetStore =
-        new R2dbcOffsetStore(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
+        R2dbcOffsetStore.fromConfig(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
 
       val result1 = new StringBuffer()
       val result2 = new StringBuffer()
@@ -950,10 +959,10 @@ class R2dbcTimestampOffsetProjectionSpec
       val pid2 = UUID.randomUUID().toString
       val projectionId = genRandomProjectionId()
 
-      val startTime = Instant.now()
+      val startTime = now()
       val sourceProvider = new TestSourceProviderWithInput()
       implicit val offsetStore: R2dbcOffsetStore =
-        new R2dbcOffsetStore(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
+        R2dbcOffsetStore.fromConfig(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
 
       val projectionRef = spawn(
         ProjectionBehavior(
@@ -1154,10 +1163,10 @@ class R2dbcTimestampOffsetProjectionSpec
       val pid1 = UUID.randomUUID().toString
       val pid2 = UUID.randomUUID().toString
       val projectionId = genRandomProjectionId()
-      val startTime = Instant.now()
+      val startTime = now()
       val sourceProvider = new TestSourceProviderWithInput()
       implicit val offsetStore: R2dbcOffsetStore =
-        new R2dbcOffsetStore(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
+        R2dbcOffsetStore.fromConfig(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
 
       val result1 = new StringBuffer()
       val result2 = new StringBuffer()
@@ -1296,10 +1305,10 @@ class R2dbcTimestampOffsetProjectionSpec
       val pid2 = UUID.randomUUID().toString
       val projectionId = genRandomProjectionId()
 
-      val startTime = Instant.now()
+      val startTime = now()
       val sourceProvider = new TestSourceProviderWithInput()
       implicit val offsetStore: R2dbcOffsetStore =
-        new R2dbcOffsetStore(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
+        R2dbcOffsetStore.fromConfig(projectionId, Some(sourceProvider), system, settings, r2dbcExecutor)
 
       val flowHandler =
         FlowWithContext[EventEnvelope[String], ProjectionContext]
@@ -1393,7 +1402,7 @@ class R2dbcTimestampOffsetProjectionSpec
             sourceProvider,
             handler = () =>
               R2dbcHandler[EventEnvelope[String]] { (session, envelope) =>
-                TestRepository(session).concatToText(envelope.persistenceId, envelope.event)
+                testRepositoryProvider(session).concatToText(envelope.persistenceId, envelope.event)
               })
 
       offsetShouldBeEmpty()
@@ -1427,7 +1436,7 @@ class R2dbcTimestampOffsetProjectionSpec
             sourceProvider,
             handler = () =>
               R2dbcHandler[EventEnvelope[String]] { (session, envelope) =>
-                TestRepository(session).concatToText(envelope.persistenceId, envelope.event)
+                testRepositoryProvider(session).concatToText(envelope.persistenceId, envelope.event)
               })
 
       offsetShouldBeEmpty()

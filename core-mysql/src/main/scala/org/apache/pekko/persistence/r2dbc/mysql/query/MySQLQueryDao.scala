@@ -171,13 +171,9 @@ class MySQLQueryDao(
             metadata = readMetadata(row)))
 
     if (log.isDebugEnabled)
-      result.foreach(rows => {
-        if (rows.size == 0) {
-          println("no rows")
-        }
+      result.foreach(rows =>
         log.debug("Read [{}] events from slices [{} - {}]", rows.size: java.lang.Integer, minSlice: java.lang.Integer,
-          maxSlice: java.lang.Integer)
-      })
+          maxSlice: java.lang.Integer))
 
     Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
   }

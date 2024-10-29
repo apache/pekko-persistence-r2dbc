@@ -24,7 +24,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
@@ -39,7 +38,6 @@ import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.typed.PersistenceId
 import pekko.projection.BySlicesSourceProvider
 import pekko.projection.MergeableOffset
@@ -51,6 +49,11 @@ import pekko.projection.internal.OffsetSerialization.SingleOffset
 import pekko.projection.r2dbc.R2dbcProjectionSettings
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.Statement
+import org.apache.pekko.persistence.r2dbc.Dialect
+import org.apache.pekko.persistence.r2dbc.internal.Sql
+import org.apache.pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
+import org.apache.pekko.projection.r2dbc.R2dbcProjectionSettings2
+import org.apache.pekko.util.Reflect
 import org.slf4j.LoggerFactory
 
 object R2dbcOffsetStore {
@@ -154,6 +157,25 @@ object R2dbcOffsetStore {
   val FutureDone: Future[Done] = Future.successful(Done)
   val FutureTrue: Future[Boolean] = Future.successful(true)
   val FutureFalse: Future[Boolean] = Future.successful(false)
+
+  def fromConfig(
+      projectionId: ProjectionId,
+      sourceProvider: Option[BySlicesSourceProvider],
+      system: ActorSystem[_],
+      settings: R2dbcProjectionSettings,
+      r2dbcExecutor: R2dbcExecutor,
+      clock: Clock = Clock.systemUTC()
+  ): R2dbcOffsetStore = {
+    val settings2 = R2dbcProjectionSettings2(system)
+    settings2.offsetStoreDaoClassName match {
+      case Some(className) =>
+        val aClass = system.dynamicAccess.getClassFor[Any](className).get
+        Reflect.instantiate(aClass, Seq(projectionId, sourceProvider, system, settings, r2dbcExecutor, clock))
+          .asInstanceOf[R2dbcOffsetStore]
+      case None =>
+        new R2dbcOffsetStore(projectionId, sourceProvider, system, settings, r2dbcExecutor, clock)
+    }
+  }
 }
 
 /**
@@ -170,6 +192,9 @@ private[projection] class R2dbcOffsetStore(
 
   import R2dbcOffsetStore._
 
+  protected implicit lazy val sqlReplacements: Sql.Replacements = Sql.Replacements.Numbered
+  protected lazy val timestampSql: String = "transaction_timestamp()"
+
   // FIXME include projectionId in all log messages
   private val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -181,8 +206,8 @@ private[projection] class R2dbcOffsetStore(
   import offsetSerialization.toStorageRepresentation
 
   private val timestampOffsetTable = settings.timestampOffsetTableWithSchema
-  private val offsetTable = settings.offsetTableWithSchema
-  private val managementTable = settings.managementTableWithSchema
+  protected val offsetTable = settings.offsetTableWithSchema
+  protected val managementTable = settings.managementTableWithSchema
 
   private[projection] implicit val executionContext: ExecutionContext = system.executionContext
 
@@ -195,7 +220,7 @@ private[projection] class R2dbcOffsetStore(
   private val insertTimestampOffsetSql: String = sql"""
     INSERT INTO $timestampOffsetTable
     (projection_name, projection_key, slice, persistence_id, seq_nr, timestamp_offset, timestamp_consumed)
-    VALUES (?,?,?,?,?,?, transaction_timestamp())"""
+    VALUES (?,?,?,?,?,?, $timestampSql)"""
 
   // delete less than a timestamp
   private val deleteOldTimestampOffsetSql: String =
@@ -211,7 +236,7 @@ private[projection] class R2dbcOffsetStore(
   private val selectOffsetSql: String =
     sql"SELECT projection_key, current_offset, manifest, mergeable FROM $offsetTable WHERE projection_name = ?"
 
-  private val upsertOffsetSql: String = sql"""
+  protected val upsertOffsetSql: String = sql"""
     INSERT INTO $offsetTable
     (projection_name, projection_key, current_offset, manifest, mergeable, last_updated)
     VALUES (?,?,?,?,?,?)
@@ -230,7 +255,7 @@ private[projection] class R2dbcOffsetStore(
     projection_name = ? AND
     projection_key = ? """
 
-  val updateManagementStateSql: String = sql"""
+  protected val updateManagementStateSql: String = sql"""
     INSERT INTO $managementTable
     (projection_name, projection_key, paused, last_updated)
     VALUES (?,?,?,?)
@@ -518,8 +543,10 @@ private[projection] class R2dbcOffsetStore(
     } else {
       // TODO Try Batch without bind parameters for better performance. Risk of sql injection for these parameters is low.
       val boundStatement =
-        records.foldLeft(statement) { (stmt, rec) =>
-          stmt.add()
+        records.zipWithIndex.foldLeft(statement) { case (stmt, (rec, idx)) =>
+          if (idx != 0) {
+            stmt.add()
+          }
           bindRecord(stmt, rec)
         }
       R2dbcExecutor.updateBatchInTx(boundStatement)
@@ -979,11 +1006,7 @@ private[projection] class R2dbcOffsetStore(
           .bind(2, paused)
           .bind(3, Instant.now(clock).toEpochMilli)
       }
-      .flatMap {
-        case i if i == 1 => Future.successful(Done)
-        case _ =>
-          Future.failed(new RuntimeException(s"Failed to update management table for $projectionId"))
-      }
+      .map(_ => Done)(ExecutionContexts.parasitic)
   }
 
   private def createRecordWithOffset[Envelope](envelope: Envelope): Option[RecordWithOffset] = {
