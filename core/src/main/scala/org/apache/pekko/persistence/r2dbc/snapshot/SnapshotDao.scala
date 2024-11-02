@@ -15,22 +15,22 @@ package org.apache.pekko.persistence.r2dbc.snapshot
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
+import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.typed.PersistenceId
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
-import org.apache.pekko.persistence.r2dbc.Dialect
-import org.apache.pekko.persistence.r2dbc.Dialect
-import org.apache.pekko.util.Reflect
+import pekko.util.Reflect
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -99,11 +99,13 @@ private[r2dbc] class SnapshotDao(settings: R2dbcSettings, connectionFactory: Con
     system: ActorSystem[_]) {
   import SnapshotDao._
 
-  private val snapshotTable = settings.snapshotsTableWithSchema
+  protected implicit lazy val sqlReplacements: Sql.Replacements = Sql.Replacements.Numbered
+
+  protected val snapshotTable: String = settings.snapshotsTableWithSchema
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
-  private val upsertSql = sql"""
+  protected val upsertSql = sql"""
     INSERT INTO $snapshotTable
     (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
