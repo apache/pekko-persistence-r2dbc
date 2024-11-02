@@ -28,7 +28,8 @@ import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
@@ -94,16 +95,20 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {
   import DurableStateDao._
 
+  protected implicit lazy val sqlReplacements: Sql.Replacements = Sql.Replacements.Numbered
+  protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
+  protected lazy val statementTimestampSql: String = "statement_timestamp()"
+
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
-  private val stateTable = settings.durableStateTableWithSchema
+  protected val stateTable = settings.durableStateTableWithSchema
 
   private val selectStateSql: String = sql"""
     SELECT revision, state_ser_id, state_ser_manifest, state_payload, db_timestamp
     FROM $stateTable WHERE persistence_id = ?"""
 
-  private def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
+  protected def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
     sql"""
      SELECT extract(EPOCH from db_timestamp)::BIGINT / 10 AS bucket, count(*) AS count
      FROM $stateTable
@@ -124,14 +129,14 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
   private val insertStateSql: String = sql"""
     INSERT INTO $stateTable
     (slice, entity_type, persistence_id, revision, state_ser_id, state_ser_manifest, state_payload, tags, db_timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, transaction_timestamp())"""
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, $transactionTimestampSql)"""
 
   private val updateStateSql: String = {
     val timestamp =
       if (settings.dbTimestampMonotonicIncreasing)
-        "transaction_timestamp()"
+        s"$transactionTimestampSql"
       else
-        "GREATEST(transaction_timestamp(), " +
+        s"GREATEST($transactionTimestampSql, " +
         s"(SELECT db_timestamp + '1 microsecond'::interval FROM $stateTable WHERE persistence_id = ? AND revision = ?))"
 
     val revisionCondition =
@@ -160,7 +165,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
   private val allPersistenceIdsAfterSql =
     sql"SELECT persistence_id from $stateTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
-  private def stateBySlicesRangeSql(
+  protected def stateBySlicesRangeSql(
       maxDbTimestampParam: Boolean,
       behindCurrentTime: FiniteDuration,
       backtracking: Boolean,
