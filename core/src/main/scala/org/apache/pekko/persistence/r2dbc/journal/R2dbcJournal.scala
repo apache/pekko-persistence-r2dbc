@@ -35,7 +35,6 @@ import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
 import pekko.persistence.query.PersistenceQuery
-import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
@@ -47,8 +46,6 @@ import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
 import com.typesafe.config.Config
-import org.apache.pekko.persistence.r2dbc.Dialect
-import org.apache.pekko.util.Reflect
 
 /**
  * INTERNAL API

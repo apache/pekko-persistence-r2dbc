@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.state.scaladsl
 
 import java.time.Instant
 
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -73,7 +74,7 @@ import org.slf4j.LoggerFactory
     (journalSettings.dialect, journalSettings.durableStateDaoClassName) match {
       case (_: Dialect.Unknown, Some(className)) =>
         val daoClassName = system.dynamicAccess.getClassFor[Any](className).get
-        Reflect.instantiate(daoClassName, Seq(journalSettings, connectionFactoryProvider, ec, system))
+        Reflect.instantiate(daoClassName, immutable.Seq(journalSettings, connectionFactoryProvider, ec, system))
           .asInstanceOf[DurableStateDao]
       case (_: Dialect.Known, None) =>
         new DurableStateDao(journalSettings, connectionFactoryProvider)

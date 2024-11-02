@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import org.apache.pekko
@@ -83,7 +84,7 @@ private[r2dbc] object JournalDao {
     (journalSettings.dialect, journalSettings.journalDaoClassName) match {
       case (_: Dialect.Unknown, Some(className)) =>
         val journalClass = system.dynamicAccess.getClassFor[Any](className).get
-        Reflect.instantiate(journalClass, Seq(journalSettings, connectionFactoryProvider, ec, system))
+        Reflect.instantiate(journalClass, immutable.Seq(journalSettings, connectionFactoryProvider, ec, system))
           .asInstanceOf[JournalDao]
       case (_: Dialect.Known, None) =>
         new JournalDao(journalSettings, connectionFactoryProvider)

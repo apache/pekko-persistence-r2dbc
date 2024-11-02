@@ -170,7 +170,7 @@ object R2dbcOffsetStore {
     settings2.offsetStoreDaoClassName match {
       case Some(className) =>
         val aClass = system.dynamicAccess.getClassFor[Any](className).get
-        Reflect.instantiate(aClass, Seq(projectionId, sourceProvider, system, settings, r2dbcExecutor, clock))
+        Reflect.instantiate(aClass, immutable.Seq(projectionId, sourceProvider, system, settings, r2dbcExecutor, clock))
           .asInstanceOf[R2dbcOffsetStore]
       case None =>
         new R2dbcOffsetStore(projectionId, sourceProvider, system, settings, r2dbcExecutor, clock)

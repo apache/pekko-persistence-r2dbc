@@ -13,6 +13,7 @@
 
 package org.apache.pekko.persistence.r2dbc.snapshot
 
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import io.r2dbc.spi.ConnectionFactory
@@ -78,7 +79,7 @@ private[r2dbc] object SnapshotDao {
     (journalSettings.dialect, journalSettings.snapshotDaoClassName) match {
       case (_: Dialect.Unknown, Some(className)) =>
         val journalClass = system.dynamicAccess.getClassFor[Any](className).get
-        Reflect.instantiate(journalClass, Seq(journalSettings, connectionFactoryProvider, ec, system))
+        Reflect.instantiate(journalClass, immutable.Seq(journalSettings, connectionFactoryProvider, ec, system))
           .asInstanceOf[SnapshotDao]
       case (_: Dialect.Known, None) =>
         new SnapshotDao(journalSettings, connectionFactoryProvider)

@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.query.scaladsl
 
 import java.time.Instant
 
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -52,7 +53,7 @@ object QueryDao {
     (journalSettings.dialect, journalSettings.queryDaoClassName) match {
       case (_: Dialect.Unknown, Some(className)) =>
         val journalClass = system.dynamicAccess.getClassFor[Any](className).get
-        Reflect.instantiate(journalClass, Seq(journalSettings, connectionFactoryProvider, ec, system))
+        Reflect.instantiate(journalClass, immutable.Seq(journalSettings, connectionFactoryProvider, ec, system))
           .asInstanceOf[QueryDao]
       case (_: Dialect.Known, None) =>
         new QueryDao(journalSettings, connectionFactoryProvider)
