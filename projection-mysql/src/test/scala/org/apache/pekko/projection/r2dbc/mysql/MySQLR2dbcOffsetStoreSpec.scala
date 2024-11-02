@@ -9,8 +9,9 @@
 
 package org.apache.pekko.projection.r2dbc.mysql
 
-import org.apache.pekko.persistence.r2dbc.internal.Sql
-import org.apache.pekko.projection.r2dbc.R2dbcOffsetStoreSpec
+import org.apache.pekko
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.projection.r2dbc.R2dbcOffsetStoreSpec
 
 class MySQLR2dbcOffsetStoreSpec extends R2dbcOffsetStoreSpec {
   override implicit lazy val sqlReplacements: Sql.Replacements = Sql.Replacements.None

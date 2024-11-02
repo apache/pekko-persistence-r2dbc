@@ -20,6 +20,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.Statement
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -27,21 +30,18 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
+import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql
-import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import io.r2dbc.spi.Statement
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
-import org.apache.pekko.util.Reflect
+import pekko.util.Reflect
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 

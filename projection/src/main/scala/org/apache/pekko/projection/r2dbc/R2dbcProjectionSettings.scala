@@ -17,12 +17,12 @@ import java.time.{ Duration => JDuration }
 import java.util.Locale
 
 import scala.concurrent.duration._
-import org.apache.pekko
-import pekko.util.JavaDurationConverters._
-import pekko.actor.typed.ActorSystem
 import com.typesafe.config.Config
-import org.apache.pekko.annotation.InternalStableApi
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSettings.DefaultConfigPath
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.annotation.InternalStableApi
+import pekko.projection.r2dbc.R2dbcProjectionSettings.DefaultConfigPath
+import pekko.util.JavaDurationConverters._
 
 object R2dbcProjectionSettings {
 

@@ -9,8 +9,9 @@
 
 package org.apache.pekko.projection.r2dbc.mysql
 
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
-import org.apache.pekko.projection.r2dbc.R2dbcTimestampOffsetProjectionSpec
+import org.apache.pekko
+import pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
+import pekko.projection.r2dbc.R2dbcTimestampOffsetProjectionSpec
 
 class MySQLR2dbcTimestampOffsetProjectionSpec extends R2dbcTimestampOffsetProjectionSpec {
   override lazy val testRepositoryProvider: TestRepositoryProvider =

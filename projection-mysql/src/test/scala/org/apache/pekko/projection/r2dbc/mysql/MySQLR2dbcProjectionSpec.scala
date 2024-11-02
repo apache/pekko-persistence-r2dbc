@@ -9,11 +9,12 @@
 
 package org.apache.pekko.projection.r2dbc.mysql
 
-import org.apache.pekko.persistence.r2dbc.internal.Sql
-import org.apache.pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
-import org.apache.pekko.persistence.r2dbc.internal.Sql.Replacements
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
+import org.apache.pekko
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
+import pekko.persistence.r2dbc.internal.Sql.Replacements
+import pekko.projection.r2dbc.R2dbcProjectionSpec
+import pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
 
 object MySQLR2dbcProjectionSpec {
   object MySQLTestRepositoryProvider extends TestRepositoryProvider.Default {

@@ -11,14 +11,15 @@ package org.apache.pekko.projection.r2dbc.mysql.internal
 
 import java.time.Clock
 
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.persistence.r2dbc.internal.R2dbcExecutor
-import org.apache.pekko.persistence.r2dbc.internal.Sql
-import org.apache.pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
-import org.apache.pekko.projection.BySlicesSourceProvider
-import org.apache.pekko.projection.ProjectionId
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSettings
-import org.apache.pekko.projection.r2dbc.internal.R2dbcOffsetStore
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
+import pekko.projection.BySlicesSourceProvider
+import pekko.projection.ProjectionId
+import pekko.projection.r2dbc.R2dbcProjectionSettings
+import pekko.projection.r2dbc.internal.R2dbcOffsetStore
 
 class MySQLR2dbcOffsetStore(
     projectionId: ProjectionId,

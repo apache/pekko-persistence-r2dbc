@@ -19,9 +19,11 @@ import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
+import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.pubsub.Topic
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
@@ -35,7 +37,6 @@ import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.query.typed.scaladsl.EventsBySliceQuery
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
 import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
-import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
@@ -47,8 +48,6 @@ import pekko.serialization.SerializationExtension
 import pekko.stream.OverflowStrategy
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
-import com.typesafe.config.Config
-import org.apache.pekko.actor.typed.ActorSystem
 import org.slf4j.LoggerFactory
 
 object R2dbcReadJournal {

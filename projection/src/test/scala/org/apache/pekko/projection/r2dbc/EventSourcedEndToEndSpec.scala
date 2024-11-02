@@ -19,6 +19,8 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -29,6 +31,7 @@ import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.internal.Sql
 import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
@@ -41,10 +44,6 @@ import pekko.projection.r2dbc.scaladsl.R2dbcHandler
 import pekko.projection.r2dbc.scaladsl.R2dbcProjection
 import pekko.projection.r2dbc.scaladsl.R2dbcSession
 import pekko.serialization.SerializationExtension
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
-import org.apache.pekko.persistence.r2dbc.internal.Sql
-import org.apache.pekko.persistence.r2dbc.internal.Sql
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
 

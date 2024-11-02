@@ -9,8 +9,9 @@
 
 package org.apache.pekko.projection.r2dbc.mysql
 
-import org.apache.pekko.persistence.r2dbc.internal.Sql
-import org.apache.pekko.projection.r2dbc.EventSourcedEndToEndSpec
+import org.apache.pekko
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.projection.r2dbc.EventSourcedEndToEndSpec
 
 class MySQLEventSourcedEndToEndSpec extends EventSourcedEndToEndSpec {
   override implicit lazy val sqlReplacements: Sql.Replacements = Sql.Replacements.None

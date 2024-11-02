@@ -27,8 +27,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import org.apache.pekko
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.testkit.typed.TestException
@@ -49,6 +47,7 @@ import pekko.projection.ProjectionId
 import pekko.projection.TestStatusObserver
 import pekko.projection.TestStatusObserver.Err
 import pekko.projection.TestStatusObserver.OffsetProgress
+import pekko.projection.r2dbc.R2dbcProjectionSpec.TestRepositoryProvider
 import pekko.projection.r2dbc.internal.R2dbcOffsetStore
 import pekko.projection.r2dbc.scaladsl.R2dbcHandler
 import pekko.projection.r2dbc.scaladsl.R2dbcProjection

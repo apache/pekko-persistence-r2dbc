@@ -9,12 +9,13 @@
 
 package org.apache.pekko.persistence.r2dbc.mysql.journal
 
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.actor.typed.scaladsl.adapter.ClassicActorSystemOps
-import org.apache.pekko.persistence.CapabilityFlag
-import org.apache.pekko.persistence.journal.JournalSpec
-import org.apache.pekko.persistence.r2dbc.TestDbLifecycle
-import org.apache.pekko.persistence.r2dbc.journal.R2dbcJournalSpec
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.scaladsl.adapter.ClassicActorSystemOps
+import pekko.persistence.CapabilityFlag
+import pekko.persistence.journal.JournalSpec
+import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.journal.R2dbcJournalSpec
 
 class MySQLR2dbcJournalSpec extends JournalSpec(R2dbcJournalSpec.config) with TestDbLifecycle {
   override protected def supportsRejectingNonSerializableObjects: CapabilityFlag = CapabilityFlag.off()

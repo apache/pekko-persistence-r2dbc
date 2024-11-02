@@ -24,7 +24,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.internal.Sql
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.testkit.typed.TestException
@@ -32,8 +31,9 @@ import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorRef
 import pekko.actor.typed.ActorSystem
-import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql
+import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.projection.HandlerRecoveryStrategy
 import pekko.projection.OffsetVerification
 import pekko.projection.OffsetVerification.VerificationFailure
@@ -92,8 +92,6 @@ object R2dbcProjectionSpec {
         copy(text = text + "|" + newMsg)
     }
   }
-
-  object TestRepository {}
 
   final case class TestRepository(upsertSql: String, selectSql: String, session: R2dbcSession)(
       implicit ec: ExecutionContext,
