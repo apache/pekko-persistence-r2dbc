@@ -50,10 +50,10 @@ lazy val root = (project in file("."))
 def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.getAbsolutePath.endsWith(suffix))
 
 lazy val postgres = (project in file("postgres"))
-  .aggregate(`core`, `projection`)
+  .aggregate(core, projection, migration)
 
 lazy val yugabyte = (project in file("yugabyte"))
-  .aggregate(`core`, `projection`)
+  .aggregate(core, projection)
 
 lazy val mysql = (project in file("mysql"))
   .aggregate(`core-mysql`, `projection-mysql`)
