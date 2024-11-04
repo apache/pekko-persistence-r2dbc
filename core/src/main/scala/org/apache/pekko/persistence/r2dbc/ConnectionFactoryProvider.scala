@@ -18,13 +18,16 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.util._
 
+import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.CoordinatedShutdown
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Extension
 import pekko.actor.typed.ExtensionId
+import pekko.persistence.r2dbc.ConnectionFactoryProvider.{ NoopOptionsCustomizer, OptionsCustomizer }
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.util.ccompat.JavaConverters._
 import io.r2dbc.pool.ConnectionPool
@@ -40,6 +43,14 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
 
   // Java API
   def get(system: ActorSystem[_]): ConnectionFactoryProvider = apply(system)
+
+  trait OptionsCustomizer {
+    def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions
+  }
+
+  private object NoopOptionsCustomizer extends OptionsCustomizer {
+    override def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions = options
+  }
 }
 
 class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
@@ -62,13 +73,26 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         configLocation => {
           val config = system.settings.config.getConfig(configLocation)
           val settings = new ConnectionFactorySettings(config)
-          createConnectionPoolFactory(settings)
+          val customizer = createOptionsCustomizer(settings)
+          createConnectionPoolFactory(settings, customizer, config)
         })
       .asInstanceOf[ConnectionFactory]
   }
 
-  private def createConnectionFactory(settings: ConnectionFactorySettings): ConnectionFactory = {
+  private def createOptionsCustomizer(settings: ConnectionFactorySettings): OptionsCustomizer = {
+    settings.optionsCustomizer match {
+      case None => NoopOptionsCustomizer
+      case Some(fqcn) =>
+        val args = List(classOf[ActorSystem[_]] -> system)
+        system.dynamicAccess.createInstanceFor[OptionsCustomizer](fqcn, args) match {
+          case Success(customizer) => customizer
+          case Failure(cause)      => throw new RuntimeException("Failed to create OptionsCustomizer", cause)
+        }
+    }
+  }
 
+  private def createConnectionFactory(settings: ConnectionFactorySettings, customizer: OptionsCustomizer,
+      config: Config): ConnectionFactory = {
     val builder =
       settings.urlOption match {
         case Some(url) =>
@@ -102,11 +126,12 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT, settings.sslRootCert)
     }
 
-    ConnectionFactories.get(builder.build())
+    ConnectionFactories.get(customizer(builder.build(), config))
   }
 
-  private def createConnectionPoolFactory(settings: ConnectionFactorySettings): ConnectionPool = {
-    val connectionFactory = createConnectionFactory(settings)
+  private def createConnectionPoolFactory(settings: ConnectionFactorySettings, customizer: OptionsCustomizer,
+      config: Config): ConnectionPool = {
+    val connectionFactory = createConnectionFactory(settings, customizer, config)
 
     val evictionInterval = {
       import settings.{ maxIdleTime, maxLifeTime }
