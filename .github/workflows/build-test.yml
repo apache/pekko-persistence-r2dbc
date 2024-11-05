@@ -185,7 +185,7 @@ jobs:
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
 
       - name: test
-        run: sbt ++${{ matrix.SCALA_VERSION }} mysql/"${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
+        run: sbt ++${{ matrix.SCALA_VERSION }} mysql/${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
 
   test-docs:
     name: Docs
