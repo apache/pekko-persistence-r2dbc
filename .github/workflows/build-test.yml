@@ -138,7 +138,18 @@ jobs:
     strategy:
       matrix:
         SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
-        JAVA_VERSION: [ 11 ] # not running tests on JDK 8 because of the lack of greater timestamp precision
+        JAVA_VERSION: [ 11, 17, 21 ]
+        # only compiling on JDK 8 because of lower timestamp precision, which causes flakiness in certain tests
+        include:
+          - JAVA_VERSION: 8
+            SCALA_VERSION: 2.12
+            COMPILE_ONLY: true
+          - JAVA_VERSION: 8
+            SCALA_VERSION: 2.13
+            COMPILE_ONLY: true
+          - JAVA_VERSION: 8
+            SCALA_VERSION: 3.3
+            COMPILE_ONLY: true
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Checkout
@@ -174,7 +185,7 @@ jobs:
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
 
       - name: test
-        run: sbt ++${{ matrix.SCALA_VERSION }} mysql/test
+        run: sbt ++${{ matrix.SCALA_VERSION }} mysql/"${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
 
   test-docs:
     name: Docs
