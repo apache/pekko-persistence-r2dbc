@@ -45,7 +45,7 @@ class EventsBySlicePerfSpec
 
   private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
 
-  s"EventsBySlices performance" should {
+  "EventsBySlices performance" should {
 
     "retrieve from several slices" in {
       // increase these properties for "real" testing

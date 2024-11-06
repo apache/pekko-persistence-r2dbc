@@ -96,7 +96,7 @@ class EventsBySlicePubSubSpec
   private val envB1 = createEnvelope(pidB, 1L, "b1")
   private val envB2 = createEnvelope(pidB, 2L, "b2")
 
-  s"EventsBySlices pub-sub" should {
+  "EventsBySlices pub-sub" should {
 
     "publish new events" in new Setup {
 

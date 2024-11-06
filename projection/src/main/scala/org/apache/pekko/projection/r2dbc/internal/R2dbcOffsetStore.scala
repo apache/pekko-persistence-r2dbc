@@ -263,7 +263,7 @@ private[projection] class R2dbcOffsetStore(
       case Some(provider) => provider
       case None =>
         throw new IllegalArgumentException(
-          s"Expected BySlicesSourceProvider to be defined when TimestampOffset is used.")
+          "Expected BySlicesSourceProvider to be defined when TimestampOffset is used.")
     }
 
   private def timestampOf(persistenceId: String, sequenceNr: Long): Future[Option[Instant]] = {
@@ -276,7 +276,7 @@ private[projection] class R2dbcOffsetStore(
         timestampQuery.timestampOf(persistenceId, sequenceNr).asScala.map(_.toScala)
       case _ =>
         throw new IllegalArgumentException(
-          s"Expected BySlicesSourceProvider to implement EventTimestampQuery when TimestampOffset is used.")
+          "Expected BySlicesSourceProvider to implement EventTimestampQuery when TimestampOffset is used.")
     }
   }
 
@@ -494,7 +494,7 @@ private[projection] class R2dbcOffsetStore(
       if (slice < minSlice || slice > maxSlice)
         throw new IllegalArgumentException(
           s"This offset store [$projectionId] manages slices " +
-          s"[$minSlice - $maxSlice] but received slice [$slice] for persistenceId [${record.pid}]")
+          "[$minSlice - $maxSlice] but received slice [$slice] for persistenceId [${record.pid}]")
 
       stmt
         .bind(0, projectionId.name)
