@@ -143,6 +143,6 @@ final class ConnectionFactorySettings(config: Config) {
 
   val statementCacheSize: Int = config.getInt("statement-cache-size")
 
-  val optionsCustomizer: Option[String] =
-    Option(config.getString("options-customizer")).filter(_.trim.nonEmpty)
+  val connectionFactoryOptionsCustomizer: Option[String] =
+    Option(config.getString("connection-factory-options-customizer")).filter(_.trim.nonEmpty)
 }

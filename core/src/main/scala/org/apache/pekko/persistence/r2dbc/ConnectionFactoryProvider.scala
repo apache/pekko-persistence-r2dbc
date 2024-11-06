@@ -27,7 +27,7 @@ import pekko.actor.CoordinatedShutdown
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Extension
 import pekko.actor.typed.ExtensionId
-import pekko.persistence.r2dbc.ConnectionFactoryProvider.{ NoopOptionsCustomizer, OptionsCustomizer }
+import pekko.persistence.r2dbc.ConnectionFactoryProvider.{ ConnectionFactoryOptionsCustomizer, NoopCustomizer }
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.util.ccompat.JavaConverters._
 import io.r2dbc.pool.ConnectionPool
@@ -44,11 +44,11 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   // Java API
   def get(system: ActorSystem[_]): ConnectionFactoryProvider = apply(system)
 
-  trait OptionsCustomizer {
+  trait ConnectionFactoryOptionsCustomizer {
     def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions
   }
 
-  private object NoopOptionsCustomizer extends OptionsCustomizer {
+  private object NoopCustomizer extends ConnectionFactoryOptionsCustomizer {
     override def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions = options
   }
 }
@@ -73,25 +73,28 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         configLocation => {
           val config = system.settings.config.getConfig(configLocation)
           val settings = new ConnectionFactorySettings(config)
-          val customizer = createOptionsCustomizer(settings)
+          val customizer = createConnectionFactoryOptionsCustomizer(settings)
           createConnectionPoolFactory(settings, customizer, config)
         })
       .asInstanceOf[ConnectionFactory]
   }
 
-  private def createOptionsCustomizer(settings: ConnectionFactorySettings): OptionsCustomizer = {
-    settings.optionsCustomizer match {
-      case None => NoopOptionsCustomizer
+  private def createConnectionFactoryOptionsCustomizer(
+      settings: ConnectionFactorySettings): ConnectionFactoryOptionsCustomizer = {
+    settings.connectionFactoryOptionsCustomizer match {
+      case None => NoopCustomizer
       case Some(fqcn) =>
         val args = List(classOf[ActorSystem[_]] -> system)
-        system.dynamicAccess.createInstanceFor[OptionsCustomizer](fqcn, args) match {
+        system.dynamicAccess.createInstanceFor[ConnectionFactoryOptionsCustomizer](fqcn, args) match {
           case Success(customizer) => customizer
-          case Failure(cause)      => throw new RuntimeException("Failed to create OptionsCustomizer", cause)
+          case Failure(cause) =>
+            throw new RuntimeException("Failed to create ConnectionFactoryOptionsCustomizer", cause)
         }
     }
   }
 
-  private def createConnectionFactory(settings: ConnectionFactorySettings, customizer: OptionsCustomizer,
+  private def createConnectionFactory(settings: ConnectionFactorySettings,
+      customizer: ConnectionFactoryOptionsCustomizer,
       config: Config): ConnectionFactory = {
     val builder =
       settings.urlOption match {
@@ -129,7 +132,8 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
     ConnectionFactories.get(customizer(builder.build(), config))
   }
 
-  private def createConnectionPoolFactory(settings: ConnectionFactorySettings, customizer: OptionsCustomizer,
+  private def createConnectionPoolFactory(settings: ConnectionFactorySettings,
+      customizer: ConnectionFactoryOptionsCustomizer,
       config: Config): ConnectionPool = {
     val connectionFactory = createConnectionFactory(settings, customizer, config)
 

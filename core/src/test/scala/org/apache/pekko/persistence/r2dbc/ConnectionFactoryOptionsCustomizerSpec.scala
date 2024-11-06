@@ -14,12 +14,12 @@ import io.r2dbc.spi.ConnectionFactoryOptions
 import org.apache.pekko.actor.testkit.typed.scaladsl._
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.eventstream.EventStream
-import org.apache.pekko.persistence.r2dbc.OptionsCustomizerSpec._
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec._
 import org.scalatest.wordspec.AnyWordSpecLike
 
-class OptionsCustomizerSpec extends ScalaTestWithActorTestKit(config) with AnyWordSpecLike {
+class ConnectionFactoryOptionsCustomizerSpec extends ScalaTestWithActorTestKit(config) with AnyWordSpecLike {
   "ConnectionFactoryProvider" should {
-    "instantiate and apply a custom OptionsCustomizer when options-customizer settings is set" in {
+    "instantiate and apply a custom ConnectionFactoryOptionsCustomizer when connection-factory-options-customizer settings is set" in {
       val probe = TestProbe[CustomizerCalled.type]()
       system.eventStream.tell(EventStream.Subscribe(probe.ref))
 
@@ -29,10 +29,10 @@ class OptionsCustomizerSpec extends ScalaTestWithActorTestKit(config) with AnyWo
   }
 }
 
-object OptionsCustomizerSpec {
+object ConnectionFactoryOptionsCustomizerSpec {
   object CustomizerCalled
 
-  class Customizer(system: ActorSystem[_]) extends ConnectionFactoryProvider.OptionsCustomizer {
+  class Customizer(system: ActorSystem[_]) extends ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer {
     override def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions = {
       system.eventStream.tell(EventStream.Publish(CustomizerCalled))
       options
@@ -41,7 +41,7 @@ object OptionsCustomizerSpec {
 
   val config: Config = ConfigFactory.parseString("""
     pekko.persistence.r2dbc.connection-factory {
-      options-customizer = "org.apache.pekko.persistence.r2dbc.OptionsCustomizerSpec$Customizer"
+      connection-factory-options-customizer = "org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec$Customizer"
     }
     """).withFallback(TestConfig.config)
 }
