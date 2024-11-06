@@ -17,15 +17,12 @@
 
 package org.apache.pekko.persistence.r2dbc
 
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ Config, ConfigFactory }
 import io.r2dbc.spi.ConnectionFactoryOptions
-import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.testkit.typed.scaladsl.{ ScalaTestWithActorTestKit, TestProbe }
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.eventstream.EventStream
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec.CustomizerCalled
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec.config
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec.{ config, CustomizerCalled }
 import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import org.scalatest.wordspec.AnyWordSpecLike
 
