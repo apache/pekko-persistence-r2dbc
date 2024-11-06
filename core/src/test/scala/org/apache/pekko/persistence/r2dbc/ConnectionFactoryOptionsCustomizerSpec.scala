@@ -26,6 +26,7 @@ import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.eventstream.EventStream
 import org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec.CustomizerCalled
 import org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec.config
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class ConnectionFactoryOptionsCustomizerSpec extends ScalaTestWithActorTestKit(config) with AnyWordSpecLike {
@@ -43,10 +44,10 @@ class ConnectionFactoryOptionsCustomizerSpec extends ScalaTestWithActorTestKit(c
 object ConnectionFactoryOptionsCustomizerSpec {
   object CustomizerCalled
 
-  class Customizer(system: ActorSystem[_]) extends ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer {
-    override def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions = {
+  class Customizer(system: ActorSystem[_]) extends ConnectionFactoryOptionsCustomizer {
+    override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder = {
       system.eventStream.tell(EventStream.Publish(CustomizerCalled))
-      options
+      builder
     }
   }
 

@@ -46,11 +46,12 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   def get(system: ActorSystem[_]): ConnectionFactoryProvider = apply(system)
 
   trait ConnectionFactoryOptionsCustomizer {
-    def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions
+    def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder
   }
 
   private object NoopCustomizer extends ConnectionFactoryOptionsCustomizer {
-    override def apply(options: ConnectionFactoryOptions, config: Config): ConnectionFactoryOptions = options
+    override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder =
+      builder
   }
 }
 
@@ -131,7 +132,7 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT, settings.sslRootCert)
     }
 
-    ConnectionFactories.get(customizer(builder.build(), config))
+    ConnectionFactories.get(customizer(builder, config).build())
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,
