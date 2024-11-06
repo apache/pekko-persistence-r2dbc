@@ -18,7 +18,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.util._
+import scala.util.Failure
+import scala.util.Success
 
 import com.typesafe.config.Config
 import org.apache.pekko
