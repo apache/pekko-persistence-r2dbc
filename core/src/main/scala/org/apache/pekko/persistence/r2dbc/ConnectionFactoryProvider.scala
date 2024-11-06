@@ -89,7 +89,8 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         system.dynamicAccess.createInstanceFor[ConnectionFactoryOptionsCustomizer](fqcn, args) match {
           case Success(customizer) => customizer
           case Failure(cause) =>
-            throw new RuntimeException("Failed to create ConnectionFactoryOptionsCustomizer", cause)
+            throw new IllegalArgumentException(s"Failed to create ConnectionFactoryOptionsCustomizer for class $fqcn",
+              cause)
         }
     }
   }
