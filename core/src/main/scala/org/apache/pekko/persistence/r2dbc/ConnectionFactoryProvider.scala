@@ -44,7 +44,25 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   // Java API
   def get(system: ActorSystem[_]): ConnectionFactoryProvider = apply(system)
 
+  /**
+   * Enables customization of [[ConnectionFactoryOptions]] right before the connection factory is created.
+   * This is particularly useful for setting options that support dynamically computed values rather than
+   * just plain constants. Classes implementing this trait must have a constructor with a single parameter
+   * of type [[ActorSystem]].
+   *
+   * @since 1.1.0
+   */
   trait ConnectionFactoryOptionsCustomizer {
+
+    /**
+     * Customizes the [[ConnectionFactoryOptions.Builder]] instance based on the provided configuration.
+     *
+     * @param builder the options builder that has been pre-configured by the connection factory provider
+     * @param config  the connection factory configuration
+     * @return        the modified options builder with the applied customizations
+     *
+     * @since 1.1.0
+     */
     def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder
   }
 
