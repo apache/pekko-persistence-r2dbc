@@ -149,11 +149,6 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT, settings.sslRootCert)
     }
 
-    settings.additionalOptions.foreach {
-      case (option, value) =>
-        builder.option(io.r2dbc.spi.Option.valueOf(option), value)
-    }
-
     ConnectionFactories.get(customizer(builder, config).build())
   }
 
