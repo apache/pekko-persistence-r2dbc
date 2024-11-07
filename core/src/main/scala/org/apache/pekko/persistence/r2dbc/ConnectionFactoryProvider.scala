@@ -18,13 +18,16 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.util.{ Failure, Success }
 
+import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.CoordinatedShutdown
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Extension
 import pekko.actor.typed.ExtensionId
+import pekko.persistence.r2dbc.ConnectionFactoryProvider.{ ConnectionFactoryOptionsCustomizer, NoopCustomizer }
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.util.ccompat.JavaConverters._
 import io.r2dbc.pool.ConnectionPool
@@ -40,6 +43,33 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
 
   // Java API
   def get(system: ActorSystem[_]): ConnectionFactoryProvider = apply(system)
+
+  /**
+   * Enables customization of [[ConnectionFactoryOptions]] right before the connection factory is created.
+   * This is particularly useful for setting options that support dynamically computed values rather than
+   * just plain constants. Classes implementing this trait must have a constructor with a single parameter
+   * of type [[ActorSystem]].
+   *
+   * @since 1.1.0
+   */
+  trait ConnectionFactoryOptionsCustomizer {
+
+    /**
+     * Customizes the [[ConnectionFactoryOptions.Builder]] instance based on the provided configuration.
+     *
+     * @param builder the options builder that has been pre-configured by the connection factory provider
+     * @param config  the connection factory configuration
+     * @return        the modified options builder with the applied customizations
+     *
+     * @since 1.1.0
+     */
+    def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder
+  }
+
+  private object NoopCustomizer extends ConnectionFactoryOptionsCustomizer {
+    override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder =
+      builder
+  }
 }
 
 class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
@@ -62,13 +92,30 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         configLocation => {
           val config = system.settings.config.getConfig(configLocation)
           val settings = new ConnectionFactorySettings(config)
-          createConnectionPoolFactory(settings)
+          val customizer = createConnectionFactoryOptionsCustomizer(settings)
+          createConnectionPoolFactory(settings, customizer, config)
         })
       .asInstanceOf[ConnectionFactory]
   }
 
-  private def createConnectionFactory(settings: ConnectionFactorySettings): ConnectionFactory = {
+  private def createConnectionFactoryOptionsCustomizer(
+      settings: ConnectionFactorySettings): ConnectionFactoryOptionsCustomizer = {
+    settings.connectionFactoryOptionsCustomizer match {
+      case None => NoopCustomizer
+      case Some(fqcn) =>
+        val args = List(classOf[ActorSystem[_]] -> system)
+        system.dynamicAccess.createInstanceFor[ConnectionFactoryOptionsCustomizer](fqcn, args) match {
+          case Success(customizer) => customizer
+          case Failure(cause) =>
+            throw new IllegalArgumentException(s"Failed to create ConnectionFactoryOptionsCustomizer for class $fqcn",
+              cause)
+        }
+    }
+  }
 
+  private def createConnectionFactory(settings: ConnectionFactorySettings,
+      customizer: ConnectionFactoryOptionsCustomizer,
+      config: Config): ConnectionFactory = {
     val builder =
       settings.urlOption match {
         case Some(url) =>
@@ -102,11 +149,13 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT, settings.sslRootCert)
     }
 
-    ConnectionFactories.get(builder.build())
+    ConnectionFactories.get(customizer(builder, config).build())
   }
 
-  private def createConnectionPoolFactory(settings: ConnectionFactorySettings): ConnectionPool = {
-    val connectionFactory = createConnectionFactory(settings)
+  private def createConnectionPoolFactory(settings: ConnectionFactorySettings,
+      customizer: ConnectionFactoryOptionsCustomizer,
+      config: Config): ConnectionPool = {
+    val connectionFactory = createConnectionFactory(settings, customizer, config)
 
     val evictionInterval = {
       import settings.{ maxIdleTime, maxLifeTime }

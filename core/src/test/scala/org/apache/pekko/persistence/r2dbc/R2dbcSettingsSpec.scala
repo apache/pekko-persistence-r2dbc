@@ -62,5 +62,13 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
       settings.connectionFactorySettings.sslMode shouldBe "verify-full"
       SSLMode.fromValue(settings.connectionFactorySettings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
+
+    "allow to specify ConnectionFactoryOptions customizer" in {
+      val config = ConfigFactory
+        .parseString("pekko.persistence.r2dbc.connection-factory.connection-factory-options-customizer=fqcn")
+        .withFallback(ConfigFactory.load())
+      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
+      settings.connectionFactorySettings.connectionFactoryOptionsCustomizer shouldBe Some("fqcn")
+    }
   }
 }

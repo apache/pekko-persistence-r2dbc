@@ -142,4 +142,7 @@ final class ConnectionFactorySettings(config: Config) {
   val validationQuery: String = config.getString("validation-query")
 
   val statementCacheSize: Int = config.getInt("statement-cache-size")
+
+  val connectionFactoryOptionsCustomizer: Option[String] =
+    Option(config.getString("connection-factory-options-customizer")).filter(_.trim.nonEmpty)
 }
