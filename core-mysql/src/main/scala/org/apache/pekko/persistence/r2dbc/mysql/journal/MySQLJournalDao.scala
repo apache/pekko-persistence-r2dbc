@@ -1,18 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * license agreements; and to You under the Apache License, version 2.0:
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
 package org.apache.pekko.persistence.r2dbc.mysql.journal
@@ -25,8 +17,12 @@ import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.Sql
 import pekko.persistence.r2dbc.internal.Sql.ConfigurableInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 object MySQLJournalDao {
+  val log: Logger = LoggerFactory.getLogger(classOf[MySQLJournalDao])
+
   def settingRequirements(journalSettings: R2dbcSettings): Unit = {
     // Application timestamps are used because MySQL does not have transaction_timestamp like Postgres. In future releases
     // they could be tried to be emulated, but the benefits are questionable - no matter where the timestamps are generated,
