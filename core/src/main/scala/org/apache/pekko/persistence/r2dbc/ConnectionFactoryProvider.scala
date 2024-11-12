@@ -19,17 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.util.{ Failure, Success }
-
 import com.typesafe.config.Config
-import org.apache.pekko
-import pekko.Done
-import pekko.actor.CoordinatedShutdown
-import pekko.actor.typed.ActorSystem
-import pekko.actor.typed.Extension
-import pekko.actor.typed.ExtensionId
-import pekko.persistence.r2dbc.ConnectionFactoryProvider.{ ConnectionFactoryOptionsCustomizer, NoopCustomizer }
-import pekko.persistence.r2dbc.internal.R2dbcExecutor
-import pekko.util.ccompat.JavaConverters._
 import io.r2dbc.pool.ConnectionPool
 import io.r2dbc.pool.ConnectionPoolConfiguration
 import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
@@ -37,6 +27,17 @@ import io.r2dbc.postgresql.client.SSLMode
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
+import org.apache.pekko
+import pekko.Done
+import pekko.actor.CoordinatedShutdown
+import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.Extension
+import pekko.actor.typed.ExtensionId
+import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
+import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
+import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.util.ccompat.JavaConverters._
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
   def createExtension(system: ActorSystem[_]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)
@@ -149,6 +150,12 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT, settings.sslRootCert)
     }
 
+    if (settings.driver == "mysql") {
+      // Either `connectionTimeZone = SERVER` or `forceConnectionTimeZoneToSession = true` need to be set for timezones to work correctly,
+      // likely caused by bug in https://github.com/asyncer-io/r2dbc-mysql/pull/240.
+      builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
+    }
+
     ConnectionFactories.get(customizer(builder, config).build())
   }
 
@@ -158,7 +165,8 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
     val connectionFactory = createConnectionFactory(settings, customizer, config)
 
     val evictionInterval = {
-      import settings.{ maxIdleTime, maxLifeTime }
+      import settings.maxIdleTime
+      import settings.maxLifeTime
       if (maxIdleTime <= Duration.Zero && maxLifeTime <= Duration.Zero) {
         JDuration.ZERO
       } else if (maxIdleTime <= Duration.Zero) {

@@ -36,6 +36,7 @@ object Dependencies {
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.2.RELEASE"
     val r2dbcPostgres = Seq(
       "org.postgresql" % "r2dbc-postgresql" % "1.0.7.RELEASE")
+    val r2dbcMysql = "io.asyncer" % "r2dbc-mysql" % "1.3.0"
   }
 
   object TestDeps {
@@ -75,6 +76,7 @@ object Dependencies {
     pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
+    r2dbcMysql % "provided,test",
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoActorTestkitTyped,
@@ -87,6 +89,7 @@ object Dependencies {
     r2dbcSpi,
     r2dbcPool,
     pekkoProjectionCore,
+    r2dbcMysql % "provided,test",
     TestDeps.pekkoProjectionEventSourced,
     TestDeps.pekkoProjectionDurableState,
     TestDeps.pekkoProjectionTestKit,

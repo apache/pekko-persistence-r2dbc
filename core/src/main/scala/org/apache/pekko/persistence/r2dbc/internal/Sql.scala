@@ -14,8 +14,9 @@
 package org.apache.pekko.persistence.r2dbc.internal
 
 import scala.annotation.varargs
-
-import org.apache.pekko.annotation.InternalStableApi
+import org.apache.pekko
+import pekko.annotation.InternalStableApi
+import pekko.persistence.r2dbc.Dialect
 
 /**
  * INTERNAL API: Utility to format SQL strings. Replaces `?` with numbered `\$1`, `\$2` for bind parameters. Trims
@@ -24,6 +25,17 @@ import org.apache.pekko.annotation.InternalStableApi
 @InternalStableApi
 object Sql {
 
+  implicit class DialectOps(dialect: Dialect) {
+    def replaceParameters(sql: String): String = {
+      dialect match {
+        case Dialect.Postgres | Dialect.Yugabyte =>
+          fillInParameterNumbers(sql)
+        case Dialect.MySQL =>
+          sql
+      }
+    }
+  }
+
   /**
    * Scala string interpolation with `sql` prefix. Replaces `?` with numbered `\$1`, `\$2` for bind parameters. Trims
    * whitespace, including line breaks. Standard string interpolation arguments `$` can be used.
@@ -31,6 +43,11 @@ object Sql {
   implicit class Interpolation(val sc: StringContext) extends AnyVal {
     def sql(args: Any*): String =
       fillInParameterNumbers(trimLineBreaks(sc.s(args: _*)))
+  }
+
+  implicit class DialectInterpolation(val sc: StringContext) extends AnyVal {
+    def sql(args: Any*)(implicit dialect: Dialect): String =
+      dialect.replaceParameters(trimLineBreaks(sc.s(args: _*)))
   }
 
   /**

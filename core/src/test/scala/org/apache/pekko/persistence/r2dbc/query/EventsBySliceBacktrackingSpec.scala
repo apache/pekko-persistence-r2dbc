@@ -16,7 +16,6 @@ package org.apache.pekko.persistence.r2dbc.query
 import java.time.Instant
 
 import scala.concurrent.duration._
-
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
@@ -24,11 +23,12 @@ import pekko.actor.typed.ActorSystem
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.typed.EventEnvelope
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
@@ -55,6 +55,7 @@ class EventsBySliceBacktrackingSpec
   // to be able to store events with specific timestamps
   private def writeEvent(slice: Int, persistenceId: String, seqNr: Long, timestamp: Instant, event: String): Unit = {
     log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
+    implicit val dialect: Dialect = settings.dialect
     val insertEventSql = sql"""
       INSERT INTO ${settings.journalTableWithSchema}
       (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload)

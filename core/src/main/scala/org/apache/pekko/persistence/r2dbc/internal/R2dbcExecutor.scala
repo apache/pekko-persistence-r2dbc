@@ -325,7 +325,8 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
           connection.close().asFutureDone().map { _ =>
             val durationMicros = durationInMicros(startTime)
             if (durationMicros >= logDbCallsExceedingMicros)
-              log.info("{} - DB call completed [{}] in [{}] µs", logPrefix, r.toString, durationMicros: java.lang.Long)
+              log.info("{} - DB call completed [{}] in [{}] µs", logPrefix, Option(r).map(_.toString).orNull,
+                durationMicros: java.lang.Long)
             r
           }
         }

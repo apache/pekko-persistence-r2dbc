@@ -1,0 +1,13 @@
+services:
+  mysql-db:
+    image: mysql:9.1.0
+    container_name: docker-mysql-db-1
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "--password=root", "ping", "-h", "127.0.0.1" ]
+      interval: 1s
+      timeout: 1s
+      retries: 60

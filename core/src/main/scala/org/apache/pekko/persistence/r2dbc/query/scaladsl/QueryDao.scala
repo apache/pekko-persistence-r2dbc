@@ -19,28 +19,42 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-
+import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.persistence.Persistence
+import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
+import pekko.persistence.r2dbc.query.scaladsl.mysql.MySQLQueryDao
 import pekko.stream.scaladsl.Source
-import io.r2dbc.spi.ConnectionFactory
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 object QueryDao {
   val log: Logger = LoggerFactory.getLogger(classOf[QueryDao])
+
+  def fromConfig(
+      journalSettings: R2dbcSettings,
+      sharedConfigPath: String
+  )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
+    val connectionFactory =
+      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
+    journalSettings.dialect match {
+      case Dialect.Postgres | Dialect.Yugabyte =>
+        new QueryDao(journalSettings, connectionFactory)
+      case Dialect.MySQL =>
+        new MySQLQueryDao(journalSettings, connectionFactory)
+    }
+  }
 }
 
 /**
@@ -54,12 +68,15 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
   import JournalDao.readMetadata
   import QueryDao.log
 
-  private val journalTable = settings.journalTableWithSchema
+  implicit protected val dialect: Dialect = settings.dialect
+  protected lazy val statementTimestampSql: String = "statement_timestamp()"
+
+  protected val journalTable = settings.journalTableWithSchema
 
   private val currentDbTimestampSql =
     "SELECT transaction_timestamp() AS db_timestamp"
 
-  private def eventsBySlicesRangeSql(
+  protected def eventsBySlicesRangeSql(
       toDbTimestampParam: Boolean,
       behindCurrentTime: FiniteDuration,
       backtracking: Boolean,
@@ -96,10 +113,11 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
     settings.dialect match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
+      case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
     }
   }
 
-  private def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
+  protected def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
     sql"""
       SELECT extract(EPOCH from db_timestamp)::BIGINT / 10 AS bucket, count(*) AS count
       FROM $journalTable
@@ -116,12 +134,12 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
     WHERE persistence_id = ? AND seq_nr = ? AND deleted = false"""
 
   private val selectOneEventSql = sql"""
-    SELECT slice, entity_type, db_timestamp, statement_timestamp() AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload
+    SELECT slice, entity_type, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload
     FROM $journalTable
     WHERE persistence_id = ? AND seq_nr = ? AND deleted = false"""
 
   private val selectEventsSql = sql"""
-    SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload
+    SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload
     from $journalTable
     WHERE persistence_id = ? AND seq_nr >= ? AND seq_nr <= ?
     AND deleted = false
