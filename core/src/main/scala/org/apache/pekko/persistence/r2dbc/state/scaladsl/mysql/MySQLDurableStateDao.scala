@@ -18,18 +18,17 @@ import scala.concurrent.duration.FiniteDuration
 import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
+import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
-object MySQLDurableStateDao {
-  val log: Logger = LoggerFactory.getLogger(classOf[MySQLDurableStateDao])
-}
-
-class MySQLDurableStateDao(
+/**
+ * INTERNAL API
+ */
+@InternalApi
+private[r2dbc]class MySQLDurableStateDao(
     settings: R2dbcSettings,
     connectionFactory: ConnectionFactory
 )(implicit ec: ExecutionContext, system: ActorSystem[_]) extends DurableStateDao(settings, connectionFactory) {

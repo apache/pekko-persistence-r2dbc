@@ -93,6 +93,8 @@ sealed trait Dialect
 object Dialect {
   case object Postgres extends Dialect
   case object Yugabyte extends Dialect
+
+  /** @since 1.1.0 */
   case object MySQL extends Dialect
 }
 

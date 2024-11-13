@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import scala.annotation.varargs
 import org.apache.pekko
+import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
 import pekko.persistence.r2dbc.Dialect
 
@@ -25,7 +26,11 @@ import pekko.persistence.r2dbc.Dialect
 @InternalStableApi
 object Sql {
 
-  implicit class DialectOps(dialect: Dialect) {
+  /**
+   * INTERNAL API
+   */
+  @InternalApi
+  private[r2dbc] implicit class DialectOps(dialect: Dialect) {
     def replaceParameters(sql: String): String = {
       dialect match {
         case Dialect.Postgres | Dialect.Yugabyte =>
@@ -45,7 +50,11 @@ object Sql {
       fillInParameterNumbers(trimLineBreaks(sc.s(args: _*)))
   }
 
-  implicit class DialectInterpolation(val sc: StringContext) extends AnyVal {
+  /**
+   * INTERNAL API
+   */
+  @InternalApi
+  private[r2dbc] implicit class DialectInterpolation(val sc: StringContext) extends AnyVal {
     def sql(args: Any*)(implicit dialect: Dialect): String =
       dialect.replaceParameters(trimLineBreaks(sc.s(args: _*)))
   }

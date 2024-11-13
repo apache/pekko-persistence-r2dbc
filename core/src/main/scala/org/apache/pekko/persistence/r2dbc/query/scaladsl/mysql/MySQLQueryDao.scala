@@ -18,11 +18,16 @@ import scala.concurrent.duration.FiniteDuration
 import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
+import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.QueryDao
 
-class MySQLQueryDao(
+/**
+ * INTERNAL API
+ */
+@InternalApi
+private[r2dbc] class MySQLQueryDao(
     journalSettings: R2dbcSettings,
     connectionFactory: ConnectionFactory
 )(implicit ec: ExecutionContext, system: ActorSystem[_]) extends QueryDao(journalSettings, connectionFactory) {

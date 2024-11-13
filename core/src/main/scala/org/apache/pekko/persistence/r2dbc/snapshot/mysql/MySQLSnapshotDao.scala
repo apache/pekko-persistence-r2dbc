@@ -13,11 +13,16 @@ import scala.concurrent.ExecutionContext
 import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
+import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.snapshot.SnapshotDao
 
-class MySQLSnapshotDao(
+/**
+ * INTERNAL API
+ */
+@InternalApi
+private[r2dbc] class MySQLSnapshotDao(
     settings: R2dbcSettings, connectionFactory: ConnectionFactory
 )(implicit ec: ExecutionContext, system: ActorSystem[_]) extends SnapshotDao(settings, connectionFactory) {
 
