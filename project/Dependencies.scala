@@ -89,7 +89,6 @@ object Dependencies {
     r2dbcSpi,
     r2dbcPool,
     pekkoProjectionCore,
-    r2dbcMysql % "provided,test",
     TestDeps.pekkoProjectionEventSourced,
     TestDeps.pekkoProjectionDurableState,
     TestDeps.pekkoProjectionTestKit,
