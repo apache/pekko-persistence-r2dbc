@@ -36,7 +36,6 @@ import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
 import pekko.persistence.query.PersistenceQuery
-import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
@@ -97,10 +96,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = R2dbcSettings(context.system.settings.config.getConfig(sharedConfigPath))
 
-  private val journalDao =
-    new JournalDao(
-      journalSettings,
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory"))
+  private val journalDao = JournalDao.fromConfig(journalSettings, sharedConfigPath)
   private val query = PersistenceQuery(system).readJournalFor[R2dbcReadJournal](sharedConfigPath + ".query")
 
   private val pubSub: Option[PubSub] =

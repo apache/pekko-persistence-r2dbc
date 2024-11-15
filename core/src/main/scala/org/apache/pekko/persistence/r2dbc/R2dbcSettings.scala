@@ -56,6 +56,7 @@ final class R2dbcSettings(config: Config) {
   val dialect: Dialect = toRootLowerCase(config.getString("dialect")) match {
     case "yugabyte" => Dialect.Yugabyte
     case "postgres" => Dialect.Postgres
+    case "mysql"    => Dialect.MySQL
     case other =>
       throw new IllegalArgumentException(s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres].")
   }
@@ -92,6 +93,9 @@ sealed trait Dialect
 object Dialect {
   case object Postgres extends Dialect
   case object Yugabyte extends Dialect
+
+  /** @since 1.1.0 */
+  case object MySQL extends Dialect
 }
 
 /**

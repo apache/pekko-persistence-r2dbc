@@ -19,7 +19,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.Statement
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -27,18 +29,17 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
+import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import io.r2dbc.spi.Statement
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -61,6 +62,20 @@ import org.slf4j.LoggerFactory
       extends BySliceQuery.SerializedRow {
     override def seqNr: Long = revision
   }
+
+  def fromConfig(
+      journalSettings: R2dbcSettings,
+      sharedConfigPath: String
+  )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
+    val connectionFactory =
+      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
+    journalSettings.dialect match {
+      case Dialect.Postgres | Dialect.Yugabyte =>
+        new DurableStateDao(journalSettings, connectionFactory)
+      case Dialect.MySQL =>
+        new MySQLDurableStateDao(journalSettings, connectionFactory)
+    }
+  }
 }
 
 /**
@@ -75,16 +90,19 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {
   import DurableStateDao._
 
+  implicit protected val dialect: Dialect = settings.dialect
+  protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
+
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
-  private val stateTable = settings.durableStateTableWithSchema
+  protected val stateTable = settings.durableStateTableWithSchema
 
   private val selectStateSql: String = sql"""
     SELECT revision, state_ser_id, state_ser_manifest, state_payload, db_timestamp
     FROM $stateTable WHERE persistence_id = ?"""
 
-  private def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
+  protected def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
     sql"""
      SELECT extract(EPOCH from db_timestamp)::BIGINT / 10 AS bucket, count(*) AS count
      FROM $stateTable
@@ -99,20 +117,21 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
     settings.dialect match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
+      case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
     }
   }
 
   private val insertStateSql: String = sql"""
     INSERT INTO $stateTable
     (slice, entity_type, persistence_id, revision, state_ser_id, state_ser_manifest, state_payload, tags, db_timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, transaction_timestamp())"""
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, $transactionTimestampSql)"""
 
   private val updateStateSql: String = {
     val timestamp =
       if (settings.dbTimestampMonotonicIncreasing)
-        "transaction_timestamp()"
+        s"$transactionTimestampSql"
       else
-        "GREATEST(transaction_timestamp(), " +
+        s"GREATEST($transactionTimestampSql, " +
         s"(SELECT db_timestamp + '1 microsecond'::interval FROM $stateTable WHERE persistence_id = ? AND revision = ?))"
 
     val revisionCondition =
@@ -141,7 +160,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
   private val allPersistenceIdsAfterSql =
     sql"SELECT persistence_id from $stateTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
-  private def stateBySlicesRangeSql(
+  protected def stateBySlicesRangeSql(
       maxDbTimestampParam: Boolean,
       behindCurrentTime: FiniteDuration,
       backtracking: Boolean,

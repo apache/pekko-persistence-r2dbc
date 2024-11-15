@@ -17,7 +17,7 @@ import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.persistence.{ SelectedSnapshot, SnapshotMetadata, SnapshotSelectionCriteria }
-import pekko.persistence.r2dbc.{ ConnectionFactoryProvider, R2dbcSettings }
+import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.snapshot.SnapshotStore
 import pekko.serialization.{ Serialization, SerializationExtension }
 import com.typesafe.config.Config
@@ -59,9 +59,7 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
   private val dao = {
     val sharedConfigPath = cfgPath.replaceAll("""\.snapshot$""", "")
     val settings = R2dbcSettings(context.system.settings.config.getConfig(sharedConfigPath))
-    new SnapshotDao(
-      settings,
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory"))
+    SnapshotDao.fromConfig(settings, sharedConfigPath)
   }
 
   def loadAsync(persistenceId: String, criteria: SnapshotSelectionCriteria): Future[Option[SelectedSnapshot]] =

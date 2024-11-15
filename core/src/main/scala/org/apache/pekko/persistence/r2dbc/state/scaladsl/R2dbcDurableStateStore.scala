@@ -16,11 +16,12 @@ package org.apache.pekko.persistence.r2dbc.state.scaladsl
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
+import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
+import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
@@ -30,7 +31,6 @@ import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.scaladsl.DurableStateStorePagedPersistenceIdsQuery
 import pekko.persistence.query.typed.scaladsl.DurableStateStoreBySliceQuery
-import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
@@ -40,7 +40,6 @@ import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Source
-import com.typesafe.config.Config
 import org.slf4j.LoggerFactory
 
 object R2dbcDurableStateStore {
@@ -59,15 +58,11 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   private val sharedConfigPath = cfgPath.replaceAll("""\.state$""", "")
   private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
 
-  private val typedSystem = system.toTyped
+  private implicit val typedSystem: ActorSystem[_] = system.toTyped
+  implicit val ec: ExecutionContext = system.dispatcher
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val stateDao =
-    new DurableStateDao(
-      settings,
-      ConnectionFactoryProvider(typedSystem).connectionFactoryFor(sharedConfigPath + ".connection-factory"))(
-      typedSystem.executionContext,
-      typedSystem)
+  private val stateDao = DurableStateDao.fromConfig(settings, sharedConfigPath)
 
   private val bySlice: BySliceQuery[SerializedStateRow, DurableStateChange[A]] = {
     val createEnvelope: (TimestampOffset, SerializedStateRow) => DurableStateChange[A] = (offset, row) => {

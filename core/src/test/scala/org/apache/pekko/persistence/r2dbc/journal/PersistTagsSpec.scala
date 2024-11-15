@@ -40,7 +40,18 @@ class PersistTagsSpec
 
   case class Row(pid: String, seqNr: Long, tags: Set[String])
 
+  private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.dialect")
+
+  private lazy val testEnabled: Boolean = {
+    // tags are not implemented for MySQL
+    dialect != "mysql"
+  }
+
   "Persist tags" should {
+    if (!testEnabled) {
+      info(s"PersistTagsSpec not enabled for $dialect")
+      pending
+    }
 
     "be the same for events stored in same transaction" in {
       val numberOfEntities = 9

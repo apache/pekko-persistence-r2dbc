@@ -9,6 +9,9 @@ Postgres:
 Yugabyte:
 : @@snip [application.conf](/docs/src/test/resources/application-yugabyte.conf) { #connection-settings }
 
+MySQL:
+: @@snip [application.conf](/docs/src/test/resources/application-mysql.conf) { #connection-settings }
+
 ## Reference configuration 
 
 The following can be overridden in your `application.conf` for the connection settings:

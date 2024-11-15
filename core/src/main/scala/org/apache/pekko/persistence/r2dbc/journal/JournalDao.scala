@@ -17,20 +17,22 @@ import java.time.Instant
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
+import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.typed.PersistenceId
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -71,6 +73,19 @@ private[r2dbc] object JournalDao {
     }
   }
 
+  def fromConfig(
+      journalSettings: R2dbcSettings,
+      sharedConfigPath: String
+  )(implicit system: ActorSystem[_], ec: ExecutionContext): JournalDao = {
+    val connectionFactory =
+      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
+    journalSettings.dialect match {
+      case Dialect.Postgres | Dialect.Yugabyte =>
+        new JournalDao(journalSettings, connectionFactory)
+      case Dialect.MySQL =>
+        new MySQLJournalDao(journalSettings, connectionFactory)
+    }
+  }
 }
 
 /**
@@ -86,13 +101,16 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
   import JournalDao.SerializedJournalRow
   import JournalDao.log
 
+  implicit protected val dialect: Dialect = journalSettings.dialect
+  protected lazy val timestampSql: String = "transaction_timestamp()"
+
   private val persistenceExt = Persistence(system)
 
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, journalSettings.logDbCallsExceeding)(ec, system)
 
-  private val journalTable = journalSettings.journalTableWithSchema
+  protected val journalTable: String = journalSettings.journalTableWithSchema
 
-  private val (insertEventWithParameterTimestampSql, insertEventWithTransactionTimestampSql) = {
+  protected val (insertEventWithParameterTimestampSql: String, insertEventWithTransactionTimestampSql: String) = {
     val baseSql =
       s"INSERT INTO $journalTable " +
       "(slice, entity_type, persistence_id, seq_nr, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload, tags, meta_ser_id, meta_ser_manifest, meta_payload, db_timestamp) " +
@@ -132,7 +150,7 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
   private val insertDeleteMarkerSql = sql"""
     INSERT INTO $journalTable
     (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload, deleted)
-    VALUES (?, ?, ?, ?, transaction_timestamp(), ?, ?, ?, ?, ?, ?)"""
+    VALUES (?, ?, ?, ?, $timestampSql, ?, ?, ?, ?, ?, ?)"""
 
   /**
    * All events must be for the same persistenceId.
@@ -217,12 +235,18 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
         result.foreach { _ =>
           log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
         }
-      result
+      if (useTimestampFromDb) {
+        result
+      } else {
+        result.map(_ => events.head.dbTimestamp)(ExecutionContexts.parasitic)
+      }
     } else {
       val result = r2dbcExecutor.updateInBatchReturning(s"batch insert [$persistenceId], [$totalEvents] events")(
         connection =>
-          events.foldLeft(connection.createStatement(insertSql)) { (stmt, write) =>
-            stmt.add()
+          events.zipWithIndex.foldLeft(connection.createStatement(insertSql)) { case (stmt, (write, idx)) =>
+            if (idx != 0) {
+              stmt.add()
+            }
             bind(stmt, write)
           },
         row => row.get(0, classOf[Instant]))
@@ -230,7 +254,11 @@ private[r2dbc] class JournalDao(journalSettings: R2dbcSettings, connectionFactor
         result.foreach { _ =>
           log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
         }
-      result.map(_.head)(ExecutionContexts.parasitic)
+      if (useTimestampFromDb) {
+        result.map(_.head)(ExecutionContexts.parasitic)
+      } else {
+        result.map(_ => events.head.dbTimestamp)(ExecutionContexts.parasitic)
+      }
     }
   }
 

@@ -132,6 +132,61 @@ jobs:
       - name: test
         run: sbt -Dpekko.persistence.r2dbc.dialect=yugabyte -Dpekko.projection.r2dbc.dialect=yugabyte ++${{ matrix.SCALA_VERSION }} test
 
+  test-mysql:
+    name: Run tests with MySQL
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
+        JAVA_VERSION: [ 11, 17, 21 ]
+        # only compiling on JDK 8, because certain tests depend on the higher timestamp precision added in JDK 9
+        include:
+          - JAVA_VERSION: 8
+            SCALA_VERSION: 2.12
+            COMPILE_ONLY: true
+          - JAVA_VERSION: 8
+            SCALA_VERSION: 2.13
+            COMPILE_ONLY: true
+          - JAVA_VERSION: 8
+            SCALA_VERSION: 3.3
+            COMPILE_ONLY: true
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout GitHub merge
+        if: github.event.pull_request
+        run: |-
+          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
+          git checkout scratch
+
+      - name: Setup Java ${{ matrix.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.JAVA_VERSION }}
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@v6
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Start DB
+        run: |-
+          docker compose -f docker/docker-compose-mysql.yml up -d --wait
+          docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
+
+      - name: test
+        run: sbt -Dpekko.persistence.r2dbc.dialect=mysql ++${{ matrix.SCALA_VERSION }} core/${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
+
   test-docs:
     name: Docs
     runs-on: ubuntu-latest
