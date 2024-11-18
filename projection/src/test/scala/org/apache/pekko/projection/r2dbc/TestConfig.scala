@@ -44,6 +44,21 @@ object TestConfig {
             database = "yugabyte"
           }
           """)
+      case "mysql" =>
+        ConfigFactory.parseString("""
+          pekko.persistence.r2dbc{
+            connection-factory {
+              driver = "mysql"
+              host = "localhost"
+              port = 3306
+              user = "root"
+              password = "root"
+              database = "mysql"
+            }
+            db-timestamp-monotonic-increasing = on
+            use-app-timestamp = on
+          }
+          """)
     }
 
     // using load here so that connection-factory can be overridden

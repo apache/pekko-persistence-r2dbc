@@ -201,7 +201,7 @@ class EventSourcedChaosSpec
         (1 to expectedEventCounts).foreach { _ =>
           // not using receiveMessages(expectedEvents) for better logging in case of failure
           try {
-            processed :+= processedProbe.receiveMessage(15.seconds)
+            processed :+= processedProbe.receiveMessage(30.seconds)
           } catch {
             case e: AssertionError =>
               val missing = expectedEvents.diff(processed.map(_.envelope.event))

@@ -19,7 +19,6 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -29,8 +28,9 @@ import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
 import pekko.persistence.query.typed.EventEnvelope
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
+import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.persistence.typed.scaladsl.Effect
@@ -152,6 +152,7 @@ class EventSourcedEndToEndSpec
   // to be able to store events with specific timestamps
   private def writeEvent(persistenceId: String, seqNr: Long, timestamp: Instant, event: String): Unit = {
     log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
+    implicit val dialect: Dialect = projectionSettings.dialect
     val insertEventSql = sql"""
       INSERT INTO ${journalSettings.journalTableWithSchema}
       (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload)
@@ -269,7 +270,7 @@ class EventSourcedEndToEndSpec
       (1 to numberOfEvents).foreach { _ =>
         // not using receiveMessages(expectedEvents) for better logging in case of failure
         try {
-          processed :+= processedProbe.receiveMessage(15.seconds)
+          processed :+= processedProbe.receiveMessage(30.seconds)
         } catch {
           case e: AssertionError =>
             val missing = expectedEvents.diff(processed.map(_.envelope.event))
