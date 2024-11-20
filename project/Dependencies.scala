@@ -34,8 +34,7 @@ object Dependencies {
 
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "1.0.0.RELEASE"
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.2.RELEASE"
-    val r2dbcPostgres = Seq(
-      "org.postgresql" % "r2dbc-postgresql" % "1.0.7.RELEASE")
+    val r2dbcPostgres = "org.postgresql" % "r2dbc-postgresql" % "1.0.7.RELEASE"
     val r2dbcMysql = "io.asyncer" % "r2dbc-mysql" % "1.3.0"
   }
 
@@ -76,19 +75,21 @@ object Dependencies {
     pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
+    r2dbcPostgres % "provided,test",
     r2dbcMysql % "provided,test",
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoActorTestkitTyped,
     TestDeps.pekkoJackson,
     TestDeps.logback,
-    TestDeps.scalaTest) ++ r2dbcPostgres
+    TestDeps.scalaTest)
 
   val projection = Seq(
     pekkoPersistenceQuery,
     r2dbcSpi,
     r2dbcPool,
     r2dbcMysql % "provided,test",
+    r2dbcPostgres % "provided,test",
     pekkoProjectionCore,
     TestDeps.pekkoProjectionEventSourced,
     TestDeps.pekkoProjectionDurableState,
@@ -97,7 +98,7 @@ object Dependencies {
     TestDeps.pekkoJackson,
     TestDeps.pekkoStreamTestkit,
     TestDeps.logback,
-    TestDeps.scalaTest) ++ r2dbcPostgres
+    TestDeps.scalaTest)
 
   val migration = Seq(
     "org.apache.pekko" %% "pekko-persistence-jdbc" % PekkoPersistenceJdbcVersion % Test,
