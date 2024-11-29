@@ -21,7 +21,7 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
+import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.ActorRef
@@ -35,18 +35,17 @@ import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
-import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.internal.EventsByPersistenceId
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
-import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+import pekko.persistence.r2dbc.query.scaladsl.QueryDao
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
-import com.typesafe.config.Config
 
 /**
  * INTERNAL API
@@ -97,7 +96,8 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   private val journalSettings = R2dbcSettings(context.system.settings.config.getConfig(sharedConfigPath))
 
   private val journalDao = JournalDao.fromConfig(journalSettings, sharedConfigPath)
-  private val query = PersistenceQuery(system).readJournalFor[R2dbcReadJournal](sharedConfigPath + ".query")
+  private val queryDao = QueryDao.fromConfig(journalSettings, sharedConfigPath)
+  private val eventsByPersistenceId = new EventsByPersistenceId(journalSettings, queryDao)
 
   private val pubSub: Option[PubSub] =
     if (journalSettings.journalPublishEvents) Some(PubSub(system))
@@ -226,7 +226,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
     val effectiveToSequenceNr =
       if (max == Long.MaxValue) toSequenceNr
       else math.min(toSequenceNr, fromSequenceNr + max - 1)
-    query
+    eventsByPersistenceId
       .internalEventsByPersistenceId(persistenceId, fromSequenceNr, effectiveToSequenceNr)
       .runWith(Sink.foreach { row =>
         val repr = deserializeRow(serialization, row)
