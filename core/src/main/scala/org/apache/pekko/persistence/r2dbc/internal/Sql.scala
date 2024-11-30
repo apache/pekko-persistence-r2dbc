@@ -54,7 +54,7 @@ object Sql {
    * INTERNAL API
    */
   @InternalApi
-  private[r2dbc] implicit class DialectInterpolation(val sc: StringContext) extends AnyVal {
+  private[pekko] implicit class DialectInterpolation(val sc: StringContext) extends AnyVal {
     def sql(args: Any*)(implicit dialect: Dialect): String =
       dialect.replaceParameters(trimLineBreaks(sc.s(args: _*)))
   }

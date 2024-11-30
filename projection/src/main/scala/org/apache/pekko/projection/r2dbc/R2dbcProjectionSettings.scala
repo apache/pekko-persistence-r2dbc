@@ -17,11 +17,12 @@ import java.time.{ Duration => JDuration }
 import java.util.Locale
 
 import scala.concurrent.duration._
-
-import org.apache.pekko
-import pekko.util.JavaDurationConverters._
-import pekko.actor.typed.ActorSystem
+import scala.util.hashing.MurmurHash3
 import com.typesafe.config.Config
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.Dialect
+import pekko.util.JavaDurationConverters._
 
 object R2dbcProjectionSettings {
 
@@ -34,7 +35,8 @@ object R2dbcProjectionSettings {
         case _     => config.getDuration("log-db-calls-exceeding").asScala
       }
 
-    R2dbcProjectionSettings(
+    new R2dbcProjectionSettings(
+      dialect = Dialect.fromString(config.getString("dialect")),
       schema = Option(config.getString("offset-store.schema")).filterNot(_.trim.isEmpty),
       offsetTable = config.getString("offset-store.offset-table"),
       timestampOffsetTable = config.getString("offset-store.timestamp-offset-table"),
@@ -44,25 +46,149 @@ object R2dbcProjectionSettings {
       keepNumberOfEntries = config.getInt("offset-store.keep-number-of-entries"),
       evictInterval = config.getDuration("offset-store.evict-interval"),
       deleteInterval = config.getDuration("offset-store.delete-interval"),
-      logDbCallsExceeding)
+      logDbCallsExceeding
+    )
   }
 
   def apply(system: ActorSystem[_]): R2dbcProjectionSettings =
     apply(system.settings.config.getConfig(DefaultConfigPath))
+
+  def apply(
+      schema: Option[String],
+      offsetTable: String,
+      timestampOffsetTable: String,
+      managementTable: String,
+      useConnectionFactory: String,
+      timeWindow: JDuration,
+      keepNumberOfEntries: Int,
+      evictInterval: JDuration,
+      deleteInterval: JDuration,
+      logDbCallsExceeding: FiniteDuration
+  ): R2dbcProjectionSettings = new R2dbcProjectionSettings(
+    Dialect.Postgres,
+    schema,
+    offsetTable,
+    timestampOffsetTable,
+    managementTable,
+    useConnectionFactory,
+    timeWindow,
+    keepNumberOfEntries,
+    evictInterval,
+    deleteInterval,
+    logDbCallsExceeding
+  )
 }
 
-// FIXME remove case class, and add `with` methods
-final case class R2dbcProjectionSettings(
-    schema: Option[String],
-    offsetTable: String,
-    timestampOffsetTable: String,
-    managementTable: String,
-    useConnectionFactory: String,
-    timeWindow: JDuration,
-    keepNumberOfEntries: Int,
-    evictInterval: JDuration,
-    deleteInterval: JDuration,
-    logDbCallsExceeding: FiniteDuration) {
+final class R2dbcProjectionSettings private (
+    val dialect: Dialect,
+    val schema: Option[String],
+    val offsetTable: String,
+    val timestampOffsetTable: String,
+    val managementTable: String,
+    val useConnectionFactory: String,
+    val timeWindow: JDuration,
+    val keepNumberOfEntries: Int,
+    val evictInterval: JDuration,
+    val deleteInterval: JDuration,
+    val logDbCallsExceeding: FiniteDuration
+) extends Serializable {
+
+  override def toString: String =
+    s"R2dbcProjectionSettings($dialect, $schema, $offsetTable, $timestampOffsetTable, $managementTable, " +
+    s"$useConnectionFactory, $timeWindow, $keepNumberOfEntries, $evictInterval, $deleteInterval, $logDbCallsExceeding)"
+
+  override def equals(other: Any): Boolean =
+    other match {
+      case that: R2dbcProjectionSettings =>
+        dialect == that.dialect && schema == that.schema &&
+        offsetTable == that.offsetTable && timestampOffsetTable == that.timestampOffsetTable &&
+        managementTable == that.managementTable && useConnectionFactory == that.useConnectionFactory &&
+        timeWindow == that.timeWindow && keepNumberOfEntries == that.keepNumberOfEntries &&
+        evictInterval == that.evictInterval && deleteInterval == that.deleteInterval &&
+        logDbCallsExceeding == that.logDbCallsExceeding
+      case _ => false
+    }
+
+  override def hashCode(): Int = {
+    val values = Seq(
+      dialect,
+      schema,
+      offsetTable,
+      timestampOffsetTable,
+      managementTable,
+      useConnectionFactory,
+      timeWindow,
+      keepNumberOfEntries,
+      evictInterval,
+      deleteInterval,
+      logDbCallsExceeding
+    )
+    val h = values.foldLeft(MurmurHash3.productSeed) { case (h, value) =>
+      MurmurHash3.mix(h, value.##)
+    }
+    MurmurHash3.finalizeHash(h, values.size)
+  }
+
+  private[this] def copy(
+      dialect: Dialect = dialect,
+      schema: Option[String] = schema,
+      offsetTable: String = offsetTable,
+      timestampOffsetTable: String = timestampOffsetTable,
+      managementTable: String = managementTable,
+      useConnectionFactory: String = useConnectionFactory,
+      timeWindow: JDuration = timeWindow,
+      keepNumberOfEntries: Int = keepNumberOfEntries,
+      evictInterval: JDuration = evictInterval,
+      deleteInterval: JDuration = deleteInterval,
+      logDbCallsExceeding: FiniteDuration = logDbCallsExceeding
+  ): R2dbcProjectionSettings =
+    new R2dbcProjectionSettings(
+      dialect,
+      schema,
+      offsetTable,
+      timestampOffsetTable,
+      managementTable,
+      useConnectionFactory,
+      timeWindow,
+      keepNumberOfEntries,
+      evictInterval,
+      deleteInterval,
+      logDbCallsExceeding
+    )
+
+  def withDialect(dialect: Dialect): R2dbcProjectionSettings =
+    copy(dialect = dialect)
+
+  def withSchema(schema: Option[String]): R2dbcProjectionSettings =
+    copy(schema = schema)
+
+  def withOffsetTable(offsetTable: String): R2dbcProjectionSettings =
+    copy(offsetTable = offsetTable)
+
+  def withTimestampOffsetTable(timestampOffsetTable: String): R2dbcProjectionSettings =
+    copy(timestampOffsetTable = timestampOffsetTable)
+
+  def withManagementTable(managementTable: String): R2dbcProjectionSettings =
+    copy(managementTable = managementTable)
+
+  def withUseConnectionFactory(useConnectionFactory: String): R2dbcProjectionSettings =
+    copy(useConnectionFactory = useConnectionFactory)
+
+  def withTimeWindow(timeWindow: JDuration): R2dbcProjectionSettings =
+    copy(timeWindow = timeWindow)
+
+  def withKeepNumberOfEntries(keepNumberOfEntries: Int): R2dbcProjectionSettings =
+    copy(keepNumberOfEntries = keepNumberOfEntries)
+
+  def withEvictInterval(evictInterval: JDuration): R2dbcProjectionSettings =
+    copy(evictInterval = evictInterval)
+
+  def withDeleteInterval(deleteInterval: JDuration): R2dbcProjectionSettings =
+    copy(deleteInterval = deleteInterval)
+
+  def withLogDbCallsExceeding(logDbCallsExceeding: FiniteDuration): R2dbcProjectionSettings =
+    copy(logDbCallsExceeding = logDbCallsExceeding)
+
   val offsetTableWithSchema: String = schema.map(_ + ".").getOrElse("") + offsetTable
   val timestampOffsetTableWithSchema: String = schema.map(_ + ".").getOrElse("") + timestampOffsetTable
   val managementTableWithSchema: String = schema.map(_ + ".").getOrElse("") + managementTable

@@ -53,13 +53,7 @@ final class R2dbcSettings(config: Config) {
 
   val durableStateAssertSingleWriter: Boolean = config.getBoolean("state.assert-single-writer")
 
-  val dialect: Dialect = toRootLowerCase(config.getString("dialect")) match {
-    case "yugabyte" => Dialect.Yugabyte
-    case "postgres" => Dialect.Postgres
-    case "mysql"    => Dialect.MySQL
-    case other =>
-      throw new IllegalArgumentException(s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres].")
-  }
+  val dialect: Dialect = Dialect.fromString(config.getString("dialect"))
 
   val querySettings = new QuerySettings(config.getConfig("query"))
 
@@ -96,6 +90,18 @@ object Dialect {
 
   /** @since 1.1.0 */
   case object MySQL extends Dialect
+
+  /** @since 1.1.0 */
+  def fromString(value: String): Dialect = {
+    toRootLowerCase(value) match {
+      case "yugabyte" => Dialect.Yugabyte
+      case "postgres" => Dialect.Postgres
+      case "mysql"    => Dialect.MySQL
+      case other =>
+        throw new IllegalArgumentException(
+          s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres, mysql].")
+    }
+  }
 }
 
 /**
