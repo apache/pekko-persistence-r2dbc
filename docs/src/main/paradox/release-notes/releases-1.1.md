@@ -5,6 +5,7 @@ Apache Pekko Persistence R2DBC 1.1.x releases support Java 8 and above.
 ## 1.1.0-M1
 
 Release notes for Apache Pekko Persistence R2DBC 1.1.0-M1. See [GitHub Milestone for 1.1.0-M1](https://github.com/apache/pekko-persistence-r2dbc/milestone/2?closed=1) for a fuller list of changes.
+As with all milestone releases, this release is not recommended for production use - it is designed to allow users to try out the changes in a test environment.
 
 ### Breaking Changes
 
