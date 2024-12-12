@@ -1,4 +1,4 @@
-# Release Notes
+# Release Notes (1.0.x)
 
 ## 1.0.0
 
@@ -29,7 +29,7 @@ We haven't had to fix any significant bugs that were in Akka Persistence R2DBC 0
     * the minimum required version is Scala 3.3.0
 
 ### Dependency Upgrades
-We have tried to limit the changes to third party dependencies that are used in Pekko Persistence R2DBC 0.7.7. These are some exceptions:
+We have tried to limit the changes to third party dependencies that are used in Akka Persistence R2DBC 0.7.7. These are some exceptions:
 
 * some minor upgrades to r2dbc jars (all still 0.9.x)
 * scalatest 3.2.14. Pekko users who have existing tests based on Akka Testkit may need to migrate their tests due to the scalatest upgrade. The [scalatest 3.2 release notes](https://www.scalatest.org/release_notes/3.2.0) have a detailed description of the changes needed.
