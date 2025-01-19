@@ -84,7 +84,8 @@ import org.slf4j.LoggerFactory
  * Class for encapsulating db interaction.
  */
 @InternalApi
-private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(implicit
+private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
+    implicit
     ec: ExecutionContext,
     system: ActorSystem[_])
     extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {

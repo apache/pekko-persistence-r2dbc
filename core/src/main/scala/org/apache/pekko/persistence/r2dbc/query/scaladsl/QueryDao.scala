@@ -61,7 +61,8 @@ object QueryDao {
  * INTERNAL API
  */
 @InternalApi
-private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(implicit
+private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
+    implicit
     ec: ExecutionContext,
     system: ActorSystem[_])
     extends BySliceQuery.Dao[SerializedJournalRow] {

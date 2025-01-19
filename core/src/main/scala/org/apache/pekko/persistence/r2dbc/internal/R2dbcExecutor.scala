@@ -81,13 +81,15 @@ import reactor.core.publisher.Mono
       }
     }
 
-  def selectOneInTx[A](statement: Statement, mapRow: Row => A)(implicit
+  def selectOneInTx[A](statement: Statement, mapRow: Row => A)(
+      implicit
       ec: ExecutionContext,
       system: ActorSystem[_]): Future[Option[A]] = {
     selectInTx(statement, mapRow).map(_.headOption)
   }
 
-  def selectInTx[A](statement: Statement, mapRow: Row => A)(implicit
+  def selectInTx[A](statement: Statement, mapRow: Row => A)(
+      implicit
       ec: ExecutionContext,
       system: ActorSystem[_]): Future[immutable.IndexedSeq[A]] = {
     statement.execute().asFuture().flatMap { result =>
@@ -107,7 +109,8 @@ import reactor.core.publisher.Mono
  * INTERNAL API:
  */
 @InternalStableApi
-class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDbCallsExceeding: FiniteDuration)(implicit
+class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDbCallsExceeding: FiniteDuration)(
+    implicit
     ec: ExecutionContext,
     system: ActorSystem[_]) {
   import R2dbcExecutor._
