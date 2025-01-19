@@ -31,7 +31,7 @@ import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.scaladsl.DurableStateStorePagedPersistenceIdsQuery
 import pekko.persistence.query.typed.scaladsl.DurableStateStoreBySliceQuery
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao.SerializedStateRow
@@ -56,7 +56,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
 
   private val log = LoggerFactory.getLogger(getClass)
   private val sharedConfigPath = cfgPath.replaceAll("""\.state$""", "")
-  private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
+  private val settings = StateSettings(config)
 
   private implicit val typedSystem: ActorSystem[_] = system.toTyped
   implicit val ec: ExecutionContext = system.dispatcher
@@ -72,7 +72,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
 
     val extractOffset: DurableStateChange[A] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
 
-    new BySliceQuery(stateDao, createEnvelope, extractOffset, settings, log)(typedSystem.executionContext)
+    new BySliceQuery(stateDao, createEnvelope, extractOffset, settings.shared, log)(typedSystem.executionContext)
   }
 
   override def getObject(persistenceId: String): Future[GetObjectResult[A]] = {
@@ -152,7 +152,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
     stateDao.persistenceIds(afterId, limit)
 
   def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.querySettings.persistenceIdsBufferSize
+    import settings.shared.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 

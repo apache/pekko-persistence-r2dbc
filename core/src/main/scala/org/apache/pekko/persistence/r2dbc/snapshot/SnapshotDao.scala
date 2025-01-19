@@ -25,7 +25,7 @@ import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
@@ -69,16 +69,16 @@ private[r2dbc] object SnapshotDao {
       })
 
   def fromConfig(
-      journalSettings: R2dbcSettings,
-      sharedConfigPath: String
+      settings: SnapshotSettings,
+      cfgPath: String
   )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
-    journalSettings.dialect match {
+      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, settings.shared.connectionFactorySettings)
+    settings.shared.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new SnapshotDao(journalSettings, connectionFactory)
+        new SnapshotDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLSnapshotDao(journalSettings, connectionFactory)
+        new MySQLSnapshotDao(settings, connectionFactory)
     }
   }
 }
@@ -89,17 +89,17 @@ private[r2dbc] object SnapshotDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class SnapshotDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[_]) {
   import SnapshotDao._
 
-  implicit protected val dialect: Dialect = settings.dialect
+  implicit protected val dialect: Dialect = settings.shared.dialect
 
-  protected val snapshotTable: String = settings.snapshotsTableWithSchema
+  protected val snapshotTable: String = settings.snapshotsTableWithSchema(settings.shared.schema)
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.shared.logDbCallsExceeding)(ec, system)
 
   protected val upsertSql = sql"""
     INSERT INTO $snapshotTable

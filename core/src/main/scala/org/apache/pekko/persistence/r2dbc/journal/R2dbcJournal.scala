@@ -35,12 +35,10 @@ import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
-import pekko.persistence.r2dbc.R2dbcSettings
-import pekko.persistence.r2dbc.internal.EventsByPersistenceId
+import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
-import pekko.persistence.r2dbc.query.scaladsl.QueryDao
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
@@ -91,16 +89,13 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   private val persistenceExt = Persistence(system)
 
-  private val sharedConfigPath = cfgPath.replaceAll("""\.journal$""", "")
   private val serialization: Serialization = SerializationExtension(context.system)
-  private val journalSettings = R2dbcSettings(context.system.settings.config.getConfig(sharedConfigPath))
+  private val journalSettings = JournalSettings(config)
 
-  private val journalDao = JournalDao.fromConfig(journalSettings, sharedConfigPath)
-  private val queryDao = QueryDao.fromConfig(journalSettings, sharedConfigPath)
-  private val eventsByPersistenceId = new EventsByPersistenceId(journalSettings, queryDao)
+  private val journalDao = JournalDao.fromConfig(journalSettings, cfgPath)
 
   private val pubSub: Option[PubSub] =
-    if (journalSettings.journalPublishEvents) Some(PubSub(system))
+    if (journalSettings.shared.journalPublishEvents) Some(PubSub(system))
     else None
 
   // if there are pending writes when an actor restarts we must wait for
@@ -115,7 +110,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
     def atomicWrite(atomicWrite: AtomicWrite): Future[Instant] = {
-      val timestamp = if (journalSettings.useAppTimestamp) Instant.now() else JournalDao.EmptyDbTimestamp
+      val timestamp = if (journalSettings.shared.useAppTimestamp) Instant.now() else JournalDao.EmptyDbTimestamp
       val serialized: Try[Seq[SerializedJournalRow]] = Try {
         atomicWrite.payload.map { pr =>
           val (event, tags) = pr.payload match {
@@ -226,7 +221,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
     val effectiveToSequenceNr =
       if (max == Long.MaxValue) toSequenceNr
       else math.min(toSequenceNr, fromSequenceNr + max - 1)
-    eventsByPersistenceId
+    journalDao
       .internalEventsByPersistenceId(persistenceId, fromSequenceNr, effectiveToSequenceNr)
       .runWith(Sink.foreach { row =>
         val repr = deserializeRow(serialization, row)
