@@ -27,9 +27,9 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.StateSettings
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
@@ -39,10 +39,10 @@ import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
  */
 @InternalApi
 private[r2dbc] class MySQLDurableStateDao(
-    settings: R2dbcSettings,
+    settings: StateSettings,
     connectionFactory: ConnectionFactory
 )(implicit ec: ExecutionContext, system: ActorSystem[_]) extends DurableStateDao(settings, connectionFactory) {
-  MySQLJournalDao.settingRequirements(settings)
+  MySQLJournalDao.settingRequirements(settings.shared)
 
   override lazy val transactionTimestampSql: String = "NOW(6)"
 

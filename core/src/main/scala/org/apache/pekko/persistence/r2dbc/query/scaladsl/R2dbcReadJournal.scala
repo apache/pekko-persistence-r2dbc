@@ -37,12 +37,10 @@ import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.query.typed.scaladsl.EventsBySliceQuery
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
 import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
-import pekko.persistence.r2dbc.internal.EventsByPersistenceId
 import pekko.persistence.r2dbc.internal.PubSub
-import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
@@ -73,15 +71,13 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   import R2dbcReadJournal.PersistenceIdsQueryState
 
   private val log = LoggerFactory.getLogger(getClass)
-  private val sharedConfigPath = cfgPath.replaceAll("""\.query$""", "")
-  private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
+  private val settings = QuerySettings(config)
 
   private implicit val typedSystem: ActorSystem[_] = system.toTyped
   import typedSystem.executionContext
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val queryDao = QueryDao.fromConfig(settings, sharedConfigPath)
-  private val eventsByPersistenceId = new EventsByPersistenceId(settings, queryDao)
+  private val queryDao = QueryDao.fromConfig(settings, cfgPath)
 
   private val _bySlice: BySliceQuery[SerializedJournalRow, EventEnvelope[Any]] = {
     val createEnvelope: (TimestampOffset, SerializedJournalRow) => EventEnvelope[Any] = (offset, row) => {
@@ -100,13 +96,11 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
 
     val extractOffset: EventEnvelope[Any] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
 
-    new BySliceQuery(queryDao, createEnvelope, extractOffset, settings, log)(typedSystem.executionContext)
+    new BySliceQuery(queryDao, createEnvelope, extractOffset, settings.shared, log)(typedSystem.executionContext)
   }
 
   private def bySlice[Event]: BySliceQuery[SerializedJournalRow, EventEnvelope[Event]] =
     _bySlice.asInstanceOf[BySliceQuery[SerializedJournalRow, EventEnvelope[Event]]]
-
-  private val journalDao = JournalDao.fromConfig(settings, sharedConfigPath)
 
   def extractEntityTypeFromPersistenceId(persistenceId: String): String =
     PersistenceId.extractEntityType(persistenceId)
@@ -161,14 +155,14 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       maxSlice: Int,
       offset: Offset): Source[EventEnvelope[Event], NotUsed] = {
     val dbSource = bySlice[Event].liveBySlices("eventsBySlices", entityType, minSlice, maxSlice, offset)
-    if (settings.journalPublishEvents) {
+    if (settings.shared.journalPublishEvents) {
       val pubSub = PubSub(typedSystem)
       val pubSubSource =
         Source
           .actorRef[EventEnvelope[Event]](
             completionMatcher = PartialFunction.empty,
             failureMatcher = PartialFunction.empty,
-            bufferSize = settings.querySettings.bufferSize,
+            bufferSize = settings.shared.bufferSize,
             overflowStrategy = OverflowStrategy.dropNew)
           .mapMaterializedValue { ref =>
             (minSlice to maxSlice).foreach { slice =>
@@ -176,7 +170,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
               pubSub.eventTopic(entityType, slice) ! Topic.Subscribe(ref.toTyped[EventEnvelope[Event]])
             }
           }
-      dbSource.merge(pubSubSource).via(deduplicate(settings.querySettings.deduplicateCapacity))
+      dbSource.merge(pubSubSource).via(deduplicate(settings.deduplicateCapacity))
     } else
       dbSource
   }
@@ -226,13 +220,13 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       fromSequenceNr: Long,
       toSequenceNr: Long): Source[ClassicEventEnvelope, NotUsed] = {
     val highestSeqNrFut =
-      if (toSequenceNr == Long.MaxValue) journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr)
+      if (toSequenceNr == Long.MaxValue) queryDao.readHighestSequenceNr(persistenceId, fromSequenceNr)
       else Future.successful(toSequenceNr)
 
     Source
       .futureSource[SerializedJournalRow, NotUsed] {
         highestSeqNrFut.map { highestSeqNr =>
-          eventsByPersistenceId.internalEventsByPersistenceId(persistenceId, fromSequenceNr, highestSeqNr)
+          queryDao.internalEventsByPersistenceId(persistenceId, fromSequenceNr, highestSeqNr)
         }
       }
       .map(deserializeRow)
@@ -269,8 +263,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     def delayNextQuery(state: ByPersistenceIdState): Option[FiniteDuration] = {
       val delay = ContinuousQuery.adjustNextDelay(
         state.rowCount,
-        settings.querySettings.bufferSize,
-        settings.querySettings.refreshInterval)
+        settings.shared.bufferSize,
+        settings.shared.refreshInterval)
 
       delay.foreach { d =>
         log.debug(
@@ -349,7 +343,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     queryDao.persistenceIds(afterId, limit)
 
   override def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.querySettings.persistenceIdsBufferSize
+    import settings.shared.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 

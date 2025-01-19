@@ -23,6 +23,7 @@ import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.Statement
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.StateSettings
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
@@ -31,7 +32,6 @@ import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
@@ -64,16 +64,16 @@ import org.slf4j.LoggerFactory
   }
 
   def fromConfig(
-      journalSettings: R2dbcSettings,
-      sharedConfigPath: String
+      settings: StateSettings,
+      cfgPath: String
   )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
-    journalSettings.dialect match {
+      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, settings.shared.connectionFactorySettings)
+    settings.shared.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new DurableStateDao(journalSettings, connectionFactory)
+        new DurableStateDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLDurableStateDao(journalSettings, connectionFactory)
+        new MySQLDurableStateDao(settings, connectionFactory)
     }
   }
 }
@@ -84,20 +84,20 @@ import org.slf4j.LoggerFactory
  * Class for encapsulating db interaction.
  */
 @InternalApi
-private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[_])
     extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {
   import DurableStateDao._
 
-  implicit protected val dialect: Dialect = settings.dialect
+  implicit protected val dialect: Dialect = settings.shared.dialect
   protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
 
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.shared.logDbCallsExceeding)(ec, system)
 
-  protected val stateTable = settings.durableStateTableWithSchema
+  protected val stateTable = settings.durableStateTableWithSchema(settings.shared.schema)
 
   private val selectStateSql: String = sql"""
     SELECT revision, state_ser_id, state_ser_manifest, state_payload, db_timestamp
@@ -115,7 +115,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
   }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    settings.dialect match {
+    settings.shared.dialect match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
       case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
@@ -129,7 +129,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
 
   private val updateStateSql: String = {
     val timestamp =
-      if (settings.dbTimestampMonotonicIncreasing)
+      if (settings.shared.dbTimestampMonotonicIncreasing)
         s"$transactionTimestampSql"
       else
         s"GREATEST($transactionTimestampSql, " +
@@ -256,7 +256,7 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
             .bind(3, state.payload)
           bindTags(stmt, 4)
 
-          if (settings.dbTimestampMonotonicIncreasing) {
+          if (settings.shared.dbTimestampMonotonicIncreasing) {
             if (settings.durableStateAssertSingleWriter)
               stmt
                 .bind(5, state.persistenceId)
@@ -360,9 +360,9 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
         toTimestamp match {
           case Some(until) =>
             stmt.bind(2, until)
-            stmt.bind(3, settings.querySettings.bufferSize)
+            stmt.bind(3, settings.shared.bufferSize)
           case None =>
-            stmt.bind(2, settings.querySettings.bufferSize)
+            stmt.bind(2, settings.shared.bufferSize)
         }
         stmt
       },

@@ -24,7 +24,7 @@ import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.snapshot.SnapshotDao
 
@@ -33,7 +33,7 @@ import pekko.persistence.r2dbc.snapshot.SnapshotDao
  */
 @InternalApi
 private[r2dbc] class MySQLSnapshotDao(
-    settings: R2dbcSettings, connectionFactory: ConnectionFactory
+    settings: SnapshotSettings, connectionFactory: ConnectionFactory
 )(implicit ec: ExecutionContext, system: ActorSystem[_]) extends SnapshotDao(settings, connectionFactory) {
 
   override val upsertSql = sql"""

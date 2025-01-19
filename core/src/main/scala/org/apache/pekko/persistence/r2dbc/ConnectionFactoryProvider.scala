@@ -64,11 +64,11 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
      *
      * @since 1.1.0
      */
-    def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder
+    def apply(builder: ConnectionFactoryOptions.Builder): ConnectionFactoryOptions.Builder
   }
 
   private object NoopCustomizer extends ConnectionFactoryOptionsCustomizer {
-    override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder =
+    override def apply(builder: ConnectionFactoryOptions.Builder): ConnectionFactoryOptions.Builder =
       builder
   }
 }
@@ -86,15 +86,13 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         .map(_ => Done)
     }
 
-  def connectionFactoryFor(configLocation: String): ConnectionFactory = {
+  def connectionFactoryFor(cfgPath: String, connectionFactorySettings: ConnectionFactorySettings): ConnectionFactory = {
     sessions
       .computeIfAbsent(
-        configLocation,
-        configLocation => {
-          val config = system.settings.config.getConfig(configLocation)
-          val settings = new ConnectionFactorySettings(config)
-          val customizer = createConnectionFactoryOptionsCustomizer(settings)
-          createConnectionPoolFactory(settings, customizer, config)
+        cfgPath,
+        _ => {
+          val customizer = createConnectionFactoryOptionsCustomizer(connectionFactorySettings)
+          createConnectionPoolFactory(connectionFactorySettings, customizer)
         })
       .asInstanceOf[ConnectionFactory]
   }
@@ -115,8 +113,7 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
   }
 
   private def createConnectionFactory(settings: ConnectionFactorySettings,
-      customizer: ConnectionFactoryOptionsCustomizer,
-      config: Config): ConnectionFactory = {
+      customizer: ConnectionFactoryOptionsCustomizer): ConnectionFactory = {
     val builder =
       settings.urlOption match {
         case Some(url) =>
@@ -156,13 +153,12 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
       builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
     }
 
-    ConnectionFactories.get(customizer(builder, config).build())
+    ConnectionFactories.get(customizer(builder).build())
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,
-      customizer: ConnectionFactoryOptionsCustomizer,
-      config: Config): ConnectionPool = {
-    val connectionFactory = createConnectionFactory(settings, customizer, config)
+      customizer: ConnectionFactoryOptionsCustomizer): ConnectionPool = {
+    val connectionFactory = createConnectionFactory(settings, customizer)
 
     val evictionInterval = {
       import settings.maxIdleTime
