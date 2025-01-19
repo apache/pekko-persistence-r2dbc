@@ -195,7 +195,8 @@ private[projection] object R2dbcProjectionImpl {
       sourceProvider: SourceProvider[Offset, Envelope],
       handlerFactory: () => R2dbcHandler[immutable.Seq[Envelope]],
       offsetStore: R2dbcOffsetStore,
-      r2dbcExecutor: R2dbcExecutor)(implicit
+      r2dbcExecutor: R2dbcExecutor)(
+      implicit
       ec: ExecutionContext,
       system: ActorSystem[_]): () => Handler[immutable.Seq[Envelope]] = { () =>
     new AdaptedR2dbcHandler(handlerFactory()) {
@@ -292,7 +293,8 @@ private[projection] object R2dbcProjectionImpl {
   private[projection] def adaptedHandlerForGroupedAsync[Offset, Envelope](
       sourceProvider: SourceProvider[Offset, Envelope],
       handlerFactory: () => Handler[immutable.Seq[Envelope]],
-      offsetStore: R2dbcOffsetStore)(implicit
+      offsetStore: R2dbcOffsetStore)(
+      implicit
       ec: ExecutionContext,
       system: ActorSystem[_]): () => Handler[immutable.Seq[Envelope]] = { () =>
     new AdaptedHandler(handlerFactory()) {
@@ -325,7 +327,8 @@ private[projection] object R2dbcProjectionImpl {
   private[projection] def adaptedHandlerForFlow[Offset, Envelope](
       sourceProvider: SourceProvider[Offset, Envelope],
       handler: FlowWithContext[Envelope, ProjectionContext, Done, ProjectionContext, _],
-      offsetStore: R2dbcOffsetStore)(implicit
+      offsetStore: R2dbcOffsetStore)(
+      implicit
       ec: ExecutionContext,
       system: ActorSystem[_]): FlowWithContext[Envelope, ProjectionContext, Done, ProjectionContext, _] = {
 
@@ -353,7 +356,8 @@ private[projection] object R2dbcProjectionImpl {
       .via(handler)
   }
 
-  abstract class AdaptedR2dbcHandler[E](val delegate: R2dbcHandler[E])(implicit
+  abstract class AdaptedR2dbcHandler[E](val delegate: R2dbcHandler[E])(
+      implicit
       ec: ExecutionContext,
       system: ActorSystem[_])
       extends Handler[E] {
