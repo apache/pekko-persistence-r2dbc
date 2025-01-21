@@ -74,27 +74,17 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
 }
 
 class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
-
   import R2dbcExecutor.PublisherOps
-  private val sessions = new ConcurrentHashMap[String, ConnectionPool]
 
-  CoordinatedShutdown(system)
-    .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pools") { () =>
-      import system.executionContext
-      Future
-        .sequence(sessions.asScala.values.map(_.disposeLater().asFutureDone()))
-        .map(_ => Done)
-    }
+  def connectionFactoryFor(connectionFactorySettings: ConnectionFactorySettings): ConnectionPool = {
+    val customizer = createConnectionFactoryOptionsCustomizer(connectionFactorySettings)
+    createConnectionPoolFactory(connectionFactorySettings, customizer)
+  }
 
-  def connectionFactoryFor(cfgPath: String, connectionFactorySettings: ConnectionFactorySettings): ConnectionFactory = {
-    sessions
-      .computeIfAbsent(
-        cfgPath,
-        _ => {
-          val customizer = createConnectionFactoryOptionsCustomizer(connectionFactorySettings)
-          createConnectionPoolFactory(connectionFactorySettings, customizer)
-        })
-      .asInstanceOf[ConnectionFactory]
+  def connectionFactoryFor(config: Config): ConnectionPool = {
+    val connectionFactorySettings = new ConnectionFactorySettings(config)
+    val customizer = createConnectionFactoryOptionsCustomizer(connectionFactorySettings)
+    createConnectionPoolFactory(connectionFactorySettings, customizer)
   }
 
   private def createConnectionFactoryOptionsCustomizer(

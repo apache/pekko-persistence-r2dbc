@@ -47,10 +47,8 @@ object QueryDao {
 
   def fromConfig(
       querySettings: QuerySettings,
-      cfgPath: String
+      connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
-    val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, querySettings.shared.connectionFactorySettings)
     querySettings.shared.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new QueryDao(querySettings, connectionFactory)

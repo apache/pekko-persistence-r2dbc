@@ -23,6 +23,7 @@ import scala.util.Success
 import scala.util.Try
 import com.typesafe.config.Config
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.Done
 import pekko.actor.ActorRef
 import pekko.actor.typed.ActorSystem
@@ -92,7 +93,9 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = JournalSettings(config)
 
-  private val journalDao = JournalDao.fromConfig(journalSettings, cfgPath)
+  private val connectionFactory =
+    ConnectionFactoryProvider(system).connectionFactoryFor(journalSettings.shared.connectionFactorySettings)
+  private val journalDao = JournalDao.fromConfig(journalSettings, connectionFactory)
 
   private val pubSub: Option[PubSub] =
     if (journalSettings.shared.journalPublishEvents) Some(PubSub(system))
@@ -240,5 +243,12 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
       case None => Future.successful(Done)
     }
     pendingWrite.flatMap(_ => journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr))
+  }
+
+  override def postStop(): Unit = {
+    // TODO shared connection factories should not be shutdown
+    // TODO check if blocking dispose is fine, it is documented to block indefinitely until it completes
+    connectionFactory.dispose()
+    super.postStop()
   }
 }

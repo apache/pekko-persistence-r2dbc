@@ -78,10 +78,8 @@ private[r2dbc] object JournalDao {
 
   def fromConfig(
       journalSettings: JournalSettings,
-      cfgPath: String
+      connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): JournalDao = {
-    val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, journalSettings.shared.connectionFactorySettings)
     journalSettings.shared.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new JournalDao(journalSettings, connectionFactory)

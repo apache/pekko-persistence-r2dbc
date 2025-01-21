@@ -18,6 +18,10 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import com.typesafe.config.Config
 import org.apache.pekko
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
+import org.apache.pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
@@ -55,14 +59,22 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   import R2dbcDurableStateStore.PersistenceIdsQueryState
 
   private val log = LoggerFactory.getLogger(getClass)
-  private val sharedConfigPath = cfgPath.replaceAll("""\.state$""", "")
   private val settings = StateSettings(config)
 
   private implicit val typedSystem: ActorSystem[_] = system.toTyped
   implicit val ec: ExecutionContext = system.dispatcher
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val stateDao = DurableStateDao.fromConfig(settings, sharedConfigPath)
+
+  val connectionFactory =
+    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.shared.connectionFactorySettings)
+  CoordinatedShutdown(system)
+    .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pool") { () =>
+      // TODO shared connection factories should not be shutdown
+      connectionFactory.disposeLater().asFutureDone()
+    }
+
+  private val stateDao = DurableStateDao.fromConfig(settings, connectionFactory)
 
   private val bySlice: BySliceQuery[SerializedStateRow, DurableStateChange[A]] = {
     val createEnvelope: (TimestampOffset, SerializedStateRow) => DurableStateChange[A] = (offset, row) => {

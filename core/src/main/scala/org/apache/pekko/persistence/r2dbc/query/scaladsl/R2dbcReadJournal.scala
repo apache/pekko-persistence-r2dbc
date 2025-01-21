@@ -21,6 +21,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import com.typesafe.config.Config
 import org.apache.pekko
+import org.apache.pekko.Done
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
+import org.apache.pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
 import pekko.actor.typed.ActorSystem
@@ -77,7 +82,16 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   import typedSystem.executionContext
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val queryDao = QueryDao.fromConfig(settings, cfgPath)
+
+  private val connectionFactory =
+    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.shared.connectionFactorySettings)
+  CoordinatedShutdown(system)
+    .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pool") { () =>
+      // TODO shared connection factories should not be shutdown
+      connectionFactory.disposeLater().asFutureDone()
+    }
+
+  private val queryDao = QueryDao.fromConfig(settings, connectionFactory)
 
   private val _bySlice: BySliceQuery[SerializedJournalRow, EventEnvelope[Any]] = {
     val createEnvelope: (TimestampOffset, SerializedJournalRow) => EventEnvelope[Any] = (offset, row) => {
@@ -379,5 +393,4 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       nextQuery = state => nextQuery(state))
       .mapMaterializedValue(_ => NotUsed)
   }
-
 }
