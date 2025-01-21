@@ -65,10 +65,8 @@ import org.slf4j.LoggerFactory
 
   def fromConfig(
       settings: StateSettings,
-      cfgPath: String
+      connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
-    val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, settings.shared.connectionFactorySettings)
     settings.shared.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new DurableStateDao(settings, connectionFactory)

@@ -70,10 +70,8 @@ private[r2dbc] object SnapshotDao {
 
   def fromConfig(
       settings: SnapshotSettings,
-      cfgPath: String
+      connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
-    val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, settings.shared.connectionFactorySettings)
     settings.shared.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new SnapshotDao(settings, connectionFactory)
