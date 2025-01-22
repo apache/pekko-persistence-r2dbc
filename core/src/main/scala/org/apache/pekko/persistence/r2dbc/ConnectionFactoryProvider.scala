@@ -81,12 +81,6 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
     createConnectionPoolFactory(connectionFactorySettings, customizer)
   }
 
-  def connectionFactoryFor(config: Config): ConnectionPool = {
-    val connectionFactorySettings = new ConnectionFactorySettings(config)
-    val customizer = createConnectionFactoryOptionsCustomizer(connectionFactorySettings)
-    createConnectionPoolFactory(connectionFactorySettings, customizer)
-  }
-
   private def createConnectionFactoryOptionsCustomizer(
       settings: ConnectionFactorySettings): ConnectionFactoryOptionsCustomizer = {
     settings.connectionFactoryOptionsCustomizer match {
