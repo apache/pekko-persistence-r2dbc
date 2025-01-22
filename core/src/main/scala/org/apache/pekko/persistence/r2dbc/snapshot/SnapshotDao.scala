@@ -95,7 +95,7 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
 
   implicit protected val dialect: Dialect = settings.shared.dialect
 
-  protected val snapshotTable: String = settings.snapshotsTableWithSchema(settings.shared.schema)
+  protected val snapshotTable: String = settings.snapshotsTableWithSchema
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.shared.logDbCallsExceeding)(ec, system)
 

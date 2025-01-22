@@ -75,7 +75,7 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
   implicit protected val dialect: Dialect = querySettings.shared.dialect
   protected lazy val statementTimestampSql: String = "statement_timestamp()"
 
-  protected val journalTable = querySettings.journalTableWithSchema(querySettings.shared.schema)
+  protected val journalTable = querySettings.journalTableWithSchema
 
   private val currentDbTimestampSql =
     "SELECT transaction_timestamp() AS db_timestamp"

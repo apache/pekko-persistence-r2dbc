@@ -95,7 +95,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.shared.logDbCallsExceeding)(ec, system)
 
-  protected val stateTable = settings.durableStateTableWithSchema(settings.shared.schema)
+  protected val stateTable = settings.durableStateTableWithSchema
 
   private val selectStateSql: String = sql"""
     SELECT revision, state_ser_id, state_ser_manifest, state_payload, db_timestamp
