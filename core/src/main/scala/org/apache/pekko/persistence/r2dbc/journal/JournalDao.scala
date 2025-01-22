@@ -114,7 +114,7 @@ private[r2dbc] class JournalDao(journalSettings: JournalSettings, connectionFact
   protected val r2dbcExecutor =
     new R2dbcExecutor(connectionFactory, log, journalSettings.shared.logDbCallsExceeding)(ec, system)
 
-  protected val journalTable: String = journalSettings.journalTableWithSchema(journalSettings.shared.schema)
+  protected val journalTable: String = journalSettings.journalTableWithSchema
 
   protected val (insertEventWithParameterTimestampSql: String, insertEventWithTransactionTimestampSql: String) = {
     val baseSql =

@@ -60,10 +60,10 @@ object Dialect {
 @InternalStableApi
 final class JournalSettings(config: Config) {
 
-  val journalTable: String = config.getString("table")
-  def journalTableWithSchema(schema: Option[String]): String = schema.map(_ + ".").getOrElse("") + journalTable
+  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
 
-  val shared = new SharedSettings(config.getConfig("shared"))
+  val journalTable: String = config.getString("table")
+  val journalTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + journalTable
 }
 
 /**
@@ -81,10 +81,10 @@ object JournalSettings {
 @InternalStableApi
 final class SnapshotSettings(config: Config) {
 
-  val snapshotsTable: String = config.getString("table")
-  def snapshotsTableWithSchema(schema: Option[String]): String = schema.map(_ + ".").getOrElse("") + snapshotsTable
+  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
 
-  val shared = new SharedSettings(config.getConfig("shared"))
+  val snapshotsTable: String = config.getString("table")
+  val snapshotsTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + snapshotsTable
 }
 
 /**
@@ -102,13 +102,12 @@ object SnapshotSettings {
 @InternalStableApi
 final class StateSettings(config: Config) {
 
+  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
+
   val durableStateTable: String = config.getString("table")
-  def durableStateTableWithSchema(schema: Option[String]): String =
-    schema.map(_ + ".").getOrElse("") + durableStateTable
+  val durableStateTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + durableStateTable
 
   val durableStateAssertSingleWriter: Boolean = config.getBoolean("assert-single-writer")
-
-  val shared = new SharedSettings(config.getConfig("shared"))
 }
 
 /**
@@ -126,12 +125,12 @@ object StateSettings {
 @InternalStableApi
 final class QuerySettings(config: Config) {
 
+  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
+
   val journalTable: String = config.getString("table")
-  def journalTableWithSchema(schema: Option[String]): String = schema.map(_ + ".").getOrElse("") + journalTable
+  val journalTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + journalTable
 
   val deduplicateCapacity: Int = config.getInt("deduplicate-capacity")
-
-  val shared = new SharedSettings(config.getConfig("shared"))
 }
 
 /**
@@ -155,7 +154,7 @@ final class SharedSettings(config: Config) {
 
   val schema: Option[String] = Option(config.getString("schema")).filterNot(_.trim.isEmpty)
 
-  val connectionFactorySettings = new ConnectionFactorySettings(config.getConfig("connection-factory"))
+  val connectionFactorySettings = ConnectionFactorySettings(config.getConfig("connection-factory"))
 
   val dbTimestampMonotonicIncreasing: Boolean = config.getBoolean("db-timestamp-monotonic-increasing")
 
@@ -178,6 +177,15 @@ final class SharedSettings(config: Config) {
   val backtrackingWindow: FiniteDuration = config.getDuration("backtracking.window").asScala
   val backtrackingBehindCurrentTime: FiniteDuration = config.getDuration("backtracking.behind-current-time").asScala
   val persistenceIdsBufferSize: Int = config.getInt("persistence-ids.buffer-size")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object SharedSettings {
+  def apply(config: Config): SharedSettings =
+    new SharedSettings(config)
 }
 
 /**
@@ -216,4 +224,13 @@ final class ConnectionFactorySettings(config: Config) {
 
   val connectionFactoryOptionsCustomizer: Option[String] =
     Option(config.getString("connection-factory-options-customizer")).filter(_.trim.nonEmpty)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object ConnectionFactorySettings {
+  def apply(config: Config): ConnectionFactorySettings =
+    new ConnectionFactorySettings(config)
 }
