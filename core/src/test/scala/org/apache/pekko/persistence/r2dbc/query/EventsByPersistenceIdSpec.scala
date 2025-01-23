@@ -22,7 +22,6 @@ import pekko.actor.typed.ActorSystem
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.TestActors
 import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestActors.Persister.PersistWithAck
@@ -52,7 +51,6 @@ class EventsByPersistenceIdSpec
   import EventsByPersistenceIdSpec._
 
   override def typedSystem: ActorSystem[_] = system
-  private val settings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
 
   private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
 

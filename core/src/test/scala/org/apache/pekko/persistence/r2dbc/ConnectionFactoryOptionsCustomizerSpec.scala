@@ -32,7 +32,8 @@ class ConnectionFactoryOptionsCustomizerSpec extends ScalaTestWithActorTestKit(c
       val probe = TestProbe[CustomizerCalled.type]()
       system.eventStream.tell(EventStream.Subscribe(probe.ref))
 
-      ConnectionFactoryProvider(system).connectionFactoryFor("pekko.persistence.r2dbc.connection-factory")
+      ConnectionFactoryProvider(system).connectionFactoryFor(
+        ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.shared.connection-factory")))
       probe.expectMessage(CustomizerCalled)
     }
   }
@@ -42,14 +43,14 @@ object ConnectionFactoryOptionsCustomizerSpec {
   object CustomizerCalled
 
   class Customizer(system: ActorSystem[_]) extends ConnectionFactoryOptionsCustomizer {
-    override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder = {
+    override def apply(builder: ConnectionFactoryOptions.Builder): ConnectionFactoryOptions.Builder = {
       system.eventStream.tell(EventStream.Publish(CustomizerCalled))
       builder
     }
   }
 
   val config: Config = ConfigFactory.parseString("""
-    pekko.persistence.r2dbc.connection-factory {
+    pekko.persistence.r2dbc.shared.connection-factory {
       connection-factory-options-customizer = "org.apache.pekko.persistence.r2dbc.ConnectionFactoryOptionsCustomizerSpec$Customizer"
     }
     """).withFallback(TestConfig.config)

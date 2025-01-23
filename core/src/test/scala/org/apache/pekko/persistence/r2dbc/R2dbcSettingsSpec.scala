@@ -23,51 +23,54 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
   "Settings" should {
     "have table names with schema" in {
-      val config = ConfigFactory.parseString("pekko.persistence.r2dbc.schema=s1").withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
-      settings.journalTableWithSchema shouldBe "s1.event_journal"
-      settings.snapshotsTableWithSchema shouldBe "s1.snapshot"
-      settings.durableStateTableWithSchema shouldBe "s1.durable_state"
+      val config = ConfigFactory.load(ConfigFactory.parseString("pekko.persistence.r2dbc.shared.schema=s1"))
+      val journalSettings = JournalSettings(config.getConfig("pekko.persistence.r2dbc.journal"))
+      journalSettings.journalTableWithSchema shouldBe "s1.event_journal"
+      val snapshotSettings = SnapshotSettings(config.getConfig("pekko.persistence.r2dbc.snapshot"))
+      snapshotSettings.snapshotsTableWithSchema shouldBe "s1.snapshot"
+      val stateSettings = StateSettings(config.getConfig("pekko.persistence.r2dbc.state"))
+      stateSettings.durableStateTableWithSchema shouldBe "s1.durable_state"
 
       // by default connection is configured with options
-      settings.connectionFactorySettings shouldBe a[ConnectionFactorySettings]
-      settings.connectionFactorySettings.urlOption should not be defined
+      val sharedSettings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
+      sharedSettings.connectionFactorySettings shouldBe a[ConnectionFactorySettings]
+      sharedSettings.connectionFactorySettings.urlOption should not be defined
     }
 
     "support connection settings build from url" in {
       val config =
         ConfigFactory
-          .parseString("pekko.persistence.r2dbc.connection-factory.url=whatever-url")
+          .parseString("pekko.persistence.r2dbc.shared.connection-factory.url=whatever-url")
           .withFallback(ConfigFactory.load())
 
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
+      val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings shouldBe a[ConnectionFactorySettings]
       settings.connectionFactorySettings.urlOption shouldBe defined
     }
 
     "support ssl-mode as enum name" in {
       val config = ConfigFactory
-        .parseString("pekko.persistence.r2dbc.connection-factory.ssl.mode=VERIFY_FULL")
+        .parseString("pekko.persistence.r2dbc.shared.connection-factory.ssl.mode=VERIFY_FULL")
         .withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
+      val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings.sslMode shouldBe "VERIFY_FULL"
       SSLMode.fromValue(settings.connectionFactorySettings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
 
     "support ssl-mode values in lower and dashes" in {
       val config = ConfigFactory
-        .parseString("pekko.persistence.r2dbc.connection-factory.ssl.mode=verify-full")
+        .parseString("pekko.persistence.r2dbc.shared.connection-factory.ssl.mode=verify-full")
         .withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
+      val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings.sslMode shouldBe "verify-full"
       SSLMode.fromValue(settings.connectionFactorySettings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
 
     "allow to specify ConnectionFactoryOptions customizer" in {
       val config = ConfigFactory
-        .parseString("pekko.persistence.r2dbc.connection-factory.connection-factory-options-customizer=fqcn")
+        .parseString("pekko.persistence.r2dbc.shared.connection-factory.connection-factory-options-customizer=fqcn")
         .withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
+      val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings.connectionFactoryOptionsCustomizer shouldBe Some("fqcn")
     }
   }
