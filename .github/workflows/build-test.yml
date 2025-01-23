@@ -82,6 +82,10 @@ jobs:
           # TODO: could we poll the port instead of sleep?
           sleep 10
           docker exec -i docker-postgres-db-1 psql -U postgres -t < ddl-scripts/create_tables_postgres.sql
+          docker exec -i docker-postgres-db-1 psql -U postgres -t -c 'CREATE DATABASE journal1;'
+          docker exec -i docker-postgres-db-1 psql -U postgres -t -d journal1 < ddl-scripts/create_tables_postgres.sql
+          docker exec -i docker-postgres-db-1 psql -U postgres -t -c 'CREATE DATABASE journal2;'
+          docker exec -i docker-postgres-db-1 psql -U postgres -t -d journal2 < ddl-scripts/create_tables_postgres.sql
 
       - name: test
         run: sbt ++${{ matrix.SCALA_VERSION }} test
@@ -128,6 +132,10 @@ jobs:
           # TODO: could we poll the port instead of sleep?
           sleep 10
           docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t < ddl-scripts/create_tables_yugabyte.sql
+          docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t -c 'CREATE DATABASE journal1;'
+          docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t -d journal1 < ddl-scripts/create_tables_yugabyte.sql
+          docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t -c 'CREATE DATABASE journal2;'
+          docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t -d journal2 < ddl-scripts/create_tables_yugabyte.sql
 
       - name: test
         run: sbt -Dpekko.persistence.r2dbc.dialect=yugabyte -Dpekko.projection.r2dbc.dialect=yugabyte ++${{ matrix.SCALA_VERSION }} test
@@ -183,6 +191,10 @@ jobs:
         run: |-
           docker compose -f docker/docker-compose-mysql.yml up -d --wait
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
+          docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root -e 'CREATE SCHEMA journal1;'
+          docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=journal1 < ddl-scripts/create_tables_mysql.sql
+          docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root -e 'CREATE SCHEMA journal2;'
+          docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=journal2 < ddl-scripts/create_tables_mysql.sql
 
       - name: test
         run: sbt -Dpekko.persistence.r2dbc.dialect=mysql ++${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
