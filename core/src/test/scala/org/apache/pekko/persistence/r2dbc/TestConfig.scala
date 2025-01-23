@@ -17,14 +17,15 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
 object TestConfig {
-  lazy val config: Config = {
+
+  lazy val unresolvedConfig: Config = {
     val defaultConfig = ConfigFactory.load()
-    val dialect = defaultConfig.getString("pekko.persistence.r2dbc.dialect")
+    val dialect = defaultConfig.getString("pekko.persistence.r2dbc.shared.dialect")
 
     val dialectConfig = dialect match {
       case "postgres" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.connection-factory {
+          pekko.persistence.r2dbc.shared.connection-factory {
             driver = "postgres"
             host = "localhost"
             port = 5432
@@ -35,7 +36,7 @@ object TestConfig {
           """)
       case "yugabyte" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.connection-factory {
+          pekko.persistence.r2dbc.shared.connection-factory {
             driver = "postgres"
             host = "localhost"
             port = 5433
@@ -46,7 +47,7 @@ object TestConfig {
           """)
       case "mysql" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc{
+          pekko.persistence.r2dbc.shared {
             connection-factory {
               driver = "mysql"
               host = "localhost"
@@ -61,14 +62,22 @@ object TestConfig {
           """)
     }
 
-    // using load here so that connection-factory can be overridden
-    ConfigFactory.load(dialectConfig.withFallback(ConfigFactory.parseString("""
+    // reducing pool size in tests because connection factories between plugins are not shared
+    val poolConfig =
+      ConfigFactory.parseString("""
+          pekko.persistence.r2dbc.shared.connection-factory {
+            initial-size = 2
+            max-size = 4
+          }
+          """)
+
+    dialectConfig.withFallback(poolConfig).withFallback(ConfigFactory.parseString("""
     pekko.loglevel = DEBUG
     pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
     pekko.persistence.snapshot-store.plugin = "pekko.persistence.r2dbc.snapshot"
     pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
     pekko.persistence.r2dbc {
-      query {
+      shared {
         refresh-interval = 1s
       }
     }
@@ -78,9 +87,12 @@ object TestConfig {
       }
     }
     pekko.actor.testkit.typed.default-timeout = 10s
-    """)))
+    """))
   }
 
+  // FIXME ideally every dependant that combines this config with other configs should load/resolve at their callsites
+  lazy val config: Config = ConfigFactory.load(unresolvedConfig)
+
   val backtrackingDisabledConfig: Config =
-    ConfigFactory.parseString("pekko.persistence.r2dbc.query.backtracking.enabled = off")
+    ConfigFactory.parseString("pekko.persistence.r2dbc.shared.backtracking.enabled = off")
 }
