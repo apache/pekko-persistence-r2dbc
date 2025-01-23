@@ -47,12 +47,12 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
     ConnectionFactoryProvider(typedSystem)
       .connectionFactoryFor(sharedSettings.connectionFactorySettings)
 
-  // this assuems that journal, state and store use same connection settings
+  // this assumes that journal, state and store use same connection settings
   lazy val r2dbcExecutor: R2dbcExecutor =
     new R2dbcExecutor(
       connectionFactoryProvider,
       LoggerFactory.getLogger(getClass),
-      journalSettings.shared.logDbCallsExceeding)(typedSystem.executionContext, typedSystem)
+      sharedSettings.logDbCallsExceeding)(typedSystem.executionContext, typedSystem)
 
   lazy val persistenceExt: Persistence = Persistence(typedSystem)
 
