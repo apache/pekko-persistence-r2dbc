@@ -6,6 +6,9 @@ import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
 import org.apache.pekko
+import org.apache.pekko.persistence.query.PersistenceQuery
+import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+import org.apache.pekko.stream.scaladsl.Sink
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
@@ -67,12 +70,14 @@ object RuntimeJournalsSpec {
   }
 
   private def config(journal: String) = {
-    // TODO add query config
     ConfigFactory.load(
       ConfigFactory.parseString(s"""
       $journal {
         journal = $${pekko.persistence.r2dbc.journal}
         journal.shared = $${$journal.shared}
+
+        query = $${pekko.persistence.r2dbc.query}
+        query.shared = $${$journal.shared}
 
         snapshot = $${pekko.persistence.r2dbc.snapshot}
         snapshot.shared = $${$journal.shared}
@@ -166,7 +171,19 @@ class RuntimeJournalsSpec
         assertJournal("journal2", "j2m1")
       }
 
-      // TODO assert query
+      {
+        def assertQuery(journal: String, expectedEvent: String) = {
+          val readJournal =
+            PersistenceQuery(system).readJournalFor[R2dbcReadJournal](s"$journal.query", config(journal))
+          val events = readJournal.currentEventsByPersistenceId("id1", 0, Long.MaxValue)
+            .map(_.event)
+            .runWith(Sink.seq).futureValue
+          events should contain theSameElementsAs Seq(expectedEvent)
+        }
+
+        assertQuery("journal1", "j1m1")
+        assertQuery("journal2", "j2m1")
+      }
 
       {
         def assertSnapshot(journal: String, expectedShapshot: String) = {
