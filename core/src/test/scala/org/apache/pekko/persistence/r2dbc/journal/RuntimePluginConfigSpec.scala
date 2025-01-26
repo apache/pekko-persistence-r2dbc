@@ -3,6 +3,7 @@ package org.apache.pekko.persistence.r2dbc.journal
 import scala.collection.immutable.ListSet
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
 import org.apache.pekko
@@ -38,15 +39,15 @@ import org.scalatest.Inside
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.slf4j.LoggerFactory
 
-object RuntimeJournalsSpec {
+object RuntimePluginConfigSpec {
 
-  private object Actor {
-    sealed trait Command
-    case class Save(text: String, replyTo: ActorRef[Done]) extends Command
-    case class ShowMeWhatYouGot(replyTo: ActorRef[String]) extends Command
-    case object Stop extends Command
+  trait EventSourced {
+    import EventSourced._
 
-    def apply(persistenceId: String, journal: String): Behavior[Command] =
+    def configKey: String
+    def database: String
+
+    def apply(persistenceId: String): Behavior[Command] =
       EventSourcedBehavior[Command, String, String](
         PersistenceId.ofUniqueId(persistenceId),
         "",
@@ -62,59 +63,78 @@ object RuntimeJournalsSpec {
           },
         (state, evt) => Seq(state, evt).filter(_.nonEmpty).mkString("|"))
         .withRetention(RetentionCriteria.snapshotEvery(1, Int.MaxValue))
-        .withJournalPluginId(s"$journal.journal")
-        .withJournalPluginConfig(Some(config(journal)))
-        .withSnapshotPluginId(s"$journal.snapshot")
-        .withSnapshotPluginConfig(Some(config(journal)))
+        .withJournalPluginId(s"$configKey.journal")
+        .withJournalPluginConfig(Some(config))
+        .withSnapshotPluginId(s"$configKey.snapshot")
+        .withSnapshotPluginConfig(Some(config))
 
+    lazy val config: Config = {
+      ConfigFactory
+        .load(
+          ConfigFactory
+            .parseString(
+              s"""
+              $configKey {
+                journal = $${pekko.persistence.r2dbc.journal}
+                journal.shared = $${$configKey.shared}
+
+                query = $${pekko.persistence.r2dbc.query}
+                query.shared = $${$configKey.shared}
+
+                snapshot = $${pekko.persistence.r2dbc.snapshot}
+                snapshot.shared = $${$configKey.shared}
+
+                shared = $${pekko.persistence.r2dbc.shared}
+                shared = {
+                  connection-factory {
+                    database = "$database"
+                  }
+                }
+              }
+              """
+            )
+            .withFallback(TestConfig.unresolvedConfig)
+        )
+    }
   }
-
-  private def config(journal: String) = {
-    ConfigFactory.load(
-      ConfigFactory.parseString(s"""
-      $journal {
-        journal = $${pekko.persistence.r2dbc.journal}
-        journal.shared = $${$journal.shared}
-
-        query = $${pekko.persistence.r2dbc.query}
-        query.shared = $${$journal.shared}
-
-        snapshot = $${pekko.persistence.r2dbc.snapshot}
-        snapshot.shared = $${$journal.shared}
-
-        shared = $${pekko.persistence.r2dbc.shared}
-        shared = {
-          connection-factory {
-            database = "$journal"
-          }
-        }
-      }
-    """)
-        .withFallback(TestConfig.unresolvedConfig)
-    )
+  object EventSourced {
+    sealed trait Command
+    case class Save(text: String, replyTo: ActorRef[Done]) extends Command
+    case class ShowMeWhatYouGot(replyTo: ActorRef[String]) extends Command
+    case object Stop extends Command
   }
 }
 
-class RuntimeJournalsSpec
+class RuntimePluginConfigSpec
     extends ScalaTestWithActorTestKit(TestConfig.config)
     with AnyFreeSpecLike
     with BeforeAndAfterEach
     with LogCapturing
     with Inside {
-  import RuntimeJournalsSpec._
+  import RuntimePluginConfigSpec._
+
+  private val eventSourced1 = new EventSourced {
+    override def configKey: String = "plugin1"
+    override def database: String = "database1"
+  }
+
+  private val eventSourced2 = new EventSourced {
+    override def configKey: String = "plugin2"
+    override def database: String = "database2"
+  }
 
   override protected def beforeEach(): Unit = {
     super.beforeAll()
 
     // TODO needs deduplication - very similar to TestDbLifecycle code
-    ListSet("journal1", "journal2").foreach { journal =>
-      val journalConfig = config(journal)
+    ListSet(eventSourced1, eventSourced2).foreach { eventSourced =>
+      val journalSettings: JournalSettings =
+        new JournalSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.journal"))
 
-      val journalSettings: JournalSettings = new JournalSettings(journalConfig.getConfig(s"$journal.journal"))
+      val snapshotSettings: SnapshotSettings =
+        new SnapshotSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.snapshot"))
 
-      val snapshotSettings: SnapshotSettings = new SnapshotSettings(journalConfig.getConfig(s"$journal.snapshot"))
-
-      val sharedSettings = SharedSettings(journalConfig.getConfig(s"$journal.shared"))
+      val sharedSettings = SharedSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.shared"))
 
       val connectionFactoryProvider: ConnectionPool =
         ConnectionFactoryProvider(system)
@@ -147,17 +167,17 @@ class RuntimeJournalsSpec
 
       {
         // one actor in each journal with same id
-        val j1 = spawn(Actor("id1", "journal1"))
-        val j2 = spawn(Actor("id1", "journal2"))
-        j1 ! Actor.Save("j1m1", probe.ref)
+        val j1 = spawn(eventSourced1("id1"))
+        val j2 = spawn(eventSourced2("id1"))
+        j1 ! EventSourced.Save("j1m1", probe.ref)
         probe.receiveMessage()
-        j2 ! Actor.Save("j2m1", probe.ref)
+        j2 ! EventSourced.Save("j2m1", probe.ref)
         probe.receiveMessage()
       }
 
       {
-        def assertJournal(journal: String, expectedEvent: String) = {
-          val ref = Persistence(system).journalFor(s"$journal.journal", config(journal))
+        def assertJournal(eventSourced: EventSourced, expectedEvent: String) = {
+          val ref = Persistence(system).journalFor(s"${eventSourced.configKey}.journal", eventSourced.config)
           ref.tell(ReplayMessages(0, Long.MaxValue, Long.MaxValue, "id1", probe.ref.toClassic), probe.ref.toClassic)
           inside(probe.receiveMessage()) {
             case ReplayedMessage(persistentRepr) =>
@@ -167,27 +187,28 @@ class RuntimeJournalsSpec
           probe.expectMessage(RecoverySuccess(1))
         }
 
-        assertJournal("journal1", "j1m1")
-        assertJournal("journal2", "j2m1")
+        assertJournal(eventSourced1, "j1m1")
+        assertJournal(eventSourced2, "j2m1")
       }
 
       {
-        def assertQuery(journal: String, expectedEvent: String) = {
+        def assertQuery(eventSourced: EventSourced, expectedEvent: String) = {
           val readJournal =
-            PersistenceQuery(system).readJournalFor[R2dbcReadJournal](s"$journal.query", config(journal))
+            PersistenceQuery(system).readJournalFor[R2dbcReadJournal](s"${eventSourced.configKey}.query",
+              eventSourced.config)
           val events = readJournal.currentEventsByPersistenceId("id1", 0, Long.MaxValue)
             .map(_.event)
             .runWith(Sink.seq).futureValue
           events should contain theSameElementsAs Seq(expectedEvent)
         }
 
-        assertQuery("journal1", "j1m1")
-        assertQuery("journal2", "j2m1")
+        assertQuery(eventSourced1, "j1m1")
+        assertQuery(eventSourced2, "j2m1")
       }
 
       {
-        def assertSnapshot(journal: String, expectedShapshot: String) = {
-          val ref = Persistence(system).snapshotStoreFor(s"$journal.snapshot", config(journal))
+        def assertSnapshot(eventSourced: EventSourced, expectedShapshot: String) = {
+          val ref = Persistence(system).snapshotStoreFor(s"${eventSourced.configKey}.snapshot", eventSourced.config)
           ref.tell(LoadSnapshot("id1", SnapshotSelectionCriteria.Latest, Long.MaxValue),
             probe.ref.toClassic)
           inside(probe.receiveMessage()) {
@@ -196,8 +217,8 @@ class RuntimeJournalsSpec
           }
         }
 
-        assertSnapshot("journal1", "j1m1")
-        assertSnapshot("journal2", "j2m1")
+        assertSnapshot(eventSourced1, "j1m1")
+        assertSnapshot(eventSourced2, "j2m1")
       }
     }
   }
