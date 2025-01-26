@@ -1,3 +1,12 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * license agreements; and to You under the Apache License, version 2.0:
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * This file is part of the Apache Pekko project, which was derived from Akka.
+ */
+
 package org.apache.pekko.persistence.r2dbc.journal
 
 import scala.collection.immutable.ListSet
@@ -7,8 +16,13 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
 import org.apache.pekko
+import org.apache.pekko.actor.ExtendedActorSystem
+import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.persistence.query.PersistenceQuery
+import org.apache.pekko.persistence.r2dbc.StateSettings
 import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+import org.apache.pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
+import org.apache.pekko.persistence.state.scaladsl.GetObjectResult
 import org.apache.pekko.stream.scaladsl.Sink
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -47,28 +61,7 @@ object RuntimePluginConfigSpec {
     def configKey: String
     def database: String
 
-    def apply(persistenceId: String): Behavior[Command] =
-      EventSourcedBehavior[Command, String, String](
-        PersistenceId.ofUniqueId(persistenceId),
-        "",
-        (state, cmd) =>
-          cmd match {
-            case Save(text, replyTo) =>
-              Effect.persist(text).thenRun(_ => replyTo ! Done)
-            case ShowMeWhatYouGot(replyTo) =>
-              replyTo ! state
-              Effect.none
-            case Stop =>
-              Effect.stop()
-          },
-        (state, evt) => Seq(state, evt).filter(_.nonEmpty).mkString("|"))
-        .withRetention(RetentionCriteria.snapshotEvery(1, Int.MaxValue))
-        .withJournalPluginId(s"$configKey.journal")
-        .withJournalPluginConfig(Some(config))
-        .withSnapshotPluginId(s"$configKey.snapshot")
-        .withSnapshotPluginConfig(Some(config))
-
-    lazy val config: Config = {
+    lazy val config: Config =
       ConfigFactory
         .load(
           ConfigFactory
@@ -95,13 +88,68 @@ object RuntimePluginConfigSpec {
             )
             .withFallback(TestConfig.unresolvedConfig)
         )
-    }
+
+    def apply(persistenceId: String): Behavior[Command] =
+      EventSourcedBehavior[Command, String, String](
+        PersistenceId.ofUniqueId(persistenceId),
+        "",
+        (state, cmd) =>
+          cmd match {
+            case Save(text, replyTo) =>
+              Effect.persist(text).thenRun(_ => replyTo ! Done)
+            case ShowMeWhatYouGot(replyTo) =>
+              replyTo ! state
+              Effect.none
+            case Stop =>
+              Effect.stop()
+          },
+        (state, evt) => Seq(state, evt).filter(_.nonEmpty).mkString("|"))
+        .withRetention(RetentionCriteria.snapshotEvery(1, Int.MaxValue))
+        .withJournalPluginId(s"$configKey.journal")
+        .withJournalPluginConfig(Some(config))
+        .withSnapshotPluginId(s"$configKey.snapshot")
+        .withSnapshotPluginConfig(Some(config))
   }
   object EventSourced {
     sealed trait Command
     case class Save(text: String, replyTo: ActorRef[Done]) extends Command
     case class ShowMeWhatYouGot(replyTo: ActorRef[String]) extends Command
     case object Stop extends Command
+  }
+
+  trait DurableState {
+    def typedSystem: ActorSystem[_]
+    def configKey: String
+    def database: String
+
+    lazy val config: Config =
+      ConfigFactory
+        .load(
+          ConfigFactory
+            .parseString(
+              s"""
+              $configKey {
+                state = $${pekko.persistence.r2dbc.state}
+                state.shared = $${$configKey.shared}
+
+                shared = $${pekko.persistence.r2dbc.shared}
+                shared = {
+                  connection-factory {
+                    database = "$database"
+                  }
+                }
+              }
+              """
+            )
+            .withFallback(TestConfig.unresolvedConfig)
+        )
+
+    // TODO refactor to use DurableState instead of plugin implementation directly once DurableState implements runtime config
+    val store = new R2dbcDurableStateStore[String](
+      typedSystem.toClassic.asInstanceOf[ExtendedActorSystem],
+      config.getConfig(s"$configKey.state"),
+      ""
+    )
   }
 }
 
@@ -117,8 +165,18 @@ class RuntimePluginConfigSpec
     override def configKey: String = "plugin1"
     override def database: String = "database1"
   }
-
   private val eventSourced2 = new EventSourced {
+    override def configKey: String = "plugin2"
+    override def database: String = "database2"
+  }
+
+  private val state1 = new DurableState {
+    override def typedSystem: ActorSystem[_] = system
+    override def configKey: String = "plugin1"
+    override def database: String = "database1"
+  }
+  private val state2 = new DurableState {
+    override def typedSystem: ActorSystem[_] = system
     override def configKey: String = "plugin2"
     override def database: String = "database2"
   }
@@ -129,10 +187,10 @@ class RuntimePluginConfigSpec
     // TODO needs deduplication - very similar to TestDbLifecycle code
     ListSet(eventSourced1, eventSourced2).foreach { eventSourced =>
       val journalSettings: JournalSettings =
-        new JournalSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.journal"))
+        JournalSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.journal"))
 
       val snapshotSettings: SnapshotSettings =
-        new SnapshotSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.snapshot"))
+        SnapshotSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.snapshot"))
 
       val sharedSettings = SharedSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.shared"))
 
@@ -158,11 +216,35 @@ class RuntimePluginConfigSpec
 
       connectionFactoryProvider.dispose()
     }
+
+    ListSet(state1, state2).foreach { eventSourced =>
+      val stateSettings: StateSettings =
+        StateSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.state"))
+
+      val sharedSettings = SharedSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.shared"))
+
+      val connectionFactoryProvider: ConnectionPool =
+        ConnectionFactoryProvider(system)
+          .connectionFactoryFor(sharedSettings.connectionFactorySettings)
+
+      // this assumes that journal, state and store use same connection settings
+      val r2dbcExecutor: R2dbcExecutor =
+        new R2dbcExecutor(
+          connectionFactoryProvider,
+          LoggerFactory.getLogger(getClass),
+          sharedSettings.logDbCallsExceeding)(system.executionContext, system)
+
+      Await.result(
+        r2dbcExecutor.updateOne("beforeAll delete")(
+          _.createStatement(s"delete from ${stateSettings.durableStateTableWithSchema}")),
+        10.seconds)
+
+      connectionFactoryProvider.dispose()
+    }
   }
 
-  "The journal, query and snapshot store plugins must" - {
-
-    "be possible to configure at runtime and use in multiple isolated instances" in {
+  "Should be possible to configure at runtime and use in multiple isolated instances when running " - {
+    "journal, query and snapshot store plugins" in {
       val probe = createTestProbe[Any]()
 
       {
@@ -219,6 +301,38 @@ class RuntimePluginConfigSpec
 
         assertSnapshot(eventSourced1, "j1m1")
         assertSnapshot(eventSourced2, "j2m1")
+      }
+    }
+
+    "durable state plugin" in {
+      val plugin1 = new DurableState {
+        override def typedSystem: ActorSystem[_] = system
+        override def configKey: String = "plugin1"
+        override def database: String = "database1"
+      }
+      val plugin2 = new DurableState {
+        override def typedSystem: ActorSystem[_] = system
+        override def configKey: String = "plugin2"
+        override def database: String = "database2"
+      }
+
+      {
+        // persist data on both plugins
+        plugin1.store.upsertObject("id1", 1, "j1m1", "").futureValue
+        plugin2.store.upsertObject("id1", 1, "j2m1", "").futureValue
+      }
+
+      {
+        def assertState(state: DurableState, expectedState: String) = {
+          inside(state.store.getObject("id1").futureValue) {
+            case GetObjectResult(Some(value), revision) =>
+              value shouldBe expectedState
+              revision shouldBe 1
+          }
+        }
+
+        assertState(plugin1, "j1m1")
+        assertState(plugin2, "j2m1")
       }
     }
   }
