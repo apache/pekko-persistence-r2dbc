@@ -18,6 +18,10 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import com.typesafe.config.Config
 import org.apache.pekko
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.actor.CoordinatedShutdown
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
+import org.apache.pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
@@ -31,7 +35,7 @@ import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.scaladsl.DurableStateStorePagedPersistenceIdsQuery
 import pekko.persistence.query.typed.scaladsl.DurableStateStoreBySliceQuery
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao.SerializedStateRow
@@ -55,14 +59,22 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   import R2dbcDurableStateStore.PersistenceIdsQueryState
 
   private val log = LoggerFactory.getLogger(getClass)
-  private val sharedConfigPath = cfgPath.replaceAll("""\.state$""", "")
-  private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
+  private val settings = StateSettings(config)
 
   private implicit val typedSystem: ActorSystem[_] = system.toTyped
   implicit val ec: ExecutionContext = system.dispatcher
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val stateDao = DurableStateDao.fromConfig(settings, sharedConfigPath)
+
+  val connectionFactory =
+    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.shared.connectionFactorySettings)
+  CoordinatedShutdown(system)
+    .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pool") { () =>
+      // TODO shared connection factories should not be shutdown
+      connectionFactory.disposeLater().asFutureDone()
+    }
+
+  private val stateDao = DurableStateDao.fromConfig(settings, connectionFactory)
 
   private val bySlice: BySliceQuery[SerializedStateRow, DurableStateChange[A]] = {
     val createEnvelope: (TimestampOffset, SerializedStateRow) => DurableStateChange[A] = (offset, row) => {
@@ -72,7 +84,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
 
     val extractOffset: DurableStateChange[A] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
 
-    new BySliceQuery(stateDao, createEnvelope, extractOffset, settings, log)(typedSystem.executionContext)
+    new BySliceQuery(stateDao, createEnvelope, extractOffset, settings.shared, log)(typedSystem.executionContext)
   }
 
   override def getObject(persistenceId: String): Future[GetObjectResult[A]] = {
@@ -152,7 +164,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
     stateDao.persistenceIds(afterId, limit)
 
   def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.querySettings.persistenceIdsBufferSize
+    import settings.shared.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 

@@ -21,8 +21,9 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
+import com.typesafe.config.Config
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.Done
 import pekko.actor.ActorRef
 import pekko.actor.typed.ActorSystem
@@ -35,18 +36,15 @@ import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
-import pekko.persistence.query.PersistenceQuery
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
-import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
-import com.typesafe.config.Config
 
 /**
  * INTERNAL API
@@ -92,15 +90,15 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   private val persistenceExt = Persistence(system)
 
-  private val sharedConfigPath = cfgPath.replaceAll("""\.journal$""", "")
   private val serialization: Serialization = SerializationExtension(context.system)
-  private val journalSettings = R2dbcSettings(context.system.settings.config.getConfig(sharedConfigPath))
+  private val journalSettings = JournalSettings(config)
 
-  private val journalDao = JournalDao.fromConfig(journalSettings, sharedConfigPath)
-  private val query = PersistenceQuery(system).readJournalFor[R2dbcReadJournal](sharedConfigPath + ".query")
+  private val connectionFactory =
+    ConnectionFactoryProvider(system).connectionFactoryFor(journalSettings.shared.connectionFactorySettings)
+  private val journalDao = JournalDao.fromConfig(journalSettings, connectionFactory)
 
   private val pubSub: Option[PubSub] =
-    if (journalSettings.journalPublishEvents) Some(PubSub(system))
+    if (journalSettings.shared.journalPublishEvents) Some(PubSub(system))
     else None
 
   // if there are pending writes when an actor restarts we must wait for
@@ -115,7 +113,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
     def atomicWrite(atomicWrite: AtomicWrite): Future[Instant] = {
-      val timestamp = if (journalSettings.useAppTimestamp) Instant.now() else JournalDao.EmptyDbTimestamp
+      val timestamp = if (journalSettings.shared.useAppTimestamp) Instant.now() else JournalDao.EmptyDbTimestamp
       val serialized: Try[Seq[SerializedJournalRow]] = Try {
         atomicWrite.payload.map { pr =>
           val (event, tags) = pr.payload match {
@@ -226,7 +224,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
     val effectiveToSequenceNr =
       if (max == Long.MaxValue) toSequenceNr
       else math.min(toSequenceNr, fromSequenceNr + max - 1)
-    query
+    journalDao
       .internalEventsByPersistenceId(persistenceId, fromSequenceNr, effectiveToSequenceNr)
       .runWith(Sink.foreach { row =>
         val repr = deserializeRow(serialization, row)
@@ -245,5 +243,12 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
       case None => Future.successful(Done)
     }
     pendingWrite.flatMap(_ => journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr))
+  }
+
+  override def postStop(): Unit = {
+    // TODO shared connection factories should not be shutdown
+    // TODO check if blocking dispose is fine, it is documented to block indefinitely until it completes
+    connectionFactory.dispose()
+    super.postStop()
   }
 }

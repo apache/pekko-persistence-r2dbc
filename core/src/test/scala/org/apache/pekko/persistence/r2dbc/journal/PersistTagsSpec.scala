@@ -14,13 +14,12 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import scala.concurrent.duration._
-
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.JournalSettings
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
@@ -36,11 +35,11 @@ class PersistTagsSpec
     with LogCapturing {
 
   override def typedSystem: ActorSystem[_] = system
-  private val settings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
+  private val settings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
 
   case class Row(pid: String, seqNr: Long, tags: Set[String])
 
-  private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.dialect")
+  private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.journal.shared.dialect")
 
   private lazy val testEnabled: Boolean = {
     // tags are not implemented for MySQL

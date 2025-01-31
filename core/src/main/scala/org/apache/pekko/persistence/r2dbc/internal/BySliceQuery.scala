@@ -22,13 +22,13 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.QuerySettings
+import org.apache.pekko.persistence.r2dbc.SharedSettings
 import pekko.NotUsed
 import pekko.annotation.InternalApi
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
@@ -189,15 +189,15 @@ import org.slf4j.Logger
     dao: BySliceQuery.Dao[Row],
     createEnvelope: (TimestampOffset, Row) => Envelope,
     extractOffset: Envelope => TimestampOffset,
-    settings: R2dbcSettings,
+    settings: SharedSettings,
     log: Logger)(implicit val ec: ExecutionContext) {
   import BySliceQuery._
   import TimestampOffset.toTimestampOffset
 
-  private val backtrackingWindow = JDuration.ofMillis(settings.querySettings.backtrackingWindow.toMillis)
+  private val backtrackingWindow = JDuration.ofMillis(settings.backtrackingWindow.toMillis)
   private val halfBacktrackingWindow = backtrackingWindow.dividedBy(2)
   private val firstBacktrackingQueryWindow =
-    backtrackingWindow.plus(JDuration.ofMillis(settings.querySettings.backtrackingBehindCurrentTime.toMillis))
+    backtrackingWindow.plus(JDuration.ofMillis(settings.backtrackingBehindCurrentTime.toMillis))
   private val eventBucketCountInterval = JDuration.ofSeconds(60)
 
   def currentBySlices(
@@ -218,7 +218,7 @@ import org.slf4j.Logger
       if (state.queryCount == 0L || state.rowCount > 0) {
         val newState = state.copy(rowCount = 0, queryCount = state.queryCount + 1)
 
-        val toTimestamp = newState.nextQueryToTimestamp(settings.querySettings.bufferSize) match {
+        val toTimestamp = newState.nextQueryToTimestamp(settings.bufferSize) match {
           case Some(t) =>
             if (t.isBefore(endTimestamp)) t else endTimestamp
           case None =>
@@ -323,8 +323,8 @@ import org.slf4j.Logger
       } else {
         val delay = ContinuousQuery.adjustNextDelay(
           state.rowCount,
-          settings.querySettings.bufferSize,
-          settings.querySettings.refreshInterval)
+          settings.bufferSize,
+          settings.refreshInterval)
 
         if (log.isDebugEnabled)
           delay.foreach { d =>
@@ -342,13 +342,13 @@ import org.slf4j.Logger
     }
 
     def switchFromBacktracking(state: QueryState): Boolean = {
-      state.backtracking && state.rowCount < settings.querySettings.bufferSize - 1
+      state.backtracking && state.rowCount < settings.bufferSize - 1
     }
 
     def nextQuery(state: QueryState): (QueryState, Option[Source[Envelope, NotUsed]]) = {
       val newIdleCount = if (state.rowCount == 0) state.idleCount + 1 else 0
       val newState =
-        if (settings.querySettings.backtrackingEnabled && !state.backtracking && state.latest != TimestampOffset.Zero &&
+        if (settings.backtrackingEnabled && !state.backtracking && state.latest != TimestampOffset.Zero &&
           (newIdleCount >= 5 || JDuration
             .between(state.latestBacktracking.timestamp, state.latest.timestamp)
             .compareTo(halfBacktrackingWindow) > 0)) {
@@ -376,11 +376,11 @@ import org.slf4j.Logger
         }
 
       val behindCurrentTime =
-        if (newState.backtracking) settings.querySettings.backtrackingBehindCurrentTime
-        else settings.querySettings.behindCurrentTime
+        if (newState.backtracking) settings.backtrackingBehindCurrentTime
+        else settings.behindCurrentTime
 
       val fromTimestamp = newState.nextQueryFromTimestamp
-      val toTimestamp = newState.nextQueryToTimestamp(settings.querySettings.bufferSize)
+      val toTimestamp = newState.nextQueryToTimestamp(settings.bufferSize)
 
       if (log.isDebugEnabled())
         log.debug(
@@ -431,7 +431,7 @@ import org.slf4j.Logger
       // For Durable State we always refresh the bucket counts at the interval. For Event Sourced we know
       // that they don't change because events are append only.
       (dao.countBucketsMayChange || state.buckets
-        .findTimeForLimit(state.latest.timestamp, settings.querySettings.bufferSize)
+        .findTimeForLimit(state.latest.timestamp, settings.bufferSize)
         .isEmpty)) {
 
       val fromTimestamp =
@@ -475,9 +475,9 @@ import org.slf4j.Logger
         if (row.dbTimestamp == currentTimestamp) {
           // has this already been seen?
           if (currentSequenceNrs.get(row.persistenceId).exists(_ >= row.seqNr)) {
-            if (currentSequenceNrs.size >= settings.querySettings.bufferSize) {
+            if (currentSequenceNrs.size >= settings.bufferSize) {
               throw new IllegalStateException(
-                s"Too many events stored with the same timestamp [$currentTimestamp], buffer size [${settings.querySettings.bufferSize}]")
+                s"Too many events stored with the same timestamp [$currentTimestamp], buffer size [${settings.bufferSize}]")
             }
             log.trace(
               "filtering [{}] [{}] as db timestamp is the same as last offset and is in seen [{}]",
