@@ -55,7 +55,7 @@ class EventsBySliceBacktrackingSpec
   // to be able to store events with specific timestamps
   private def writeEvent(slice: Int, persistenceId: String, seqNr: Long, timestamp: Instant, event: String): Unit = {
     log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
-    implicit val dialect: Dialect = settings.shared.dialect
+    implicit val dialect: Dialect = settings.dialect
     val insertEventSql = sql"""
       INSERT INTO ${settings.journalTableWithSchema}
       (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload)
@@ -135,14 +135,14 @@ class EventsBySliceBacktrackingSpec
       writeEvent(slice2, pid2, 1L, startTime.plusMillis(2), "e2-1")
 
       // no backtracking yet
-      result.expectNoMessage(settings.shared.refreshInterval + 100.millis)
+      result.expectNoMessage(settings.refreshInterval + 100.millis)
 
       // after 1/2 of the backtracking widow, to kick off a backtracking query
       writeEvent(
         slice1,
         pid1,
         4L,
-        startTime.plusMillis(settings.shared.backtrackingWindow.toMillis / 2).plusMillis(4),
+        startTime.plusMillis(settings.backtrackingWindow.toMillis / 2).plusMillis(4),
         "e1-4")
       val env6 = result.expectNext()
       env6.persistenceId shouldBe pid1

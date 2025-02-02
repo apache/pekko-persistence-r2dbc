@@ -49,7 +49,7 @@ object QueryDao {
       querySettings: QuerySettings,
       connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
-    querySettings.shared.dialect match {
+    querySettings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new QueryDao(querySettings, connectionFactory)
       case Dialect.MySQL =>
@@ -70,9 +70,9 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
   import JournalDao.readMetadata
   import QueryDao.log
 
-  protected val sharedSettings: SharedSettings = querySettings.shared
+  protected val sharedSettings: SharedSettings = querySettings
 
-  implicit protected val dialect: Dialect = querySettings.shared.dialect
+  implicit protected val dialect: Dialect = querySettings.dialect
   protected lazy val statementTimestampSql: String = "statement_timestamp()"
 
   protected val journalTable = querySettings.journalTableWithSchema
@@ -114,7 +114,7 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
   }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    querySettings.shared.dialect match {
+    querySettings.dialect match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
       case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
@@ -149,7 +149,7 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
     sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
   protected val r2dbcExecutor =
-    new R2dbcExecutor(connectionFactory, log, querySettings.shared.logDbCallsExceeding)(ec, system)
+    new R2dbcExecutor(connectionFactory, log, querySettings.logDbCallsExceeding)(ec, system)
 
   def currentDbTimestamp(): Future[Instant] = {
     r2dbcExecutor
@@ -185,9 +185,9 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
         toTimestamp match {
           case Some(until) =>
             stmt.bind(2, until)
-            stmt.bind(3, querySettings.shared.bufferSize)
+            stmt.bind(3, querySettings.bufferSize)
           case None =>
-            stmt.bind(2, querySettings.shared.bufferSize)
+            stmt.bind(2, querySettings.bufferSize)
         }
         stmt
       },

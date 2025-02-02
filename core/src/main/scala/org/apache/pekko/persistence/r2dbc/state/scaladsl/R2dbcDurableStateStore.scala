@@ -67,7 +67,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   private val persistenceExt = Persistence(system)
 
   val connectionFactory =
-    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.shared.connectionFactorySettings)
+    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.connectionFactorySettings)
   CoordinatedShutdown(system)
     .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pool") { () =>
       // TODO shared connection factories should not be shutdown
@@ -84,7 +84,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
 
     val extractOffset: DurableStateChange[A] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
 
-    new BySliceQuery(stateDao, createEnvelope, extractOffset, settings.shared, log)(typedSystem.executionContext)
+    new BySliceQuery(stateDao, createEnvelope, extractOffset, settings, log)(typedSystem.executionContext)
   }
 
   override def getObject(persistenceId: String): Future[GetObjectResult[A]] = {
@@ -164,7 +164,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
     stateDao.persistenceIds(afterId, limit)
 
   def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.shared.persistenceIdsBufferSize
+    import settings.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 

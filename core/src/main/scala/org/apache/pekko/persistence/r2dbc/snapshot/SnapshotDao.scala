@@ -72,7 +72,7 @@ private[r2dbc] object SnapshotDao {
       settings: SnapshotSettings,
       connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
-    settings.shared.dialect match {
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new SnapshotDao(settings, connectionFactory)
       case Dialect.MySQL =>
@@ -93,11 +93,11 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
     system: ActorSystem[_]) {
   import SnapshotDao._
 
-  implicit protected val dialect: Dialect = settings.shared.dialect
+  implicit protected val dialect: Dialect = settings.dialect
 
   protected val snapshotTable: String = settings.snapshotsTableWithSchema
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.shared.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
   protected val upsertSql = sql"""
     INSERT INTO $snapshotTable

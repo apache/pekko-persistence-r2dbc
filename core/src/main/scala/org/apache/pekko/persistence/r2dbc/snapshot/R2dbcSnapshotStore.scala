@@ -60,7 +60,7 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
   private val (connectionFactory, dao) = {
     val settings = SnapshotSettings(cfg)
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(settings.shared.connectionFactorySettings)
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.connectionFactorySettings)
     (connectionFactory, SnapshotDao.fromConfig(settings, connectionFactory))
   }
 

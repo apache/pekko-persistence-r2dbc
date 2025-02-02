@@ -93,12 +93,10 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = JournalSettings(config)
 
-  private val connectionFactory =
-    ConnectionFactoryProvider(system).connectionFactoryFor(journalSettings.shared.connectionFactorySettings)
-  private val journalDao = JournalDao.fromConfig(journalSettings, connectionFactory)
+  private val journalDao = JournalDao.fromConfig(journalSettings, cfgPath: String, config: Config)
 
   private val pubSub: Option[PubSub] =
-    if (journalSettings.shared.journalPublishEvents) Some(PubSub(system))
+    if (journalSettings.journalPublishEvents) Some(PubSub(system))
     else None
 
   // if there are pending writes when an actor restarts we must wait for
@@ -113,7 +111,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
     def atomicWrite(atomicWrite: AtomicWrite): Future[Instant] = {
-      val timestamp = if (journalSettings.shared.useAppTimestamp) Instant.now() else JournalDao.EmptyDbTimestamp
+      val timestamp = if (journalSettings.useAppTimestamp) Instant.now() else JournalDao.EmptyDbTimestamp
       val serialized: Try[Seq[SerializedJournalRow]] = Try {
         atomicWrite.payload.map { pr =>
           val (event, tags) = pr.payload match {
@@ -243,12 +241,5 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
       case None => Future.successful(Done)
     }
     pendingWrite.flatMap(_ => journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr))
-  }
-
-  override def postStop(): Unit = {
-    // TODO shared connection factories should not be shutdown
-    // TODO check if blocking dispose is fine, it is documented to block indefinitely until it completes
-    connectionFactory.dispose()
-    super.postStop()
   }
 }

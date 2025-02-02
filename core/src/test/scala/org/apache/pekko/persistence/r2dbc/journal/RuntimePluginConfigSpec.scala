@@ -223,13 +223,13 @@ class RuntimePluginConfigSpec
 
       val connectionFactoryProvider: ConnectionPool =
         ConnectionFactoryProvider(system)
-          .connectionFactoryFor(stateSettings.shared.connectionFactorySettings)
+          .connectionFactoryFor(stateSettings.connectionFactorySettings)
 
       val r2dbcExecutor: R2dbcExecutor =
         new R2dbcExecutor(
           connectionFactoryProvider,
           LoggerFactory.getLogger(getClass),
-          stateSettings.shared.logDbCallsExceeding)(system.executionContext, system)
+          stateSettings.logDbCallsExceeding)(system.executionContext, system)
 
       Await.result(
         r2dbcExecutor.updateOne("beforeAll delete")(

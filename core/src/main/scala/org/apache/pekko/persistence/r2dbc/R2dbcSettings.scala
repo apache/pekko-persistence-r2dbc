@@ -16,12 +16,14 @@ package org.apache.pekko.persistence.r2dbc
 import java.util.Locale
 
 import scala.concurrent.duration._
-
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
 import pekko.util.JavaDurationConverters._
 import com.typesafe.config.Config
+import com.typesafe.config.ConfigList
+import com.typesafe.config.ConfigObject
+import com.typesafe.config.ConfigValueType
 import pekko.util.Helpers.toRootLowerCase
 
 /**
@@ -58,12 +60,10 @@ object Dialect {
  * INTERNAL API
  */
 @InternalStableApi
-final class JournalSettings(config: Config) {
-
-  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
+final class JournalSettings(val config: Config) extends SharedSettings {
 
   val journalTable: String = config.getString("table")
-  val journalTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + journalTable
+  val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
 }
 
 /**
@@ -79,12 +79,10 @@ object JournalSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class SnapshotSettings(config: Config) {
-
-  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
+final class SnapshotSettings(val config: Config) extends SharedSettings {
 
   val snapshotsTable: String = config.getString("table")
-  val snapshotsTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + snapshotsTable
+  val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
 }
 
 /**
@@ -100,12 +98,10 @@ object SnapshotSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class StateSettings(config: Config) {
-
-  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
+final class StateSettings(val config: Config) extends SharedSettings {
 
   val durableStateTable: String = config.getString("table")
-  val durableStateTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + durableStateTable
+  val durableStateTableWithSchema: String = schema.map(_ + ".").getOrElse("") + durableStateTable
 
   val durableStateAssertSingleWriter: Boolean = config.getBoolean("assert-single-writer")
 }
@@ -123,12 +119,10 @@ object StateSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class QuerySettings(config: Config) {
-
-  val shared: SharedSettings = SharedSettings(config.getConfig("shared"))
+final class QuerySettings(val config: Config) extends SharedSettings {
 
   val journalTable: String = config.getString("table")
-  val journalTableWithSchema: String = shared.schema.map(_ + ".").getOrElse("") + journalTable
+  val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
 
   val deduplicateCapacity: Int = config.getInt("deduplicate-capacity")
 }
@@ -146,15 +140,16 @@ object QuerySettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class SharedSettings(config: Config) {
+trait SharedSettings {
+  import SharedSettings._
+
+  def config: Config
 
   val journalPublishEvents: Boolean = config.getBoolean("publish-events")
 
   val dialect: Dialect = Dialect.fromString(config.getString("dialect"))
 
   val schema: Option[String] = Option(config.getString("schema")).filterNot(_.trim.isEmpty)
-
-  val connectionFactorySettings = ConnectionFactorySettings(config.getConfig("connection-factory"))
 
   val dbTimestampMonotonicIncreasing: Boolean = config.getBoolean("db-timestamp-monotonic-increasing")
 
@@ -184,8 +179,10 @@ final class SharedSettings(config: Config) {
  */
 @InternalStableApi
 object SharedSettings {
-  def apply(config: Config): SharedSettings =
-    new SharedSettings(config)
+  def apply(_config: Config): SharedSettings =
+    new SharedSettings {
+      val config = _config
+    }
 }
 
 /**

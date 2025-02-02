@@ -23,7 +23,7 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
   "Settings" should {
     "have table names with schema" in {
-      val config = ConfigFactory.load(ConfigFactory.parseString("pekko.persistence.r2dbc.shared.schema=s1"))
+      val config = ConfigFactory.load(ConfigFactory.parseString("pekko.persistence.r2dbc.schema=s1"))
       val journalSettings = JournalSettings(config.getConfig("pekko.persistence.r2dbc.journal"))
       journalSettings.journalTableWithSchema shouldBe "s1.event_journal"
       val snapshotSettings = SnapshotSettings(config.getConfig("pekko.persistence.r2dbc.snapshot"))
@@ -40,7 +40,7 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
     "support connection settings build from url" in {
       val config =
         ConfigFactory
-          .parseString("pekko.persistence.r2dbc.shared.connection-factory.url=whatever-url")
+          .parseString("pekko.persistence.r2dbc.connection-factory.url=whatever-url")
           .withFallback(ConfigFactory.load())
 
       val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
@@ -50,7 +50,7 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
     "support ssl-mode as enum name" in {
       val config = ConfigFactory
-        .parseString("pekko.persistence.r2dbc.shared.connection-factory.ssl.mode=VERIFY_FULL")
+        .parseString("pekko.persistence.r2dbc.connection-factory.ssl.mode=VERIFY_FULL")
         .withFallback(ConfigFactory.load())
       val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings.sslMode shouldBe "VERIFY_FULL"
@@ -59,7 +59,7 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
     "support ssl-mode values in lower and dashes" in {
       val config = ConfigFactory
-        .parseString("pekko.persistence.r2dbc.shared.connection-factory.ssl.mode=verify-full")
+        .parseString("pekko.persistence.r2dbc.connection-factory.ssl.mode=verify-full")
         .withFallback(ConfigFactory.load())
       val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings.sslMode shouldBe "verify-full"
@@ -68,7 +68,7 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
     "allow to specify ConnectionFactoryOptions customizer" in {
       val config = ConfigFactory
-        .parseString("pekko.persistence.r2dbc.shared.connection-factory.connection-factory-options-customizer=fqcn")
+        .parseString("pekko.persistence.r2dbc.connection-factory.connection-factory-options-customizer=fqcn")
         .withFallback(ConfigFactory.load())
       val settings = SharedSettings(config.getConfig("pekko.persistence.r2dbc.shared"))
       settings.connectionFactorySettings.connectionFactoryOptionsCustomizer shouldBe Some("fqcn")

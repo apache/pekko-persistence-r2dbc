@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory
       settings: StateSettings,
       connectionFactory: ConnectionFactory
   )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
-    settings.shared.dialect match {
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new DurableStateDao(settings, connectionFactory)
       case Dialect.MySQL =>
@@ -89,11 +89,11 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {
   import DurableStateDao._
 
-  implicit protected val dialect: Dialect = settings.shared.dialect
+  implicit protected val dialect: Dialect = settings.dialect
   protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
 
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.shared.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
   protected val stateTable = settings.durableStateTableWithSchema
 
@@ -113,7 +113,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    settings.shared.dialect match {
+    settings.dialect match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
       case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
@@ -127,7 +127,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
   private val updateStateSql: String = {
     val timestamp =
-      if (settings.shared.dbTimestampMonotonicIncreasing)
+      if (settings.dbTimestampMonotonicIncreasing)
         s"$transactionTimestampSql"
       else
         s"GREATEST($transactionTimestampSql, " +
@@ -254,7 +254,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
             .bind(3, state.payload)
           bindTags(stmt, 4)
 
-          if (settings.shared.dbTimestampMonotonicIncreasing) {
+          if (settings.dbTimestampMonotonicIncreasing) {
             if (settings.durableStateAssertSingleWriter)
               stmt
                 .bind(5, state.persistenceId)
@@ -358,9 +358,9 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
         toTimestamp match {
           case Some(until) =>
             stmt.bind(2, until)
-            stmt.bind(3, settings.shared.bufferSize)
+            stmt.bind(3, settings.bufferSize)
           case None =>
-            stmt.bind(2, settings.shared.bufferSize)
+            stmt.bind(2, settings.bufferSize)
         }
         stmt
       },

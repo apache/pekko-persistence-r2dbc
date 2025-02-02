@@ -59,7 +59,7 @@ private[r2dbc] class MySQLJournalDao(
     connectionFactory: ConnectionFactory)(
     implicit ec: ExecutionContext, system: ActorSystem[_]
 ) extends JournalDao(journalSettings, connectionFactory) {
-  MySQLJournalDao.settingRequirements(journalSettings.shared)
+  MySQLJournalDao.settingRequirements(journalSettings)
 
   override lazy val timestampSql: String = "NOW(6)"
   override lazy val statementTimestampSql: String = "NOW(6)"

@@ -84,7 +84,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   private val persistenceExt = Persistence(system)
 
   private val connectionFactory =
-    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.shared.connectionFactorySettings)
+    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.connectionFactorySettings)
   CoordinatedShutdown(system)
     .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pool") { () =>
       // TODO shared connection factories should not be shutdown
@@ -110,7 +110,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
 
     val extractOffset: EventEnvelope[Any] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
 
-    new BySliceQuery(queryDao, createEnvelope, extractOffset, settings.shared, log)(typedSystem.executionContext)
+    new BySliceQuery(queryDao, createEnvelope, extractOffset, settings, log)(typedSystem.executionContext)
   }
 
   private def bySlice[Event]: BySliceQuery[SerializedJournalRow, EventEnvelope[Event]] =
@@ -169,14 +169,14 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       maxSlice: Int,
       offset: Offset): Source[EventEnvelope[Event], NotUsed] = {
     val dbSource = bySlice[Event].liveBySlices("eventsBySlices", entityType, minSlice, maxSlice, offset)
-    if (settings.shared.journalPublishEvents) {
+    if (settings.journalPublishEvents) {
       val pubSub = PubSub(typedSystem)
       val pubSubSource =
         Source
           .actorRef[EventEnvelope[Event]](
             completionMatcher = PartialFunction.empty,
             failureMatcher = PartialFunction.empty,
-            bufferSize = settings.shared.bufferSize,
+            bufferSize = settings.bufferSize,
             overflowStrategy = OverflowStrategy.dropNew)
           .mapMaterializedValue { ref =>
             (minSlice to maxSlice).foreach { slice =>
@@ -277,8 +277,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     def delayNextQuery(state: ByPersistenceIdState): Option[FiniteDuration] = {
       val delay = ContinuousQuery.adjustNextDelay(
         state.rowCount,
-        settings.shared.bufferSize,
-        settings.shared.refreshInterval)
+        settings.bufferSize,
+        settings.refreshInterval)
 
       delay.foreach { d =>
         log.debug(
@@ -357,7 +357,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     queryDao.persistenceIds(afterId, limit)
 
   override def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.shared.persistenceIdsBufferSize
+    import settings.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 
