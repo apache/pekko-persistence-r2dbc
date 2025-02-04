@@ -93,7 +93,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = JournalSettings(config)
 
-  private val journalDao = JournalDao.fromConfig(journalSettings, cfgPath: String, config: Config)
+  private val journalDao = JournalDao.fromConfig(journalSettings, config)
 
   private val pubSub: Option[PubSub] =
     if (journalSettings.journalPublishEvents) Some(PubSub(system))

@@ -68,22 +68,18 @@ object RuntimePluginConfigSpec {
           ConfigFactory
             .parseString(
               s"""
-              $configKey {
-                journal = $${pekko.persistence.r2dbc.journal}
-                journal.shared = $${$configKey.shared}
-
-                query = $${pekko.persistence.r2dbc.query}
-                query.shared = $${$configKey.shared}
-
-                snapshot = $${pekko.persistence.r2dbc.snapshot}
-                snapshot.shared = $${$configKey.shared}
-
-                shared = $${pekko.persistence.r2dbc.shared}
-                shared = {
-                  connection-factory {
-                    database = "$database"
-                  }
+              $configKey = $${pekko.persistence.r2dbc}
+              $configKey = {
+                connection-factory {
+                  database = "$database"
                 }
+
+                journal.$configKey.connection-factory = $${$configKey.connection-factory}
+                journal.use-connection-factory = "$configKey.connection-factory"
+                query.$configKey.connection-factory = $${$configKey.connection-factory}
+                query.use-connection-factory = "$configKey.connection-factory"
+                snapshot.$configKey.connection-factory = $${$configKey.connection-factory}
+                snapshot.use-connection-factory = "$configKey.connection-factory"
               }
               """
             )
@@ -129,16 +125,12 @@ object RuntimePluginConfigSpec {
           ConfigFactory
             .parseString(
               s"""
-              $configKey {
-                state = $${pekko.persistence.r2dbc.state}
-                state.shared = $${$configKey.shared}
-
-                shared = $${pekko.persistence.r2dbc.shared}
-                shared = {
-                  connection-factory {
-                    database = "$database"
-                  }
+              $configKey = $${pekko.persistence.r2dbc}
+              $configKey = {
+                state.$configKey.connection-factory {
+                  database = "$database"
                 }
+                state.use-connection-factory = "$configKey.connection-factory"
               }
               """
             )
@@ -162,21 +154,21 @@ class RuntimePluginConfigSpec
     with Inside {
   import RuntimePluginConfigSpec._
 
-  private val eventSourced1 = new EventSourced {
+  private lazy val eventSourced1 = new EventSourced {
     override def configKey: String = "plugin1"
     override def database: String = "database1"
   }
-  private val eventSourced2 = new EventSourced {
+  private lazy val eventSourced2 = new EventSourced {
     override def configKey: String = "plugin2"
     override def database: String = "database2"
   }
 
-  private val state1 = new DurableState {
+  private lazy val state1 = new DurableState {
     override def typedSystem: ActorSystem[_] = system
     override def configKey: String = "plugin1"
     override def database: String = "database1"
   }
-  private val state2 = new DurableState {
+  private lazy val state2 = new DurableState {
     override def typedSystem: ActorSystem[_] = system
     override def configKey: String = "plugin2"
     override def database: String = "database2"
@@ -186,24 +178,23 @@ class RuntimePluginConfigSpec
     super.beforeAll()
 
     ListSet(eventSourced1, eventSourced2).foreach { eventSourced =>
-      val journalSettings: JournalSettings =
-        JournalSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.journal"))
+      val journalConfig = eventSourced.config.getConfig(s"${eventSourced.configKey}.journal")
+      val journalSettings: JournalSettings = JournalSettings(journalConfig)
 
       val snapshotSettings: SnapshotSettings =
         SnapshotSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.snapshot"))
 
-      val sharedSettings = SharedSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.shared"))
-
-      val connectionFactoryProvider: ConnectionPool =
+      // TODO provide unique ID for connection factory used by test harness
+      val connectionFactoryProvider =
         ConnectionFactoryProvider(system)
-          .connectionFactoryFor(sharedSettings.connectionFactorySettings)
+          .connectionFactoryFor(journalSettings.useConnectionFactory, journalConfig)
 
-      // this assumes that journal, state and store use same connection settings
+      // this assumes that journal, snapshot store and state use same connection settings
       val r2dbcExecutor: R2dbcExecutor =
         new R2dbcExecutor(
           connectionFactoryProvider,
           LoggerFactory.getLogger(getClass),
-          sharedSettings.logDbCallsExceeding)(system.executionContext, system)
+          journalSettings.logDbCallsExceeding)(system.executionContext, system)
 
       Await.result(
         r2dbcExecutor.updateOne("beforeAll delete")(
@@ -213,17 +204,16 @@ class RuntimePluginConfigSpec
         r2dbcExecutor.updateOne("beforeAll delete")(
           _.createStatement(s"delete from ${snapshotSettings.snapshotsTableWithSchema}")),
         10.seconds)
-
-      connectionFactoryProvider.dispose()
     }
 
     ListSet(state1, state2).foreach { state =>
-      val stateSettings: StateSettings =
-        StateSettings(state.config.getConfig(s"${state.configKey}.state"))
+      val stateConfig = state.config.getConfig(s"${state.configKey}.state")
+      val stateSettings: StateSettings = StateSettings(stateConfig)
 
-      val connectionFactoryProvider: ConnectionPool =
+      // TODO provide unique ID for connection factory used by test harness
+      val connectionFactoryProvider =
         ConnectionFactoryProvider(system)
-          .connectionFactoryFor(stateSettings.connectionFactorySettings)
+          .connectionFactoryFor(stateSettings.useConnectionFactory, stateConfig)
 
       val r2dbcExecutor: R2dbcExecutor =
         new R2dbcExecutor(
@@ -235,8 +225,6 @@ class RuntimePluginConfigSpec
         r2dbcExecutor.updateOne("beforeAll delete")(
           _.createStatement(s"delete from ${stateSettings.durableStateTableWithSchema}")),
         10.seconds)
-
-      connectionFactoryProvider.dispose()
     }
   }
 

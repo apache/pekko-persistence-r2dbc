@@ -83,15 +83,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
 
-  private val connectionFactory =
-    ConnectionFactoryProvider(system.toTyped).connectionFactoryFor(settings.connectionFactorySettings)
-  CoordinatedShutdown(system)
-    .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pool") { () =>
-      // TODO shared connection factories should not be shutdown
-      connectionFactory.disposeLater().asFutureDone()
-    }
-
-  private val queryDao = QueryDao.fromConfig(settings, connectionFactory)
+  private val queryDao = QueryDao.fromConfig(settings, config)
 
   private val _bySlice: BySliceQuery[SerializedJournalRow, EventEnvelope[Any]] = {
     val createEnvelope: (TimestampOffset, SerializedJournalRow) => EventEnvelope[Any] = (offset, row) => {

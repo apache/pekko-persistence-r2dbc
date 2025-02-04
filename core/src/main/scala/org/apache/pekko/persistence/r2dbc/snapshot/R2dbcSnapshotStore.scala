@@ -57,11 +57,9 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
   private val serialization: Serialization = SerializationExtension(context.system)
   private implicit val system: ActorSystem[_] = context.system.toTyped
 
-  private val (connectionFactory, dao) = {
+  private val dao = {
     val settings = SnapshotSettings(cfg)
-    val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(settings.connectionFactorySettings)
-    (connectionFactory, SnapshotDao.fromConfig(settings, connectionFactory))
+    SnapshotDao.fromConfig(settings, cfg)
   }
 
   def loadAsync(persistenceId: String, criteria: SnapshotSelectionCriteria): Future[Option[SelectedSnapshot]] =
@@ -110,11 +108,4 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
 
   def deleteAsync(persistenceId: String, criteria: SnapshotSelectionCriteria): Future[Unit] =
     dao.delete(persistenceId, criteria)
-
-  override def postStop(): Unit = {
-    // TODO shared connection factories should not be shutdown
-    // TODO check if blocking dispose is fine, it is documented to block indefinitely until it completes
-    connectionFactory.dispose()
-    super.postStop()
-  }
 }

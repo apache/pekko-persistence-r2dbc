@@ -60,7 +60,7 @@ object Dialect {
  * INTERNAL API
  */
 @InternalStableApi
-final class JournalSettings(val config: Config) extends SharedSettings {
+final class JournalSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
 
   val journalTable: String = config.getString("table")
   val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
@@ -79,7 +79,7 @@ object JournalSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class SnapshotSettings(val config: Config) extends SharedSettings {
+final class SnapshotSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
 
   val snapshotsTable: String = config.getString("table")
   val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
@@ -98,7 +98,7 @@ object SnapshotSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class StateSettings(val config: Config) extends SharedSettings {
+final class StateSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
 
   val durableStateTable: String = config.getString("table")
   val durableStateTableWithSchema: String = schema.map(_ + ".").getOrElse("") + durableStateTable
@@ -119,7 +119,7 @@ object StateSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class QuerySettings(val config: Config) extends SharedSettings {
+final class QuerySettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
 
   val journalTable: String = config.getString("table")
   val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
@@ -141,7 +141,6 @@ object QuerySettings {
  */
 @InternalStableApi
 trait SharedSettings {
-  import SharedSettings._
 
   def config: Config
 
@@ -172,17 +171,6 @@ trait SharedSettings {
   val backtrackingWindow: FiniteDuration = config.getDuration("backtracking.window").asScala
   val backtrackingBehindCurrentTime: FiniteDuration = config.getDuration("backtracking.behind-current-time").asScala
   val persistenceIdsBufferSize: Int = config.getInt("persistence-ids.buffer-size")
-}
-
-/**
- * INTERNAL API
- */
-@InternalStableApi
-object SharedSettings {
-  def apply(_config: Config): SharedSettings =
-    new SharedSettings {
-      val config = _config
-    }
 }
 
 /**
@@ -230,4 +218,11 @@ final class ConnectionFactorySettings(config: Config) {
 object ConnectionFactorySettings {
   def apply(config: Config): ConnectionFactorySettings =
     new ConnectionFactorySettings(config)
+}
+
+trait UseConnnectionFactory {
+
+  def config: Config
+
+  val useConnectionFactory: String = config.getString("use-connection-factory")
 }

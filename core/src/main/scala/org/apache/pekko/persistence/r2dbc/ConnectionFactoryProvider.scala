@@ -20,6 +20,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.util.{ Failure, Success }
 import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import com.typesafe.config.ConfigValueType
 import com.typesafe.config.ConfigValueType
 import io.r2dbc.pool.ConnectionPool
@@ -66,11 +67,11 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
      *
      * @since 1.1.0
      */
-    def apply(builder: ConnectionFactoryOptions.Builder): ConnectionFactoryOptions.Builder
+    def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder
   }
 
   private object NoopCustomizer extends ConnectionFactoryOptionsCustomizer {
-    override def apply(builder: ConnectionFactoryOptions.Builder): ConnectionFactoryOptions.Builder =
+    override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder =
       builder
   }
 }
@@ -87,42 +88,20 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         .map(_ => Done)
     }
 
-  def connectionFactoryFor(connectionFactorySettings: ConnectionFactorySettings): ConnectionPool = {
-    val customizer = createConnectionFactoryOptionsCustomizer(connectionFactorySettings)
-    createConnectionPoolFactory(connectionFactorySettings, customizer)
+  def connectionFactoryFor(configPath: String): ConnectionFactory = {
+    connectionFactoryFor(configPath, ConfigFactory.empty())
   }
 
-  def connectionFactoryFor(configPath: String): ConnectionFactory = {
+  def connectionFactoryFor(configPath: String, config: Config): ConnectionFactory = {
     sessions
       .computeIfAbsent(
         configPath,
         _ => {
-          val settings = new ConnectionFactorySettings(system.settings.config.getConfig(configPath))
+          val fullConfig = config.withFallback(system.settings.config)
+          val settings =
+            new ConnectionFactorySettings(fullConfig.getConfig(configPath))
           val customizer = createConnectionFactoryOptionsCustomizer(settings)
-          createConnectionPoolFactory(settings, customizer)
-        })
-      .asInstanceOf[ConnectionFactory]
-  }
-
-  def connectionFactoryFor(configPath: String, config: Config): ConnectionFactory = {
-    val (actualConfigPath, connectionFactoryConfig) = config.getValue("connection-factory").valueType() match {
-      case ConfigValueType.OBJECT =>
-        (configPath, config.getConfig("connection-factory"))
-      case ConfigValueType.STRING =>
-        val connectionFactoryConfigPath = config.getString("connection-factory")
-        val fullConfig = config.withFallback(system.settings.config)
-        (connectionFactoryConfigPath, fullConfig.getConfig(connectionFactoryConfigPath))
-      case invalid =>
-        throw new IllegalArgumentException(
-          s"Invalid connection-factory type [$invalid]. Must be either object or string.")
-    }
-    sessions
-      .computeIfAbsent(
-        actualConfigPath,
-        _ => {
-          val settings = new ConnectionFactorySettings(connectionFactoryConfig)
-          val customizer = createConnectionFactoryOptionsCustomizer(settings)
-          createConnectionPoolFactory(settings, customizer)
+          createConnectionPoolFactory(settings, customizer, fullConfig)
         })
       .asInstanceOf[ConnectionFactory]
   }
@@ -143,7 +122,8 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
   }
 
   private def createConnectionFactory(settings: ConnectionFactorySettings,
-      customizer: ConnectionFactoryOptionsCustomizer): ConnectionFactory = {
+      customizer: ConnectionFactoryOptionsCustomizer,
+      config: Config): ConnectionFactory = {
     val builder =
       settings.urlOption match {
         case Some(url) =>
@@ -183,12 +163,13 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
       builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
     }
 
-    ConnectionFactories.get(customizer(builder).build())
+    ConnectionFactories.get(customizer(builder, config).build())
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,
-      customizer: ConnectionFactoryOptionsCustomizer): ConnectionPool = {
-    val connectionFactory = createConnectionFactory(settings, customizer)
+      customizer: ConnectionFactoryOptionsCustomizer,
+      config: Config): ConnectionPool = {
+    val connectionFactory = createConnectionFactory(settings, customizer, config)
 
     val evictionInterval = {
       import settings.maxIdleTime

@@ -19,6 +19,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
+import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.Statement
@@ -65,8 +66,10 @@ import org.slf4j.LoggerFactory
 
   def fromConfig(
       settings: StateSettings,
-      connectionFactory: ConnectionFactory
+      config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
+    val connectionFactory =
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new DurableStateDao(settings, connectionFactory)

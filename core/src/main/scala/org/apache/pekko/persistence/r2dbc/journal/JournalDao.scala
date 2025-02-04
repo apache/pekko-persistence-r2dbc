@@ -17,10 +17,12 @@ import java.time.Instant
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
 import org.apache.pekko.persistence.r2dbc.JournalSettings
 import org.apache.pekko.persistence.r2dbc.SharedSettings
 import org.apache.pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
@@ -76,17 +78,16 @@ private[r2dbc] object JournalDao {
   }
 
   def fromConfig(
-      journalSettings: JournalSettings,
-      configPath: Config,
+      settings: JournalSettings,
       config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): JournalDao = {
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(cfgPath, config)
-    journalSettings.dialect match {
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new JournalDao(journalSettings, connectionFactory)
+        new JournalDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLJournalDao(journalSettings, connectionFactory)
+        new MySQLJournalDao(settings, connectionFactory)
     }
   }
 }

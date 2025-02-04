@@ -15,9 +15,9 @@ package org.apache.pekko.persistence.r2dbc
 
 import com.typesafe.config.Config
 import io.r2dbc.pool.ConnectionPool
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.Persistence
@@ -40,19 +40,17 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
 
   lazy val stateSettings: StateSettings = new StateSettings(config.getConfig(testConfigPath + ".state"))
 
-  lazy val sharedSettings: SharedSettings =
-    SharedSettings(typedSystem.settings.config.getConfig(testConfigPath + ".shared"))
-
-  lazy val connectionFactoryProvider: ConnectionPool =
+  // TODO provide unique ID for connection factory used by test harness
+  lazy val connectionFactoryProvider: ConnectionFactory =
     ConnectionFactoryProvider(typedSystem)
-      .connectionFactoryFor(sharedSettings.connectionFactorySettings)
+      .connectionFactoryFor("pekko.persistence.r2dbc.connection-factory")
 
-  // this assumes that journal, state and store use same connection settings
+  // this assumes that journal, snapshot store and state use same connection settings
   lazy val r2dbcExecutor: R2dbcExecutor =
     new R2dbcExecutor(
       connectionFactoryProvider,
       LoggerFactory.getLogger(getClass),
-      sharedSettings.logDbCallsExceeding)(typedSystem.executionContext, typedSystem)
+      journalSettings.logDbCallsExceeding)(typedSystem.executionContext, typedSystem)
 
   lazy val persistenceExt: Persistence = Persistence(typedSystem)
 
@@ -70,10 +68,5 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
         _.createStatement(s"delete from ${stateSettings.durableStateTableWithSchema}")),
       10.seconds)
     super.beforeAll()
-  }
-
-  override protected def afterAll(): Unit = {
-    connectionFactoryProvider.dispose()
-    super.afterAll()
   }
 }

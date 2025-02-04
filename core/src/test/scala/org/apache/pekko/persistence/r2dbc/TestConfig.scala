@@ -20,12 +20,12 @@ object TestConfig {
 
   lazy val unresolvedConfig: Config = {
     val defaultConfig = ConfigFactory.load()
-    val dialect = defaultConfig.getString("pekko.persistence.r2dbc.shared.dialect")
+    val dialect = defaultConfig.getString("pekko.persistence.r2dbc.dialect")
 
     val dialectConfig = dialect match {
       case "postgres" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.shared.connection-factory {
+          pekko.persistence.r2dbc.connection-factory {
             driver = "postgres"
             host = "localhost"
             port = 5432
@@ -36,7 +36,7 @@ object TestConfig {
           """)
       case "yugabyte" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.shared.connection-factory {
+          pekko.persistence.r2dbc.connection-factory {
             driver = "postgres"
             host = "localhost"
             port = 5433
@@ -47,7 +47,7 @@ object TestConfig {
           """)
       case "mysql" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.shared {
+          pekko.persistence.r2dbc {
             connection-factory {
               driver = "mysql"
               host = "localhost"
@@ -65,7 +65,7 @@ object TestConfig {
     // reducing pool size in tests because connection factories between plugins are not shared
     val poolConfig =
       ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.shared.connection-factory {
+          pekko.persistence.r2dbc.connection-factory {
             initial-size = 2
             max-size = 4
           }
@@ -94,5 +94,5 @@ object TestConfig {
   lazy val config: Config = ConfigFactory.load(unresolvedConfig)
 
   val backtrackingDisabledConfig: Config =
-    ConfigFactory.parseString("pekko.persistence.r2dbc.shared.backtracking.enabled = off")
+    ConfigFactory.parseString("pekko.persistence.r2dbc.backtracking.enabled = off")
 }

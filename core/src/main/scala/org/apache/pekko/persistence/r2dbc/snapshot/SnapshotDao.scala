@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.snapshot
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Row
 import org.apache.pekko
@@ -70,8 +71,10 @@ private[r2dbc] object SnapshotDao {
 
   def fromConfig(
       settings: SnapshotSettings,
-      connectionFactory: ConnectionFactory
+      config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
+    val connectionFactory =
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new SnapshotDao(settings, connectionFactory)

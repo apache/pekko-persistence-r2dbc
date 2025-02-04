@@ -19,6 +19,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
+import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import org.apache.pekko.persistence.r2dbc.QuerySettings
@@ -46,14 +47,16 @@ object QueryDao {
   val log: Logger = LoggerFactory.getLogger(classOf[QueryDao])
 
   def fromConfig(
-      querySettings: QuerySettings,
-      connectionFactory: ConnectionFactory
+                  settings: QuerySettings,
+      config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
-    querySettings.dialect match {
+    val connectionFactory =
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new QueryDao(querySettings, connectionFactory)
+        new QueryDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLQueryDao(querySettings, connectionFactory)
+        new MySQLQueryDao(settings, connectionFactory)
     }
   }
 }
