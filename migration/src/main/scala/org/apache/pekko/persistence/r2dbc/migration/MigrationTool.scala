@@ -125,13 +125,13 @@ class MigrationTool(system: ActorSystem[_]) {
   private val serialization: Serialization = SerializationExtension(system)
 
   private val targetJournalConnectionFactory = ConnectionFactoryProvider(system)
-    .connectionFactoryFor(targetJournalSettings.shared.connectionFactorySettings)
+    .connectionFactoryFor(targetJournalSettings.useConnectionFactory)
   private val targetJournalDao =
     new JournalDao(targetJournalSettings, targetJournalConnectionFactory)
   private val targetSnapshotDao =
     new SnapshotDao(targetSnapshotettings,
       ConnectionFactoryProvider(system)
-        .connectionFactoryFor(targetSnapshotettings.shared.connectionFactorySettings))
+        .connectionFactoryFor(targetSnapshotettings.useConnectionFactory))
 
   private val targetBatch = migrationConfig.getInt("target.batch")
 
@@ -143,9 +143,9 @@ class MigrationTool(system: ActorSystem[_]) {
   private val sourceSnapshotPluginId = migrationConfig.getString("source.snapshot-plugin-id")
   private lazy val sourceSnapshotStore = Persistence(system).snapshotStoreFor(sourceSnapshotPluginId)
 
-  // using journal connection factory settings for migration-specific functionality, consider adding separate settings
+  // TODO using journal connection factory settings for migration-specific functionality, consider adding separate settings
   private[r2dbc] val migrationDao =
-    new MigrationToolDao(targetJournalConnectionFactory, targetJournalSettings.shared.logDbCallsExceeding)
+    new MigrationToolDao(targetJournalConnectionFactory, targetJournalSettings.logDbCallsExceeding)
 
   private lazy val createProgressTable: Future[Done] =
     migrationDao.createProgressTable()

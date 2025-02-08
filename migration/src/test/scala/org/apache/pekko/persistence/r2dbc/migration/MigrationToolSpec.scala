@@ -86,7 +86,7 @@ class MigrationToolSpec
 
   private val testEnabled: Boolean = {
     // don't run this for Yugabyte since it is using pekko-persistence-jdbc
-    system.settings.config.getString("pekko.persistence.r2dbc.shared.dialect") == "postgres"
+    system.settings.config.getString("pekko.persistence.r2dbc.dialect") == "postgres"
   }
 
   override protected def beforeAll(): Unit = {
@@ -178,7 +178,7 @@ class MigrationToolSpec
   "MigrationTool" should {
     if (!testEnabled) {
       info(
-        s"MigrationToolSpec not enabled for ${system.settings.config.getString("pekko.persistence.r2dbc.shared.dialect")}")
+        s"MigrationToolSpec not enabled for ${system.settings.config.getString("pekko.persistence.r2dbc.dialect")}")
       pending
     }
 
