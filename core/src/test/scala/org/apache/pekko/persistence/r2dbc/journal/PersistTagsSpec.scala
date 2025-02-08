@@ -39,7 +39,7 @@ class PersistTagsSpec
 
   case class Row(pid: String, seqNr: Long, tags: Set[String])
 
-  private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.journal.shared.dialect")
+  private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.journal.dialect")
 
   private lazy val testEnabled: Boolean = {
     // tags are not implemented for MySQL

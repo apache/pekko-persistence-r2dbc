@@ -48,7 +48,7 @@ object EventsBySlicePubSubSpec {
     ConfigFactory.load(
       ConfigFactory
         .parseString("""
-    pekko.persistence.r2dbc.shared {
+    pekko.persistence.r2dbc {
       publish-events = on
       # no events from database query, only via pub-sub
       behind-current-time = 5 minutes
@@ -102,9 +102,9 @@ class EventsBySlicePubSubSpec
   "EventsBySlices pub-sub" should {
 
     "publish new events" in new Setup {
-      system.settings.config.getBoolean("pekko.persistence.r2dbc.shared.publish-events") shouldBe true
-      system.settings.config.getBoolean("pekko.persistence.r2dbc.journal.shared.publish-events") shouldBe true
-      system.settings.config.getBoolean("pekko.persistence.r2dbc.query.shared.publish-events") shouldBe true
+      system.settings.config.getBoolean("pekko.persistence.r2dbc.publish-events") shouldBe true
+      system.settings.config.getBoolean("pekko.persistence.r2dbc.journal.publish-events") shouldBe true
+      system.settings.config.getBoolean("pekko.persistence.r2dbc.query.publish-events") shouldBe true
 
       val result: TestSubscriber.Probe[EventEnvelope[String]] =
         query.eventsBySlices[String](setupEntityType, slice, slice, NoOffset).runWith(sinkProbe).request(10)

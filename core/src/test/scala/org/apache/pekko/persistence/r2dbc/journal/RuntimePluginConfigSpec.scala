@@ -41,7 +41,6 @@ import pekko.persistence.SnapshotProtocol.LoadSnapshotResult
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.JournalSettings
-import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.internal.R2dbcExecutor

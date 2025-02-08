@@ -62,25 +62,12 @@ object TestConfig {
           """)
     }
 
-    // reducing pool size in tests because connection factories between plugins are not shared
-    val poolConfig =
-      ConfigFactory.parseString("""
-          pekko.persistence.r2dbc.connection-factory {
-            initial-size = 2
-            max-size = 4
-          }
-          """)
-
-    dialectConfig.withFallback(poolConfig).withFallback(ConfigFactory.parseString("""
+    dialectConfig.withFallback(ConfigFactory.parseString("""
     pekko.loglevel = DEBUG
     pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
     pekko.persistence.snapshot-store.plugin = "pekko.persistence.r2dbc.snapshot"
     pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
-    pekko.persistence.r2dbc {
-      shared {
-        refresh-interval = 1s
-      }
-    }
+    pekko.persistence.r2dbc.refresh-interval = 1s
     pekko.actor {
       serialization-bindings {
         "org.apache.pekko.persistence.r2dbc.CborSerializable" = jackson-cbor
