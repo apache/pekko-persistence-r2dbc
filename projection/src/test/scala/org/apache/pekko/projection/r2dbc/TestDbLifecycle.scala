@@ -15,12 +15,13 @@ package org.apache.pekko.projection.r2dbc
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.JournalSettings
+import org.apache.pekko.persistence.r2dbc.StateSettings
+import org.apache.pekko.persistence.r2dbc.StateSettings
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite
@@ -45,15 +46,17 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
   lazy val persistenceExt: Persistence = Persistence(typedSystem)
 
   override protected def beforeAll(): Unit = {
-    lazy val r2dbcSettings: R2dbcSettings =
-      new R2dbcSettings(typedSystem.settings.config.getConfig("pekko.persistence.r2dbc"))
+    lazy val journalSettings: JournalSettings =
+      new JournalSettings(typedSystem.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
+    lazy val stateSettings: StateSettings =
+      new StateSettings(typedSystem.settings.config.getConfig("pekko.persistence.r2dbc.state"))
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(
-        _.createStatement(s"delete from ${r2dbcSettings.journalTableWithSchema}")),
+        _.createStatement(s"delete from ${journalSettings.journalTableWithSchema}")),
       10.seconds)
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(
-        _.createStatement(s"delete from ${r2dbcSettings.durableStateTableWithSchema}")),
+        _.createStatement(s"delete from ${stateSettings.durableStateTableWithSchema}")),
       10.seconds)
     if (r2dbcProjectionSettings.isOffsetTableDefined) {
       Await.result(

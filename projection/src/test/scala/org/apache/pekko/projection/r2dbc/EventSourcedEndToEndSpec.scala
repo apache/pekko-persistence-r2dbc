@@ -29,7 +29,6 @@ import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
@@ -44,6 +43,7 @@ import pekko.projection.r2dbc.scaladsl.R2dbcSession
 import pekko.serialization.SerializationExtension
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import org.apache.pekko.persistence.r2dbc.JournalSettings
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
 
@@ -141,7 +141,7 @@ class EventSourcedEndToEndSpec
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  private val journalSettings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
+  private val journalSettings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
   private val projectionSettings = R2dbcProjectionSettings(system)
   private val stringSerializer = SerializationExtension(system).serializerFor(classOf[String])
 
@@ -323,13 +323,12 @@ class EventSourcedEndToEndSpec
 
       // pid3, seqNr 8 is missing (knows 7) when receiving 9
       writeEvent(pid3, 9L, startTime.plusMillis(4), "e3-9")
-      processedProbe.expectNoMessage(journalSettings.querySettings.refreshInterval + 2000.millis)
+      processedProbe.expectNoMessage(journalSettings.refreshInterval + 2000.millis)
 
       // but backtracking can fill in the gaps, backtracking will pick up pid3 seqNr 8 and 9
       writeEvent(pid3, 8L, startTime.plusMillis(3), "e3-8")
       val possibleDelay =
-        journalSettings.querySettings.backtrackingBehindCurrentTime + journalSettings.querySettings
-          .refreshInterval + processedProbe.remainingOrDefault
+        journalSettings.backtrackingBehindCurrentTime + journalSettings.refreshInterval + processedProbe.remainingOrDefault
       processedProbe.receiveMessage(possibleDelay).envelope.event shouldBe "e3-8"
       processedProbe.receiveMessage(possibleDelay).envelope.event shouldBe "e3-9"
 
