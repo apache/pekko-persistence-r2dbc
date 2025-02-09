@@ -16,12 +16,11 @@ package org.apache.pekko.projection.r2dbc
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.JournalSettings
-import org.apache.pekko.persistence.r2dbc.StateSettings
-import org.apache.pekko.persistence.r2dbc.StateSettings
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite
@@ -38,7 +37,11 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
 
   lazy val r2dbcExecutor: R2dbcExecutor = {
     new R2dbcExecutor(
-      ConnectionFactoryProvider(typedSystem).connectionFactoryFor(r2dbcProjectionSettings.useConnectionFactory),
+      // making sure that test harness does not initialize connection factory for the plugin that is being tested
+      ConnectionFactoryProvider(typedSystem)
+        .connectionFactoryFor("test.connection-factory",
+          typedSystem.settings.config.getConfig(r2dbcProjectionSettings.useConnectionFactory).atPath(
+            "test.connection-factory")),
       LoggerFactory.getLogger(getClass),
       r2dbcProjectionSettings.logDbCallsExceeding)(typedSystem.executionContext, typedSystem)
   }

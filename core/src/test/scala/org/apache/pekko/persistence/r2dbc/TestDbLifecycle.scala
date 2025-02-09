@@ -14,7 +14,6 @@
 package org.apache.pekko.persistence.r2dbc
 
 import com.typesafe.config.Config
-import io.r2dbc.pool.ConnectionPool
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import io.r2dbc.spi.ConnectionFactory
@@ -40,10 +39,11 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
 
   lazy val stateSettings: StateSettings = new StateSettings(config.getConfig(testConfigPath + ".state"))
 
-  // TODO provide unique ID for connection factory used by test harness
+  // making sure that test harness does not initialize connection factory for the plugin that is being tested
   lazy val connectionFactoryProvider: ConnectionFactory =
     ConnectionFactoryProvider(typedSystem)
-      .connectionFactoryFor("pekko.persistence.r2dbc.connection-factory")
+      .connectionFactoryFor("test.connection-factory",
+        config.getConfig("pekko.persistence.r2dbc.connection-factory").atPath("test.connection-factory"))
 
   // this assumes that journal, snapshot store and state use same connection settings
   lazy val r2dbcExecutor: R2dbcExecutor =

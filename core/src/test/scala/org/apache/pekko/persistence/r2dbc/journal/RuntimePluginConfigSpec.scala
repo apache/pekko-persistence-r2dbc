@@ -14,21 +14,13 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.pool.ConnectionPool
 import org.apache.pekko
-import org.apache.pekko.actor.ExtendedActorSystem
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.persistence.query.PersistenceQuery
-import org.apache.pekko.persistence.r2dbc.ConnectionFactorySettings
-import org.apache.pekko.persistence.r2dbc.StateSettings
-import org.apache.pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
-import org.apache.pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
-import org.apache.pekko.persistence.state.scaladsl.GetObjectResult
-import org.apache.pekko.stream.scaladsl.Sink
 import pekko.Done
+import pekko.actor.ExtendedActorSystem
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorRef
+import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.persistence.JournalProtocol.RecoverySuccess
@@ -39,15 +31,21 @@ import pekko.persistence.SelectedSnapshot
 import pekko.persistence.SnapshotProtocol.LoadSnapshot
 import pekko.persistence.SnapshotProtocol.LoadSnapshotResult
 import pekko.persistence.SnapshotSelectionCriteria
+import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.SnapshotSettings
+import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
+import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
 import pekko.persistence.typed.scaladsl.Effect
 import pekko.persistence.typed.scaladsl.EventSourcedBehavior
 import pekko.persistence.typed.scaladsl.RetentionCriteria
+import pekko.stream.scaladsl.Sink
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Inside
 import org.scalatest.freespec.AnyFreeSpecLike
@@ -126,9 +124,11 @@ object RuntimePluginConfigSpec {
               s"""
               $configKey = $${pekko.persistence.r2dbc}
               $configKey = {
-                state.$configKey.connection-factory {
+                connection-factory {
                   database = "$database"
                 }
+
+                state.$configKey.connection-factory = $${$configKey.connection-factory}
                 state.use-connection-factory = "$configKey.connection-factory"
               }
               """
@@ -183,10 +183,12 @@ class RuntimePluginConfigSpec
       val snapshotSettings: SnapshotSettings =
         SnapshotSettings(eventSourced.config.getConfig(s"${eventSourced.configKey}.snapshot"))
 
-      // TODO provide unique ID for connection factory used by test harness
+      // making sure that test harness does not initialize connection factory for the plugin that is being tested
       val connectionFactoryProvider =
         ConnectionFactoryProvider(system)
-          .connectionFactoryFor(journalSettings.useConnectionFactory, journalConfig)
+          .connectionFactoryFor(s"test.${eventSourced.configKey}.connection-factory",
+            journalConfig.getConfig(journalSettings.useConnectionFactory).atPath(
+              s"test.${eventSourced.configKey}.connection-factory"))
 
       // this assumes that journal, snapshot store and state use same connection settings
       val r2dbcExecutor: R2dbcExecutor =
@@ -209,10 +211,12 @@ class RuntimePluginConfigSpec
       val stateConfig = state.config.getConfig(s"${state.configKey}.state")
       val stateSettings: StateSettings = StateSettings(stateConfig)
 
-      // TODO provide unique ID for connection factory used by test harness
+      // making sure that test harness does not initialize connection factory for the plugin that is being tested
       val connectionFactoryProvider =
         ConnectionFactoryProvider(system)
-          .connectionFactoryFor(stateSettings.useConnectionFactory, stateConfig)
+          .connectionFactoryFor(s"test.${state.configKey}.connection-factory",
+            state.config.getConfig(stateSettings.useConnectionFactory).atPath(
+              s"test.${state.configKey}.connection-factory"))
 
       val r2dbcExecutor: R2dbcExecutor =
         new R2dbcExecutor(
