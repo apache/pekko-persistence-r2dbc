@@ -177,8 +177,7 @@ class MigrationToolSpec
 
   "MigrationTool" should {
     if (!testEnabled) {
-      info(
-        s"MigrationToolSpec not enabled for ${system.settings.config.getString("pekko.persistence.r2dbc.dialect")}")
+      info(s"MigrationToolSpec not enabled for ${system.settings.config.getString("pekko.persistence.r2dbc.dialect")}")
       pending
     }
 

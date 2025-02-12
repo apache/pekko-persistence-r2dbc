@@ -19,12 +19,9 @@ import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
+import pekko.util.Helpers.toRootLowerCase
 import pekko.util.JavaDurationConverters._
 import com.typesafe.config.Config
-import com.typesafe.config.ConfigList
-import com.typesafe.config.ConfigObject
-import com.typesafe.config.ConfigValueType
-import pekko.util.Helpers.toRootLowerCase
 
 /**
  * INTERNAL API

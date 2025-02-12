@@ -32,12 +32,14 @@ import pekko.persistence.SelectedSnapshot
 import pekko.persistence.SnapshotProtocol.LoadSnapshot
 import pekko.persistence.SnapshotProtocol.LoadSnapshotResult
 import pekko.persistence.SnapshotSelectionCriteria
-import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.scaladsl.CurrentEventsByPersistenceIdQuery
 import pekko.persistence.query.scaladsl.CurrentPersistenceIdsQuery
 import pekko.persistence.query.scaladsl.ReadJournal
+import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
@@ -52,9 +54,6 @@ import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
 import pekko.util.Timeout
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import org.apache.pekko.persistence.r2dbc.JournalSettings
-import org.apache.pekko.persistence.r2dbc.SharedSettings
-import org.apache.pekko.persistence.r2dbc.SnapshotSettings
 import org.slf4j.LoggerFactory
 
 object MigrationTool {
@@ -143,7 +142,6 @@ class MigrationTool(system: ActorSystem[_]) {
   private val sourceSnapshotPluginId = migrationConfig.getString("source.snapshot-plugin-id")
   private lazy val sourceSnapshotStore = Persistence(system).snapshotStoreFor(sourceSnapshotPluginId)
 
-  // TODO using journal connection factory settings for migration-specific functionality, consider adding separate settings
   private[r2dbc] val migrationDao =
     new MigrationToolDao(targetJournalConnectionFactory, targetJournalSettings.logDbCallsExceeding)
 

@@ -21,11 +21,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import com.typesafe.config.Config
 import org.apache.pekko
-import org.apache.pekko.Done
-import org.apache.pekko.actor.CoordinatedShutdown
-import org.apache.pekko.actor.CoordinatedShutdown
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
-import org.apache.pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
 import pekko.actor.typed.ActorSystem

@@ -23,7 +23,6 @@ import scala.util.Success
 import scala.util.Try
 import com.typesafe.config.Config
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.Done
 import pekko.actor.ActorRef
 import pekko.actor.typed.ActorSystem

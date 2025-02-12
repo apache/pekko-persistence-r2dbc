@@ -19,27 +19,27 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-import com.typesafe.config.Config
-import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.QuerySettings
-import org.apache.pekko.persistence.r2dbc.SharedSettings
-import org.apache.pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
-import org.apache.pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
+import pekko.persistence.r2dbc.QuerySettings
+import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
+import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
+import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.query.scaladsl.mysql.MySQLQueryDao
 import pekko.stream.scaladsl.Source
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactory
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -47,7 +47,7 @@ object QueryDao {
   val log: Logger = LoggerFactory.getLogger(classOf[QueryDao])
 
   def fromConfig(
-                  settings: QuerySettings,
+      settings: QuerySettings,
       config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
     val connectionFactory =

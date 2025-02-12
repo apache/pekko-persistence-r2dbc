@@ -17,26 +17,26 @@ import java.time.Instant
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import com.typesafe.config.Config
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider
-import org.apache.pekko.persistence.r2dbc.JournalSettings
-import org.apache.pekko.persistence.r2dbc.SharedSettings
-import org.apache.pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
-import org.apache.pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
+import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
+import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
+import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
+import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.typed.PersistenceId
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 

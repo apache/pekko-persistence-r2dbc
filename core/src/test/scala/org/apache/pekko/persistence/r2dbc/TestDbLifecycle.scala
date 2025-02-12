@@ -13,14 +13,14 @@
 
 package org.apache.pekko.persistence.r2dbc
 
-import com.typesafe.config.Config
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite
 import org.slf4j.LoggerFactory

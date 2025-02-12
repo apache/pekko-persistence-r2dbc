@@ -20,14 +20,14 @@
 package org.apache.pekko.persistence.r2dbc.journal.mysql
 
 import scala.concurrent.ExecutionContext
-import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.JournalSettings
-import org.apache.pekko.persistence.r2dbc.SharedSettings
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
+import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
+import io.r2dbc.spi.ConnectionFactory
 
 /**
  * INTERNAL API

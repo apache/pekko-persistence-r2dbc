@@ -18,19 +18,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.util.{ Failure, Success }
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
-import com.typesafe.config.ConfigValueType
-import com.typesafe.config.ConfigValueType
-import io.r2dbc.pool.ConnectionPool
-import io.r2dbc.pool.ConnectionPoolConfiguration
-import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
-import io.r2dbc.postgresql.client.SSLMode
-import io.r2dbc.spi.ConnectionFactories
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Option
+import scala.util.Failure
+import scala.util.Success
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.CoordinatedShutdown
@@ -41,6 +30,16 @@ import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOption
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.util.ccompat.JavaConverters._
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import io.r2dbc.pool.ConnectionPool
+import io.r2dbc.pool.ConnectionPoolConfiguration
+import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
+import io.r2dbc.postgresql.client.SSLMode
+import io.r2dbc.spi.ConnectionFactories
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
   def createExtension(system: ActorSystem[_]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)

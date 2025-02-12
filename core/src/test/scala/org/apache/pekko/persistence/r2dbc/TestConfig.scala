@@ -17,7 +17,6 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
 object TestConfig {
-
   lazy val unresolvedConfig: Config = {
     val defaultConfig = ConfigFactory.load()
     val dialect = defaultConfig.getString("pekko.persistence.r2dbc.dialect")

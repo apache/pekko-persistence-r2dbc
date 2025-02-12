@@ -15,11 +15,11 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import scala.concurrent.duration._
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.JournalSettings
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData

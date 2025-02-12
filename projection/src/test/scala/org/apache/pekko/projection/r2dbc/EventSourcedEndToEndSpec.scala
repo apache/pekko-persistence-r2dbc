@@ -29,6 +29,7 @@ import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
+import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
@@ -43,7 +44,6 @@ import pekko.projection.r2dbc.scaladsl.R2dbcSession
 import pekko.serialization.SerializationExtension
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.apache.pekko.persistence.r2dbc.JournalSettings
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
 

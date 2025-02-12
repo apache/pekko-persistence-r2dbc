@@ -13,22 +13,21 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
-import scala.collection.immutable
 import java.time.Instant
 import java.time.{ Duration => JDuration }
 
 import scala.annotation.tailrec
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.QuerySettings
-import org.apache.pekko.persistence.r2dbc.SharedSettings
 import pekko.NotUsed
 import pekko.annotation.InternalApi
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
+import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
@@ -98,7 +97,10 @@ import org.slf4j.Logger
    *   Key is the epoch seconds for the start of the bucket. Value is the number of entries in the bucket.
    */
   class Buckets(countByBucket: immutable.SortedMap[Buckets.EpochSeconds, Buckets.Count]) {
-    import Buckets.{ Bucket, BucketDurationSeconds, Count, EpochSeconds }
+    import Buckets.Bucket
+    import Buckets.BucketDurationSeconds
+    import Buckets.Count
+    import Buckets.EpochSeconds
 
     val createdAt: Instant = Instant.now()
 
