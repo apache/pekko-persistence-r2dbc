@@ -16,63 +16,12 @@ package org.apache.pekko.persistence.r2dbc
 import java.util.Locale
 
 import scala.concurrent.duration._
-
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
+import pekko.util.Helpers.toRootLowerCase
 import pekko.util.JavaDurationConverters._
 import com.typesafe.config.Config
-import pekko.util.Helpers.toRootLowerCase
-
-/**
- * INTERNAL API
- */
-@InternalStableApi
-object R2dbcSettings {
-  def apply(config: Config): R2dbcSettings =
-    new R2dbcSettings(config)
-}
-
-/**
- * INTERNAL API
- */
-@InternalStableApi
-final class R2dbcSettings(config: Config) {
-  val schema: Option[String] = Option(config.getString("schema")).filterNot(_.trim.isEmpty)
-
-  val journalTable: String = config.getString("journal.table")
-  val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
-
-  val journalPublishEvents: Boolean = config.getBoolean("journal.publish-events")
-
-  val snapshotsTable: String = config.getString("snapshot.table")
-  val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
-
-  val durableStateTable: String = config.getString("state.table")
-  val durableStateTableWithSchema: String = schema.map(_ + ".").getOrElse("") + durableStateTable
-
-  val durableStateAssertSingleWriter: Boolean = config.getBoolean("state.assert-single-writer")
-
-  val dialect: Dialect = Dialect.fromString(config.getString("dialect"))
-
-  val querySettings = new QuerySettings(config.getConfig("query"))
-
-  val connectionFactorySettings = new ConnectionFactorySettings(config.getConfig("connection-factory"))
-
-  val dbTimestampMonotonicIncreasing: Boolean = config.getBoolean("db-timestamp-monotonic-increasing")
-
-  /**
-   * INTERNAL API FIXME remove when https://github.com/yugabyte/yugabyte-db/issues/10995 has been resolved
-   */
-  @InternalApi private[pekko] val useAppTimestamp: Boolean = config.getBoolean("use-app-timestamp")
-
-  val logDbCallsExceeding: FiniteDuration =
-    config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
-      case "off" => -1.millis
-      case _     => config.getDuration("log-db-calls-exceeding").asScala
-    }
-
-}
 
 /**
  * INTERNAL API
@@ -108,15 +57,117 @@ object Dialect {
  * INTERNAL API
  */
 @InternalStableApi
-final class QuerySettings(config: Config) {
+final class JournalSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+
+  val journalTable: String = config.getString("table")
+  val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object JournalSettings {
+  def apply(config: Config): JournalSettings =
+    new JournalSettings(config)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+final class SnapshotSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+
+  val snapshotsTable: String = config.getString("table")
+  val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object SnapshotSettings {
+  def apply(config: Config): SnapshotSettings =
+    new SnapshotSettings(config)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+final class StateSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+
+  val durableStateTable: String = config.getString("table")
+  val durableStateTableWithSchema: String = schema.map(_ + ".").getOrElse("") + durableStateTable
+
+  val durableStateAssertSingleWriter: Boolean = config.getBoolean("assert-single-writer")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object StateSettings {
+  def apply(config: Config): StateSettings =
+    new StateSettings(config)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+final class QuerySettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+
+  val journalTable: String = config.getString("table")
+  val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
+
+  val deduplicateCapacity: Int = config.getInt("deduplicate-capacity")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object QuerySettings {
+  def apply(config: Config): QuerySettings =
+    new QuerySettings(config)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait SharedSettings {
+
+  def config: Config
+
+  val journalPublishEvents: Boolean = config.getBoolean("publish-events")
+
+  val dialect: Dialect = Dialect.fromString(config.getString("dialect"))
+
+  val schema: Option[String] = Option(config.getString("schema")).filterNot(_.trim.isEmpty)
+
+  val dbTimestampMonotonicIncreasing: Boolean = config.getBoolean("db-timestamp-monotonic-increasing")
+
+  /**
+   * INTERNAL API FIXME remove when https://github.com/yugabyte/yugabyte-db/issues/10995 has been resolved
+   */
+  @InternalApi private[pekko] val useAppTimestamp: Boolean = config.getBoolean("use-app-timestamp")
+
+  val logDbCallsExceeding: FiniteDuration =
+    config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
+      case "off" => -1.millis
+      case _     => config.getDuration("log-db-calls-exceeding").asScala
+    }
+
+  val bufferSize: Int = config.getInt("buffer-size")
+
   val refreshInterval: FiniteDuration = config.getDuration("refresh-interval").asScala
   val behindCurrentTime: FiniteDuration = config.getDuration("behind-current-time").asScala
   val backtrackingEnabled: Boolean = config.getBoolean("backtracking.enabled")
   val backtrackingWindow: FiniteDuration = config.getDuration("backtracking.window").asScala
   val backtrackingBehindCurrentTime: FiniteDuration = config.getDuration("backtracking.behind-current-time").asScala
-  val bufferSize: Int = config.getInt("buffer-size")
   val persistenceIdsBufferSize: Int = config.getInt("persistence-ids.buffer-size")
-  val deduplicateCapacity: Int = config.getInt("deduplicate-capacity")
 }
 
 /**
@@ -155,4 +206,20 @@ final class ConnectionFactorySettings(config: Config) {
 
   val connectionFactoryOptionsCustomizer: Option[String] =
     Option(config.getString("connection-factory-options-customizer")).filter(_.trim.nonEmpty)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object ConnectionFactorySettings {
+  def apply(config: Config): ConnectionFactorySettings =
+    new ConnectionFactorySettings(config)
+}
+
+trait UseConnnectionFactory {
+
+  def config: Config
+
+  val useConnectionFactory: String = config.getString("use-connection-factory")
 }
