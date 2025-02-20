@@ -25,7 +25,6 @@ import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
-import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
 import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
@@ -98,26 +97,21 @@ private[r2dbc] object JournalDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class JournalDao(journalSettings: JournalSettings, connectionFactory: ConnectionFactory)(
-    implicit
-    val ec: ExecutionContext,
-    system: ActorSystem[_]) extends EventsByPersistenceIdDao with HighestSequenceNrDao {
-
+private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory: ConnectionFactory)(
+    implicit val ec: ExecutionContext, system: ActorSystem[_]) extends EventsByPersistenceIdDao
+    with HighestSequenceNrDao {
   import JournalDao.SerializedJournalRow
   import JournalDao.log
 
-  protected val sharedSettings: SharedSettings = journalSettings
-
-  implicit protected val dialect: Dialect = journalSettings.dialect
+  implicit protected val dialect: Dialect = settings.dialect
   protected lazy val timestampSql: String = "transaction_timestamp()"
   protected lazy val statementTimestampSql: String = "statement_timestamp()"
 
   private val persistenceExt = Persistence(system)
 
-  protected val r2dbcExecutor =
-    new R2dbcExecutor(connectionFactory, log, journalSettings.logDbCallsExceeding)(ec, system)
+  protected val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
-  protected val journalTable: String = journalSettings.journalTableWithSchema
+  protected val journalTable: String = settings.journalTableWithSchema
 
   protected val (insertEventWithParameterTimestampSql: String, insertEventWithTransactionTimestampSql: String) = {
     val baseSql =
@@ -133,14 +127,14 @@ private[r2dbc] class JournalDao(journalSettings: JournalSettings, connectionFact
       "WHERE persistence_id = ? AND seq_nr = ?)"
 
     val insertEventWithParameterTimestampSql = {
-      if (journalSettings.dbTimestampMonotonicIncreasing)
+      if (settings.dbTimestampMonotonicIncreasing)
         sql"$baseSql ?) RETURNING db_timestamp"
       else
         sql"$baseSql GREATEST(?, $timestampSubSelect)) RETURNING db_timestamp"
     }
 
     val insertEventWithTransactionTimestampSql = {
-      if (journalSettings.dbTimestampMonotonicIncreasing)
+      if (settings.dbTimestampMonotonicIncreasing)
         sql"$baseSql transaction_timestamp()) RETURNING db_timestamp"
       else
         sql"$baseSql GREATEST(transaction_timestamp(), $timestampSubSelect)) RETURNING db_timestamp"
@@ -209,12 +203,12 @@ private[r2dbc] class JournalDao(journalSettings: JournalSettings, connectionFact
       }
 
       if (useTimestampFromDb) {
-        if (!journalSettings.dbTimestampMonotonicIncreasing)
+        if (!settings.dbTimestampMonotonicIncreasing)
           stmt
             .bind(13, write.persistenceId)
             .bind(14, previousSeqNr)
       } else {
-        if (journalSettings.dbTimestampMonotonicIncreasing)
+        if (settings.dbTimestampMonotonicIncreasing)
           stmt
             .bind(13, write.dbTimestamp)
         else

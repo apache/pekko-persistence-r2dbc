@@ -27,7 +27,9 @@ import pekko.NotUsed
 import pekko.annotation.InternalApi
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
-import pekko.persistence.r2dbc.SharedSettings
+import pekko.persistence.r2dbc.BufferSize
+import pekko.persistence.r2dbc.BySliceQuerySettings
+import pekko.persistence.r2dbc.RefreshInterval
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
@@ -191,7 +193,7 @@ import org.slf4j.Logger
     dao: BySliceQuery.Dao[Row],
     createEnvelope: (TimestampOffset, Row) => Envelope,
     extractOffset: Envelope => TimestampOffset,
-    settings: SharedSettings,
+    settings: BySliceQuerySettings with RefreshInterval with BufferSize, // use `with` to mix the settings classes
     log: Logger)(implicit val ec: ExecutionContext) {
   import BySliceQuery._
   import TimestampOffset.toTimestampOffset

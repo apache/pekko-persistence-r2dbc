@@ -24,7 +24,7 @@ import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -45,7 +45,7 @@ class EventsBySliceBacktrackingSpec
     with LogCapturing {
 
   override def typedSystem: ActorSystem[_] = system
-  private val settings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
+  private val settings = QuerySettings(system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
 
   private val query = PersistenceQuery(testKit.system)
     .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)

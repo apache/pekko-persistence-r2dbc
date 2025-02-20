@@ -26,7 +26,6 @@ import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.QuerySettings
-import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
@@ -65,20 +64,16 @@ object QueryDao {
  * INTERNAL API
  */
 @InternalApi
-private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: ConnectionFactory)(
-    implicit
-    val ec: ExecutionContext,
-    system: ActorSystem[_])
-    extends BySliceQuery.Dao[SerializedJournalRow] with EventsByPersistenceIdDao with HighestSequenceNrDao {
+private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory)(
+    implicit val ec: ExecutionContext, system: ActorSystem[_]) extends BySliceQuery.Dao[SerializedJournalRow]
+    with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata
   import QueryDao.log
 
-  protected val sharedSettings: SharedSettings = querySettings
-
-  implicit protected val dialect: Dialect = querySettings.dialect
+  implicit protected val dialect: Dialect = settings.dialect
   protected lazy val statementTimestampSql: String = "statement_timestamp()"
 
-  protected val journalTable = querySettings.journalTableWithSchema
+  protected val journalTable = settings.journalTableWithSchema
 
   private val currentDbTimestampSql =
     "SELECT transaction_timestamp() AS db_timestamp"
@@ -117,7 +112,7 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
   }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
-    querySettings.dialect match {
+    settings.dialect match {
       case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
       case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
@@ -152,7 +147,7 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
     sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
   protected val r2dbcExecutor =
-    new R2dbcExecutor(connectionFactory, log, querySettings.logDbCallsExceeding)(ec, system)
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
   def currentDbTimestamp(): Future[Instant] = {
     r2dbcExecutor
@@ -188,9 +183,9 @@ private[r2dbc] class QueryDao(querySettings: QuerySettings, connectionFactory: C
         toTimestamp match {
           case Some(until) =>
             stmt.bind(2, until)
-            stmt.bind(3, querySettings.bufferSize)
+            stmt.bind(3, settings.bufferSize)
           case None =>
-            stmt.bind(2, querySettings.bufferSize)
+            stmt.bind(2, settings.bufferSize)
         }
         stmt
       },

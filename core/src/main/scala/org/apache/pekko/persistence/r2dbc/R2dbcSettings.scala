@@ -57,7 +57,8 @@ object Dialect {
  * INTERNAL API
  */
 @InternalStableApi
-final class JournalSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+final class JournalSettings(val config: Config) extends ConnectionSettings with UseConnnectionFactory with BufferSize
+    with JournalPublishEvents with DbTimestampMonotonicIncreasing with UseAppTimestamp {
 
   val journalTable: String = config.getString("table")
   val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
@@ -76,7 +77,7 @@ object JournalSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class SnapshotSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+final class SnapshotSettings(val config: Config) extends ConnectionSettings with UseConnnectionFactory {
 
   val snapshotsTable: String = config.getString("table")
   val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
@@ -95,7 +96,9 @@ object SnapshotSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class StateSettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+final class StateSettings(val config: Config) extends ConnectionSettings with UseConnnectionFactory with BufferSize
+    with RefreshInterval with BySliceQuerySettings with DbTimestampMonotonicIncreasing with PersistenceIdsQuerySettings
+    with UseAppTimestamp {
 
   val durableStateTable: String = config.getString("table")
   val durableStateTableWithSchema: String = schema.map(_ + ".").getOrElse("") + durableStateTable
@@ -116,7 +119,8 @@ object StateSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class QuerySettings(val config: Config) extends SharedSettings with UseConnnectionFactory {
+final class QuerySettings(val config: Config) extends ConnectionSettings with UseConnnectionFactory with BufferSize
+    with RefreshInterval with BySliceQuerySettings with JournalPublishEvents with PersistenceIdsQuerySettings {
 
   val journalTable: String = config.getString("table")
   val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
@@ -137,36 +141,93 @@ object QuerySettings {
  * INTERNAL API
  */
 @InternalStableApi
-trait SharedSettings {
-
+trait ConnectionSettings {
   def config: Config
-
-  val journalPublishEvents: Boolean = config.getBoolean("publish-events")
 
   val dialect: Dialect = Dialect.fromString(config.getString("dialect"))
 
   val schema: Option[String] = Option(config.getString("schema")).filterNot(_.trim.isEmpty)
-
-  val dbTimestampMonotonicIncreasing: Boolean = config.getBoolean("db-timestamp-monotonic-increasing")
-
-  /**
-   * INTERNAL API FIXME remove when https://github.com/yugabyte/yugabyte-db/issues/10995 has been resolved
-   */
-  @InternalApi private[pekko] val useAppTimestamp: Boolean = config.getBoolean("use-app-timestamp")
 
   val logDbCallsExceeding: FiniteDuration =
     config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
       case "off" => -1.millis
       case _     => config.getDuration("log-db-calls-exceeding").asScala
     }
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait JournalPublishEvents {
+  def config: Config
+
+  val journalPublishEvents: Boolean = config.getBoolean("publish-events")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait DbTimestampMonotonicIncreasing {
+  def config: Config
+
+  val dbTimestampMonotonicIncreasing: Boolean = config.getBoolean("db-timestamp-monotonic-increasing")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait UseAppTimestamp {
+  def config: Config
+
+  /**
+   * INTERNAL API FIXME remove when https://github.com/yugabyte/yugabyte-db/issues/10995 has been resolved
+   */
+  @InternalApi private[pekko] val useAppTimestamp: Boolean = config.getBoolean("use-app-timestamp")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait BufferSize {
+  def config: Config
 
   val bufferSize: Int = config.getInt("buffer-size")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait RefreshInterval {
+  def config: Config
 
   val refreshInterval: FiniteDuration = config.getDuration("refresh-interval").asScala
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait BySliceQuerySettings {
+  def config: Config
+
   val behindCurrentTime: FiniteDuration = config.getDuration("behind-current-time").asScala
   val backtrackingEnabled: Boolean = config.getBoolean("backtracking.enabled")
   val backtrackingWindow: FiniteDuration = config.getDuration("backtracking.window").asScala
   val backtrackingBehindCurrentTime: FiniteDuration = config.getDuration("backtracking.behind-current-time").asScala
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+trait PersistenceIdsQuerySettings {
+  def config: Config
+
   val persistenceIdsBufferSize: Int = config.getInt("persistence-ids.buffer-size")
 }
 
@@ -217,8 +278,11 @@ object ConnectionFactorySettings {
     new ConnectionFactorySettings(config)
 }
 
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
 trait UseConnnectionFactory {
-
   def config: Config
 
   val useConnectionFactory: String = config.getString("use-connection-factory")

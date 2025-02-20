@@ -14,14 +14,13 @@ import java.time.Instant
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.annotation.InternalApi
+import pekko.persistence.r2dbc.BufferSize
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.SharedSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.journal.JournalDao.readMetadata
 import pekko.stream.scaladsl.Source
 import org.slf4j.LoggerFactory
-
 import scala.concurrent.ExecutionContext
 
 /**
@@ -44,14 +43,14 @@ private[r2dbc] trait EventsByPersistenceIdDao {
 
   implicit protected def ec: ExecutionContext
 
-  protected def sharedSettings: SharedSettings
-
   implicit protected def dialect: Dialect
   protected def statementTimestampSql: String
 
   protected def journalTable: String
 
   protected def r2dbcExecutor: R2dbcExecutor
+
+  protected def settings: BufferSize
 
   // TODO try dropping lazy
   private lazy val selectEventsSql = sql"""
@@ -75,7 +74,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
     def nextQuery(
         state: ByPersistenceIdState,
         highestSeqNr: Long): (ByPersistenceIdState, Option[Source[SerializedJournalRow, NotUsed]]) = {
-      if (state.queryCount == 0L || state.rowCount >= sharedSettings.bufferSize) {
+      if (state.queryCount == 0L || state.rowCount >= settings.bufferSize) {
         val newState = state.copy(rowCount = 0, queryCount = state.queryCount + 1)
 
         if (state.queryCount != 0 && log.isDebugEnabled())
@@ -125,7 +124,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
           .bind(0, persistenceId)
           .bind(1, fromSequenceNr)
           .bind(2, toSequenceNr)
-          .bind(3, sharedSettings.bufferSize),
+          .bind(3, settings.bufferSize),
       row =>
         SerializedJournalRow(
           slice = row.get[Integer]("slice", classOf[Integer]),
