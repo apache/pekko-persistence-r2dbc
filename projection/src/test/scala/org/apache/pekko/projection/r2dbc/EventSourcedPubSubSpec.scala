@@ -47,7 +47,7 @@ object EventSourcedPubSubSpec {
     ConfigFactory
       .parseString("""
       pekko.persistence.r2dbc {
-        publish-events = on
+        journal.publish-events = on
         refresh-interval = 3 seconds
           # simulate lost messages by overflowing the buffer
           buffer-size = 10
