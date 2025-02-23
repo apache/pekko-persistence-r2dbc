@@ -14,12 +14,12 @@
 package org.apache.pekko.persistence.r2dbc.migration
 
 import java.time.Instant
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
@@ -32,13 +32,14 @@ import pekko.persistence.SelectedSnapshot
 import pekko.persistence.SnapshotProtocol.LoadSnapshot
 import pekko.persistence.SnapshotProtocol.LoadSnapshotResult
 import pekko.persistence.SnapshotSelectionCriteria
-import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.scaladsl.CurrentEventsByPersistenceIdQuery
 import pekko.persistence.query.scaladsl.CurrentPersistenceIdsQuery
 import pekko.persistence.query.scaladsl.ReadJournal
+import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
@@ -116,16 +117,20 @@ class MigrationTool(system: ActorSystem[_]) {
   private val parallelism = migrationConfig.getInt("parallelism")
 
   private val targetPluginId = migrationConfig.getString("target.persistence-plugin-id")
-  private val targetR2dbcSettings = R2dbcSettings(system.settings.config.getConfig(targetPluginId))
+  private val targetConfig = system.settings.config.getConfig(targetPluginId)
+  private val targetJournalSettings = JournalSettings(targetConfig.getConfig("journal"))
+  private val targetSnapshotettings = SnapshotSettings(targetConfig.getConfig("snapshot"))
 
   private val serialization: Serialization = SerializationExtension(system)
 
-  private val targetConnectionFactory = ConnectionFactoryProvider(system)
-    .connectionFactoryFor(targetPluginId + ".connection-factory")
+  private val targetJournalConnectionFactory = ConnectionFactoryProvider(system)
+    .connectionFactoryFor(targetJournalSettings.useConnectionFactory)
   private val targetJournalDao =
-    new JournalDao(targetR2dbcSettings, targetConnectionFactory)
+    new JournalDao(targetJournalSettings, targetJournalConnectionFactory)
   private val targetSnapshotDao =
-    new SnapshotDao(targetR2dbcSettings, targetConnectionFactory)
+    new SnapshotDao(targetSnapshotettings,
+      ConnectionFactoryProvider(system)
+        .connectionFactoryFor(targetSnapshotettings.useConnectionFactory))
 
   private val targetBatch = migrationConfig.getInt("target.batch")
 
@@ -138,7 +143,7 @@ class MigrationTool(system: ActorSystem[_]) {
   private lazy val sourceSnapshotStore = Persistence(system).snapshotStoreFor(sourceSnapshotPluginId)
 
   private[r2dbc] val migrationDao =
-    new MigrationToolDao(targetConnectionFactory, targetR2dbcSettings.logDbCallsExceeding)
+    new MigrationToolDao(targetJournalConnectionFactory, targetJournalSettings.logDbCallsExceeding)
 
   private lazy val createProgressTable: Future[Done] =
     migrationDao.createProgressTable()
