@@ -20,5 +20,5 @@ import com.github.pjfanning.pekkobuild.PekkoDependency
 object PekkoProjectionDependency extends PekkoDependency {
   override val checkProject: String = "pekko-projection-jdbc"
   override val module: Option[String] = Some("projection")
-  override val currentVersion: String = "1.1.0-M1"
+  override val currentVersion: String = "1.1.0"
 }
