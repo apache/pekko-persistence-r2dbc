@@ -17,7 +17,7 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
 object TestConfig {
-  lazy val config: Config = {
+  lazy val unresolvedConfig: Config = {
     val defaultConfig = ConfigFactory.load()
     val dialect = defaultConfig.getString("pekko.projection.r2dbc.dialect")
 
@@ -62,7 +62,7 @@ object TestConfig {
     }
 
     // using load here so that connection-factory can be overridden
-    ConfigFactory.load(dialectConfig.withFallback(ConfigFactory.parseString("""
+    dialectConfig.withFallback(ConfigFactory.parseString("""
     pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
     pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
     pekko.persistence.r2dbc {
@@ -71,6 +71,9 @@ object TestConfig {
       }
     }
     pekko.actor.testkit.typed.default-timeout = 10s
-    """)))
+    """))
   }
+
+  // FIXME ideally every dependant that combines this config with other configs should load/resolve at their callsites
+  lazy val config: Config = ConfigFactory.load(unresolvedConfig)
 }
