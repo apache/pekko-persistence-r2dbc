@@ -74,6 +74,5 @@ object TestConfig {
     """))
   }
 
-  // FIXME ideally every dependant that combines this config with other configs should load/resolve at their callsites
   lazy val config: Config = ConfigFactory.load(unresolvedConfig)
 }

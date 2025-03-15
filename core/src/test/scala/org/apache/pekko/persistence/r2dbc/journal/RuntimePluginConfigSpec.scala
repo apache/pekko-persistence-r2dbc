@@ -146,7 +146,6 @@ object RuntimePluginConfigSpec {
             .withFallback(TestConfig.unresolvedConfig)
         )
 
-    // TODO refactor to use DurableState instead of plugin implementation directly once DurableState implements runtime config
     val store = new R2dbcDurableStateStore[String](
       typedSystem.toClassic.asInstanceOf[ExtendedActorSystem],
       config.getConfig(s"$configKey.state"),
