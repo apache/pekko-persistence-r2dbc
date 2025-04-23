@@ -18,16 +18,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.util.{ Failure, Success }
-import com.typesafe.config.Config
-import io.r2dbc.pool.ConnectionPool
-import io.r2dbc.pool.ConnectionPoolConfiguration
-import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
-import io.r2dbc.postgresql.client.SSLMode
-import io.r2dbc.spi.ConnectionFactories
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Option
+import scala.util.Failure
+import scala.util.Success
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.CoordinatedShutdown
@@ -36,8 +28,18 @@ import pekko.actor.typed.Extension
 import pekko.actor.typed.ExtensionId
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
-import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.util.ccompat.JavaConverters._
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import io.r2dbc.pool.ConnectionPool
+import io.r2dbc.pool.ConnectionPoolConfiguration
+import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
+import io.r2dbc.postgresql.client.SSLMode
+import io.r2dbc.spi.ConnectionFactories
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
   def createExtension(system: ActorSystem[_]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)
@@ -75,7 +77,6 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
 
 class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
 
-  import R2dbcExecutor.PublisherOps
   private val sessions = new ConcurrentHashMap[String, ConnectionPool]
 
   CoordinatedShutdown(system)
@@ -86,15 +87,20 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
         .map(_ => Done)
     }
 
-  def connectionFactoryFor(configLocation: String): ConnectionFactory = {
+  def connectionFactoryFor(configPath: String): ConnectionFactory = {
+    connectionFactoryFor(configPath, ConfigFactory.empty())
+  }
+
+  def connectionFactoryFor(configPath: String, config: Config): ConnectionFactory = {
     sessions
       .computeIfAbsent(
-        configLocation,
-        configLocation => {
-          val config = system.settings.config.getConfig(configLocation)
-          val settings = new ConnectionFactorySettings(config)
+        configPath,
+        _ => {
+          val fullConfig = config.withFallback(system.settings.config)
+          val settings =
+            new ConnectionFactorySettings(fullConfig.getConfig(configPath))
           val customizer = createConnectionFactoryOptionsCustomizer(settings)
-          createConnectionPoolFactory(settings, customizer, config)
+          createConnectionPoolFactory(settings, customizer, fullConfig)
         })
       .asInstanceOf[ConnectionFactory]
   }
