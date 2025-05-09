@@ -20,5 +20,5 @@ import com.github.pjfanning.pekkobuild.PekkoDependency
 object PekkoPersistenceJdbcDependency extends PekkoDependency {
   override val checkProject: String = "pekko-persistence-jdbc"
   override val module: Option[String] = Some("persistence.jdbc")
-  override val currentVersion: String = "1.1.0"
+  override val currentVersion: String = "1.1.1"
 }
