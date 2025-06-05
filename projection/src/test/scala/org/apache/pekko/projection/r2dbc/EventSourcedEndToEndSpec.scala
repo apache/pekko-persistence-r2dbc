@@ -19,6 +19,7 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import org.apache.pekko.persistence.r2dbc.QuerySettings
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -29,7 +30,7 @@ import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
@@ -141,7 +142,7 @@ class EventSourcedEndToEndSpec
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  private val journalSettings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
+  private val querySettings = QuerySettings(system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
   private val projectionSettings = R2dbcProjectionSettings(system)
   private val stringSerializer = SerializationExtension(system).serializerFor(classOf[String])
 
@@ -154,7 +155,7 @@ class EventSourcedEndToEndSpec
     log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
     implicit val dialect: Dialect = projectionSettings.dialect
     val insertEventSql = sql"""
-      INSERT INTO ${journalSettings.journalTableWithSchema}
+      INSERT INTO ${querySettings.journalTableWithSchema}
       (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload)
       VALUES (?, ?, ?, ?, ?, '', '', ?, '', ?)"""
 
@@ -323,13 +324,12 @@ class EventSourcedEndToEndSpec
 
       // pid3, seqNr 8 is missing (knows 7) when receiving 9
       writeEvent(pid3, 9L, startTime.plusMillis(4), "e3-9")
-      processedProbe.expectNoMessage(journalSettings.querySettings.refreshInterval + 2000.millis)
+      processedProbe.expectNoMessage(querySettings.refreshInterval + 2000.millis)
 
       // but backtracking can fill in the gaps, backtracking will pick up pid3 seqNr 8 and 9
       writeEvent(pid3, 8L, startTime.plusMillis(3), "e3-8")
       val possibleDelay =
-        journalSettings.querySettings.backtrackingBehindCurrentTime + journalSettings.querySettings
-          .refreshInterval + processedProbe.remainingOrDefault
+        querySettings.backtrackingBehindCurrentTime + querySettings.refreshInterval + processedProbe.remainingOrDefault
       processedProbe.receiveMessage(possibleDelay).envelope.event shouldBe "e3-8"
       processedProbe.receiveMessage(possibleDelay).envelope.event shouldBe "e3-9"
 
