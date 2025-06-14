@@ -29,7 +29,6 @@ import pekko.persistence.query.NoOffset
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.UpdatedDurableState
-import pekko.persistence.r2dbc.R2dbcSettings
 import pekko.persistence.r2dbc.TestActors
 import pekko.persistence.r2dbc.TestActors.DurableStatePersister.Persist
 import pekko.persistence.r2dbc.TestActors.DurableStatePersister.PersistWithAck
@@ -71,7 +70,6 @@ class DurableStateBySliceSpec
   import DurableStateBySliceSpec._
 
   override def typedSystem: ActorSystem[_] = system
-  private val settings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
 
   private val query = DurableStateStoreRegistry(testKit.system)
     .durableStateStoreFor[R2dbcDurableStateStore[String]](R2dbcDurableStateStore.Identifier)
