@@ -65,7 +65,7 @@ object Dependencies {
     val logback = "ch.qos.logback" % "logback-classic" % "1.3.15" % Test
     val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19" % Test
     val junit = "junit" % "junit" % "4.13.2" % Test
-    val junitInterface = "com.novocode" % "junit-interface" % "0.11" % Test
+    val junitInterface = "com.github.sbt" % "junit-interface" % "0.13.3" % Test
   }
 
   import Compile._
