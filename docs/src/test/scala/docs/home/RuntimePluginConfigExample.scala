@@ -56,7 +56,7 @@ object RuntimePluginConfigExample {
             )
         )
 
-    persistenceId: String =>
+    (persistenceId: String) =>
       EventSourcedBehavior[Command, String, String](
         PersistenceId.ofUniqueId(persistenceId),
         emptyState = ???,
