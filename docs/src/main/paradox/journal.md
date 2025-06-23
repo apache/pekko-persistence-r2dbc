@@ -23,7 +23,7 @@ pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
 It can also be enabled with the `journalPluginId` for a specific `EventSourcedBehavior` and multiple
 plugin configurations are supported.
 
-See also @ref:[Connection configuration](connection-config.md).
+See also @ref:[Configuration](config.md).
 
 ### Reference configuration 
 
