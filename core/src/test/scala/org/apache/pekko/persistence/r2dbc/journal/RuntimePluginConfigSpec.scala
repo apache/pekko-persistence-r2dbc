@@ -58,7 +58,7 @@ import pekko.persistence.typed.scaladsl.RetentionCriteria
 import pekko.stream.scaladsl.Sink
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Inside
-import org.scalatest.freespec.AnyFreeSpecLike
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
 
 object RuntimePluginConfigSpec {
@@ -156,7 +156,7 @@ object RuntimePluginConfigSpec {
 
 class RuntimePluginConfigSpec
     extends ScalaTestWithActorTestKit(TestConfig.config)
-    with AnyFreeSpecLike
+    with AnyWordSpecLike
     with BeforeAndAfterEach
     with LogCapturing
     with Inside {
@@ -240,8 +240,8 @@ class RuntimePluginConfigSpec
     }
   }
 
-  "Should be possible to configure at runtime and use in multiple isolated instances when running " - {
-    "journal, query and snapshot store plugins" in {
+  "Runtime plugin config" should {
+    "work for journal, query and snapshot store plugins" in {
       val probe = createTestProbe[Any]()
 
       {
@@ -301,7 +301,7 @@ class RuntimePluginConfigSpec
       }
     }
 
-    "durable state plugin" in {
+    "work for durable state plugin" in {
       // persist data on both plugins
       state1.store.upsertObject("id1", 1, "j1m1", "").futureValue
       state2.store.upsertObject("id1", 1, "j2m1", "").futureValue
