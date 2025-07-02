@@ -47,7 +47,6 @@ trait HighestSequenceNrDao {
 
   protected def r2dbcExecutor: R2dbcExecutor
 
-  // TODO try dropping lazy
   private lazy val selectHighestSequenceNrSql = sql"""
     SELECT MAX(seq_nr) from $journalTable
     WHERE persistence_id = ? AND seq_nr >= ?"""

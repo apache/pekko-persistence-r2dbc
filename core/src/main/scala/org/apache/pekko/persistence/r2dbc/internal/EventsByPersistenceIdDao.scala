@@ -56,7 +56,6 @@ private[r2dbc] trait EventsByPersistenceIdDao {
 
   protected def settings: BufferSize
 
-  // TODO try dropping lazy
   private lazy val selectEventsSql = sql"""
     SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload
     from $journalTable
