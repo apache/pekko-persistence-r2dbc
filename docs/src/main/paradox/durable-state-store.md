@@ -19,7 +19,7 @@ pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
 It can also be enabled with the `durableStateStorePluginId` for a specific `DurableStateBehavior` and multiple
 plugin configurations are supported.
 
-See also @ref:[Connection configuration](connection-config.md).
+See also @ref:[Configuration](config.md).
 
 ### Reference configuration
 

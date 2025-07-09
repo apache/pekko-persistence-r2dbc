@@ -45,7 +45,7 @@ need to be created in the configured database, see schema definition in @ref:[Cr
 ## Configuration
 
 By default, `pekko-projection-r2dbc` uses the same connection pool and `dialect` as `pekko-persistence-r2dbc`, see
-@ref:[Connection configuration](connection-config.md).
+@ref:[Connection configuration](config.md#connection-configuration).
 
 ### Reference configuration
 

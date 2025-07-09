@@ -152,5 +152,5 @@ Query configuration is under `pekko.persistence.r2dbc.query`. Here's the default
 
 @@snip [reference.conf](/core/src/main/resources/reference.conf) { #query-settings }
 
-The query plugin shares the connection pool as the rest of the plugin, see @ref:[Connection configuration](connection-config.md).
+The query plugin shares the connection pool as the rest of the plugin, see @ref:[Connection configuration](config.md#connection-configuration).
 
