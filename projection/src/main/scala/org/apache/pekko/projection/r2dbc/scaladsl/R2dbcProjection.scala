@@ -15,7 +15,6 @@ package org.apache.pekko.projection.r2dbc.scaladsl
 
 import scala.collection.immutable
 import scala.concurrent.duration.Duration
-
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
@@ -40,6 +39,8 @@ import pekko.projection.scaladsl.GroupedProjection
 import pekko.projection.scaladsl.Handler
 import pekko.projection.scaladsl.SourceProvider
 import pekko.stream.scaladsl.FlowWithContext
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import io.r2dbc.spi.ConnectionFactory
 
 @ApiMayChange
@@ -56,10 +57,18 @@ object R2dbcProjection {
       settings: Option[R2dbcProjectionSettings],
       sourceProvider: SourceProvider[Offset, Envelope],
       handler: () => R2dbcHandler[Envelope])(implicit
-      system: ActorSystem[_]): ExactlyOnceProjection[Offset, Envelope] = {
+      system: ActorSystem[_]): ExactlyOnceProjection[Offset, Envelope] =
+    exactlyOnce(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
-    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(system))
-    val connFactory = connectionFactory(system, r2dbcSettings)
+  def exactlyOnce[Offset, Envelope](
+      projectionId: ProjectionId,
+      config: Config,
+      settings: Option[R2dbcProjectionSettings],
+      sourceProvider: SourceProvider[Offset, Envelope],
+      handler: () => R2dbcHandler[Envelope])(implicit
+      system: ActorSystem[_]): ExactlyOnceProjection[Offset, Envelope] = {
+    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(config, system))
+    val connFactory = connectionFactory(system, config, r2dbcSettings)
     val offsetStore =
       R2dbcProjectionImpl.createOffsetStore(
         projectionId,
@@ -106,10 +115,19 @@ object R2dbcProjection {
       settings: Option[R2dbcProjectionSettings],
       sourceProvider: SourceProvider[Offset, Envelope],
       handler: () => R2dbcHandler[Envelope])(implicit
+      system: ActorSystem[_]): AtLeastOnceProjection[Offset, Envelope] =
+    atLeastOnce(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
+
+  def atLeastOnce[Offset, Envelope](
+      projectionId: ProjectionId,
+      config: Config,
+      settings: Option[R2dbcProjectionSettings],
+      sourceProvider: SourceProvider[Offset, Envelope],
+      handler: () => R2dbcHandler[Envelope])(implicit
       system: ActorSystem[_]): AtLeastOnceProjection[Offset, Envelope] = {
 
-    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(system))
-    val connFactory = connectionFactory(system, r2dbcSettings)
+    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(config, system))
+    val connFactory = connectionFactory(system, config, r2dbcSettings)
     val offsetStore =
       R2dbcProjectionImpl.createOffsetStore(
         projectionId,
@@ -155,10 +173,18 @@ object R2dbcProjection {
       projectionId: ProjectionId,
       settings: Option[R2dbcProjectionSettings],
       sourceProvider: SourceProvider[Offset, Envelope],
+      handler: () => Handler[Envelope])(implicit system: ActorSystem[_]): AtLeastOnceProjection[Offset, Envelope] =
+    atLeastOnceAsync(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
+
+  def atLeastOnceAsync[Offset, Envelope](
+      projectionId: ProjectionId,
+      config: Config,
+      settings: Option[R2dbcProjectionSettings],
+      sourceProvider: SourceProvider[Offset, Envelope],
       handler: () => Handler[Envelope])(implicit system: ActorSystem[_]): AtLeastOnceProjection[Offset, Envelope] = {
 
-    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(system))
-    val connFactory = connectionFactory(system, r2dbcSettings)
+    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(config, system))
+    val connFactory = connectionFactory(system, config, r2dbcSettings)
     val offsetStore =
       R2dbcProjectionImpl.createOffsetStore(
         projectionId,
@@ -197,10 +223,19 @@ object R2dbcProjection {
       settings: Option[R2dbcProjectionSettings],
       sourceProvider: SourceProvider[Offset, Envelope],
       handler: () => R2dbcHandler[immutable.Seq[Envelope]])(implicit
+      system: ActorSystem[_]): GroupedProjection[Offset, Envelope] =
+    groupedWithin(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
+
+  def groupedWithin[Offset, Envelope](
+      projectionId: ProjectionId,
+      config: Config,
+      settings: Option[R2dbcProjectionSettings],
+      sourceProvider: SourceProvider[Offset, Envelope],
+      handler: () => R2dbcHandler[immutable.Seq[Envelope]])(implicit
       system: ActorSystem[_]): GroupedProjection[Offset, Envelope] = {
 
-    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(system))
-    val connFactory = connectionFactory(system, r2dbcSettings)
+    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(config, system))
+    val connFactory = connectionFactory(system, config, r2dbcSettings)
     val offsetStore =
       R2dbcProjectionImpl.createOffsetStore(
         projectionId,
@@ -246,10 +281,19 @@ object R2dbcProjection {
       settings: Option[R2dbcProjectionSettings],
       sourceProvider: SourceProvider[Offset, Envelope],
       handler: () => Handler[immutable.Seq[Envelope]])(implicit
+      system: ActorSystem[_]): GroupedProjection[Offset, Envelope] =
+    groupedWithinAsync(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
+
+  def groupedWithinAsync[Offset, Envelope](
+      projectionId: ProjectionId,
+      config: Config,
+      settings: Option[R2dbcProjectionSettings],
+      sourceProvider: SourceProvider[Offset, Envelope],
+      handler: () => Handler[immutable.Seq[Envelope]])(implicit
       system: ActorSystem[_]): GroupedProjection[Offset, Envelope] = {
 
-    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(system))
-    val connFactory = connectionFactory(system, r2dbcSettings)
+    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(config, system))
+    val connFactory = connectionFactory(system, config, r2dbcSettings)
     val offsetStore =
       R2dbcProjectionImpl.createOffsetStore(
         projectionId,
@@ -300,10 +344,19 @@ object R2dbcProjection {
       settings: Option[R2dbcProjectionSettings],
       sourceProvider: SourceProvider[Offset, Envelope],
       handler: FlowWithContext[Envelope, ProjectionContext, Done, ProjectionContext, _])(implicit
+      system: ActorSystem[_]): AtLeastOnceFlowProjection[Offset, Envelope] =
+    atLeastOnceFlow(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
+
+  def atLeastOnceFlow[Offset, Envelope](
+      projectionId: ProjectionId,
+      config: Config,
+      settings: Option[R2dbcProjectionSettings],
+      sourceProvider: SourceProvider[Offset, Envelope],
+      handler: FlowWithContext[Envelope, ProjectionContext, Done, ProjectionContext, _])(implicit
       system: ActorSystem[_]): AtLeastOnceFlowProjection[Offset, Envelope] = {
 
-    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(system))
-    val connFactory = connectionFactory(system, r2dbcSettings)
+    val r2dbcSettings = settings.getOrElse(R2dbcProjectionSettings(config, system))
+    val connFactory = connectionFactory(system, config, r2dbcSettings)
     val offsetStore =
       R2dbcProjectionImpl.createOffsetStore(
         projectionId,
@@ -326,8 +379,9 @@ object R2dbcProjection {
       offsetStore)
   }
 
-  private def connectionFactory(system: ActorSystem[_], r2dbcSettings: R2dbcProjectionSettings): ConnectionFactory = {
-    ConnectionFactoryProvider(system).connectionFactoryFor(r2dbcSettings.useConnectionFactory)
+  private def connectionFactory(system: ActorSystem[_], config: Config, r2dbcSettings: R2dbcProjectionSettings)
+      : ConnectionFactory = {
+    ConnectionFactoryProvider(system).connectionFactoryFor(r2dbcSettings.useConnectionFactory, config)
   }
 
   private def timestampOffsetBySlicesSourceProvider(
