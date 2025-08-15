@@ -37,12 +37,10 @@ import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.query.typed.scaladsl.EventsBySliceQuery
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
 import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
-import pekko.persistence.r2dbc.ConnectionFactoryProvider
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
 import pekko.persistence.r2dbc.internal.PubSub
-import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
@@ -73,16 +71,14 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   import R2dbcReadJournal.PersistenceIdsQueryState
 
   private val log = LoggerFactory.getLogger(getClass)
-  private val sharedConfigPath = cfgPath.replaceAll("""\.query$""", "")
-  private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
+  private val settings = QuerySettings(config)
 
   private implicit val typedSystem: ActorSystem[_] = system.toTyped
   import typedSystem.executionContext
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val connectionFactory = ConnectionFactoryProvider(typedSystem)
-    .connectionFactoryFor(sharedConfigPath + ".connection-factory")
-  private val queryDao = QueryDao.fromConfig(settings, sharedConfigPath)
+
+  private val queryDao = QueryDao.fromConfig(settings, config)
 
   private val _bySlice: BySliceQuery[SerializedJournalRow, EventEnvelope[Any]] = {
     val createEnvelope: (TimestampOffset, SerializedJournalRow) => EventEnvelope[Any] = (offset, row) => {
@@ -106,8 +102,6 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
 
   private def bySlice[Event]: BySliceQuery[SerializedJournalRow, EventEnvelope[Event]] =
     _bySlice.asInstanceOf[BySliceQuery[SerializedJournalRow, EventEnvelope[Event]]]
-
-  private val journalDao = JournalDao.fromConfig(settings, sharedConfigPath)
 
   def extractEntityTypeFromPersistenceId(persistenceId: String): String =
     PersistenceId.extractEntityType(persistenceId)
@@ -169,7 +163,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
           .actorRef[EventEnvelope[Event]](
             completionMatcher = PartialFunction.empty,
             failureMatcher = PartialFunction.empty,
-            bufferSize = settings.querySettings.bufferSize,
+            bufferSize = settings.bufferSize,
             overflowStrategy = OverflowStrategy.dropNew)
           .mapMaterializedValue { ref =>
             (minSlice to maxSlice).foreach { slice =>
@@ -177,7 +171,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
               pubSub.eventTopic(entityType, slice) ! Topic.Subscribe(ref.toTyped[EventEnvelope[Event]])
             }
           }
-      dbSource.merge(pubSubSource).via(deduplicate(settings.querySettings.deduplicateCapacity))
+      dbSource.merge(pubSubSource).via(deduplicate(settings.deduplicateCapacity))
     } else
       dbSource
   }
@@ -227,70 +221,17 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       fromSequenceNr: Long,
       toSequenceNr: Long): Source[ClassicEventEnvelope, NotUsed] = {
     val highestSeqNrFut =
-      if (toSequenceNr == Long.MaxValue) journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr)
+      if (toSequenceNr == Long.MaxValue) queryDao.readHighestSequenceNr(persistenceId, fromSequenceNr)
       else Future.successful(toSequenceNr)
 
     Source
       .futureSource[SerializedJournalRow, NotUsed] {
         highestSeqNrFut.map { highestSeqNr =>
-          internalEventsByPersistenceId(persistenceId, fromSequenceNr, highestSeqNr)
+          queryDao.internalEventsByPersistenceId(persistenceId, fromSequenceNr, highestSeqNr)
         }
       }
       .map(deserializeRow)
       .mapMaterializedValue(_ => NotUsed)
-  }
-
-  /**
-   * INTERNAL API: Used by both journal replay and currentEventsByPersistenceId
-   */
-  @InternalApi private[r2dbc] def internalEventsByPersistenceId(
-      persistenceId: String,
-      fromSequenceNr: Long,
-      toSequenceNr: Long): Source[SerializedJournalRow, NotUsed] = {
-    def updateState(state: ByPersistenceIdState, row: SerializedJournalRow): ByPersistenceIdState =
-      state.copy(rowCount = state.rowCount + 1, latestSeqNr = row.seqNr)
-
-    def nextQuery(
-        state: ByPersistenceIdState,
-        highestSeqNr: Long): (ByPersistenceIdState, Option[Source[SerializedJournalRow, NotUsed]]) = {
-      if (state.queryCount == 0L || state.rowCount >= settings.querySettings.bufferSize) {
-        val newState = state.copy(rowCount = 0, queryCount = state.queryCount + 1)
-
-        if (state.queryCount != 0 && log.isDebugEnabled())
-          log.debug(
-            "currentEventsByPersistenceId query [{}] for persistenceId [{}], from [{}] to [{}]. Found [{}] rows in previous query.",
-            state.queryCount: java.lang.Integer,
-            persistenceId,
-            state.latestSeqNr + 1: java.lang.Long,
-            highestSeqNr: java.lang.Long,
-            state.rowCount: java.lang.Integer)
-
-        newState -> Some(
-          queryDao
-            .eventsByPersistenceId(persistenceId, state.latestSeqNr + 1, highestSeqNr))
-      } else {
-        log.debug(
-          "currentEventsByPersistenceId query [{}] for persistenceId [{}] completed. Found [{}] rows in previous query.",
-          state.queryCount: java.lang.Integer,
-          persistenceId,
-          state.rowCount: java.lang.Integer)
-
-        state -> None
-      }
-    }
-
-    if (log.isDebugEnabled())
-      log.debug(
-        "currentEventsByPersistenceId query for persistenceId [{}], from [{}] to [{}].",
-        persistenceId,
-        fromSequenceNr: java.lang.Long,
-        toSequenceNr: java.lang.Long)
-
-    ContinuousQuery[ByPersistenceIdState, SerializedJournalRow](
-      initialState = ByPersistenceIdState(0, 0, latestSeqNr = fromSequenceNr - 1),
-      updateState = updateState,
-      delayNextQuery = _ => None,
-      nextQuery = state => nextQuery(state, toSequenceNr))
   }
 
   // EventTimestampQuery
@@ -323,8 +264,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     def delayNextQuery(state: ByPersistenceIdState): Option[FiniteDuration] = {
       val delay = ContinuousQuery.adjustNextDelay(
         state.rowCount,
-        settings.querySettings.bufferSize,
-        settings.querySettings.refreshInterval)
+        settings.bufferSize,
+        settings.refreshInterval)
 
       delay.foreach { d =>
         log.debug(
@@ -403,7 +344,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     queryDao.persistenceIds(afterId, limit)
 
   override def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.querySettings.persistenceIdsBufferSize
+    import settings.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 
@@ -439,5 +380,4 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       nextQuery = state => nextQuery(state))
       .mapMaterializedValue(_ => NotUsed)
   }
-
 }

@@ -25,22 +25,22 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.QueryDao
+import io.r2dbc.spi.ConnectionFactory
 
 /**
  * INTERNAL API
  */
 @InternalApi
 private[r2dbc] class MySQLQueryDao(
-    journalSettings: R2dbcSettings,
+    querySettings: QuerySettings,
     connectionFactory: ConnectionFactory
-)(implicit ec: ExecutionContext, system: ActorSystem[_]) extends QueryDao(journalSettings, connectionFactory) {
+)(implicit ec: ExecutionContext, system: ActorSystem[_]) extends QueryDao(querySettings, connectionFactory) {
 
   override lazy val statementTimestampSql: String = "NOW(6)"
 

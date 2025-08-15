@@ -31,7 +31,7 @@ import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.scaladsl.DurableStateStorePagedPersistenceIdsQuery
 import pekko.persistence.query.typed.scaladsl.DurableStateStoreBySliceQuery
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao.SerializedStateRow
@@ -55,14 +55,14 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   import R2dbcDurableStateStore.PersistenceIdsQueryState
 
   private val log = LoggerFactory.getLogger(getClass)
-  private val sharedConfigPath = cfgPath.replaceAll("""\.state$""", "")
-  private val settings = R2dbcSettings(system.settings.config.getConfig(sharedConfigPath))
+  private val settings = StateSettings(config)
 
   private implicit val typedSystem: ActorSystem[_] = system.toTyped
   implicit val ec: ExecutionContext = system.dispatcher
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)
-  private val stateDao = DurableStateDao.fromConfig(settings, sharedConfigPath)
+
+  private val stateDao = DurableStateDao.fromConfig(settings, config)
 
   private val bySlice: BySliceQuery[SerializedStateRow, DurableStateChange[A]] = {
     val createEnvelope: (TimestampOffset, SerializedStateRow) => DurableStateChange[A] = (offset, row) => {
@@ -152,7 +152,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
     stateDao.persistenceIds(afterId, limit)
 
   def currentPersistenceIds(): Source[String, NotUsed] = {
-    import settings.querySettings.persistenceIdsBufferSize
+    import settings.persistenceIdsBufferSize
     def updateState(state: PersistenceIdsQueryState, pid: String): PersistenceIdsQueryState =
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 

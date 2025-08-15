@@ -24,7 +24,7 @@ import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -45,7 +45,7 @@ class EventsBySliceBacktrackingSpec
     with LogCapturing {
 
   override def typedSystem: ActorSystem[_] = system
-  private val settings = new R2dbcSettings(system.settings.config.getConfig("pekko.persistence.r2dbc"))
+  private val settings = QuerySettings(system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
 
   private val query = PersistenceQuery(testKit.system)
     .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
@@ -135,14 +135,14 @@ class EventsBySliceBacktrackingSpec
       writeEvent(slice2, pid2, 1L, startTime.plusMillis(2), "e2-1")
 
       // no backtracking yet
-      result.expectNoMessage(settings.querySettings.refreshInterval + 100.millis)
+      result.expectNoMessage(settings.refreshInterval + 100.millis)
 
       // after 1/2 of the backtracking widow, to kick off a backtracking query
       writeEvent(
         slice1,
         pid1,
         4L,
-        startTime.plusMillis(settings.querySettings.backtrackingWindow.toMillis / 2).plusMillis(4),
+        startTime.plusMillis(settings.backtrackingWindow.toMillis / 2).plusMillis(4),
         "e1-4")
       val env6 = result.expectNext()
       env6.persistenceId shouldBe pid1

@@ -43,23 +43,23 @@ import org.slf4j.LoggerFactory
 
 object EventSourcedPubSubSpec {
 
-  val config: Config = ConfigFactory
-    .parseString("""
-    pekko.persistence.r2dbc {
-      journal.publish-events = on
-      query {
+  val config: Config = ConfigFactory.load(
+    ConfigFactory
+      .parseString("""
+      pekko.persistence.r2dbc {
+        journal.publish-events = on
         refresh-interval = 3 seconds
-        # simulate lost messages by overflowing the buffer
-        buffer-size = 10
+          # simulate lost messages by overflowing the buffer
+          buffer-size = 10
 
-        backtracking {
-          behind-current-time = 5 seconds
-          window = 20 seconds
-        }
+          backtracking {
+            behind-current-time = 5 seconds
+            window = 20 seconds
+          }
       }
-    }
-    """)
-    .withFallback(TestConfig.config)
+      """)
+      .withFallback(TestConfig.unresolvedConfig)
+  )
 
   final case class Processed(projectionId: ProjectionId, envelope: EventEnvelope[String])
 

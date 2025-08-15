@@ -19,23 +19,26 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
+import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
+import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.query.scaladsl.mysql.MySQLQueryDao
 import pekko.stream.scaladsl.Source
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactory
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -43,16 +46,16 @@ object QueryDao {
   val log: Logger = LoggerFactory.getLogger(classOf[QueryDao])
 
   def fromConfig(
-      journalSettings: R2dbcSettings,
-      sharedConfigPath: String
+      settings: QuerySettings,
+      config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
-    journalSettings.dialect match {
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new QueryDao(journalSettings, connectionFactory)
+        new QueryDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLQueryDao(journalSettings, connectionFactory)
+        new MySQLQueryDao(settings, connectionFactory)
     }
   }
 }
@@ -61,11 +64,9 @@ object QueryDao {
  * INTERNAL API
  */
 @InternalApi
-private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
-    implicit
-    ec: ExecutionContext,
-    system: ActorSystem[_])
-    extends BySliceQuery.Dao[SerializedJournalRow] {
+private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory)(
+    implicit val ec: ExecutionContext, system: ActorSystem[_]) extends BySliceQuery.Dao[SerializedJournalRow]
+    with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata
   import QueryDao.log
 
@@ -139,21 +140,14 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
     FROM $journalTable
     WHERE persistence_id = ? AND seq_nr = ? AND deleted = false"""
 
-  private val selectEventsSql = sql"""
-    SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload
-    from $journalTable
-    WHERE persistence_id = ? AND seq_nr >= ? AND seq_nr <= ?
-    AND deleted = false
-    ORDER BY seq_nr
-    LIMIT ?"""
-
   private val allPersistenceIdsSql =
     sql"SELECT DISTINCT(persistence_id) from $journalTable ORDER BY persistence_id LIMIT ?"
 
   private val allPersistenceIdsAfterSql =
     sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  protected val r2dbcExecutor =
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
   def currentDbTimestamp(): Future[Instant] = {
     r2dbcExecutor
@@ -189,9 +183,9 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
         toTimestamp match {
           case Some(until) =>
             stmt.bind(2, until)
-            stmt.bind(3, settings.querySettings.bufferSize)
+            stmt.bind(3, settings.bufferSize)
           case None =>
-            stmt.bind(2, settings.querySettings.bufferSize)
+            stmt.bind(2, settings.bufferSize)
         }
         stmt
       },
@@ -310,40 +304,6 @@ private[r2dbc] class QueryDao(settings: R2dbcSettings, connectionFactory: Connec
           writerUuid = "", // not need in this query
           tags = Set.empty, // tags not fetched in queries (yet)
           metadata = readMetadata(row)))
-
-  def eventsByPersistenceId(
-      persistenceId: String,
-      fromSequenceNr: Long,
-      toSequenceNr: Long): Source[SerializedJournalRow, NotUsed] = {
-
-    val result = r2dbcExecutor.select(s"select eventsByPersistenceId [$persistenceId]")(
-      connection =>
-        connection
-          .createStatement(selectEventsSql)
-          .bind(0, persistenceId)
-          .bind(1, fromSequenceNr)
-          .bind(2, toSequenceNr)
-          .bind(3, settings.querySettings.bufferSize),
-      row =>
-        SerializedJournalRow(
-          slice = row.get[Integer]("slice", classOf[Integer]),
-          entityType = row.get("entity_type", classOf[String]),
-          persistenceId = row.get("persistence_id", classOf[String]),
-          seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
-          dbTimestamp = row.get("db_timestamp", classOf[Instant]),
-          readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
-          payload = Some(row.get("event_payload", classOf[Array[Byte]])),
-          serId = row.get[Integer]("event_ser_id", classOf[Integer]),
-          serManifest = row.get("event_ser_manifest", classOf[String]),
-          writerUuid = row.get("writer", classOf[String]),
-          tags = Set.empty, // tags not fetched in queries (yet)
-          metadata = readMetadata(row)))
-
-    if (log.isDebugEnabled)
-      result.foreach(rows => log.debug("Read [{}] events for persistenceId [{}]", rows.size, persistenceId))
-
-    Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
-  }
 
   def persistenceIds(afterId: Option[String], limit: Long): Source[String, NotUsed] = {
     val result = r2dbcExecutor.select(s"select persistenceIds")(

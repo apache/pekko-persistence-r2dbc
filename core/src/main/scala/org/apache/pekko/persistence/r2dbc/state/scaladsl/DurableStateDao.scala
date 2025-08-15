@@ -19,9 +19,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import io.r2dbc.spi.Statement
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -31,7 +28,7 @@ import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
@@ -40,6 +37,10 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.Statement
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -64,16 +65,16 @@ import org.slf4j.LoggerFactory
   }
 
   def fromConfig(
-      journalSettings: R2dbcSettings,
-      sharedConfigPath: String
+      settings: StateSettings,
+      config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
-    journalSettings.dialect match {
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new DurableStateDao(journalSettings, connectionFactory)
+        new DurableStateDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLDurableStateDao(journalSettings, connectionFactory)
+        new MySQLDurableStateDao(settings, connectionFactory)
     }
   }
 }
@@ -84,7 +85,7 @@ import org.slf4j.LoggerFactory
  * Class for encapsulating db interaction.
  */
 @InternalApi
-private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[_])
@@ -360,9 +361,9 @@ private[r2dbc] class DurableStateDao(settings: R2dbcSettings, connectionFactory:
         toTimestamp match {
           case Some(until) =>
             stmt.bind(2, until)
-            stmt.bind(3, settings.querySettings.bufferSize)
+            stmt.bind(3, settings.bufferSize)
           case None =>
-            stmt.bind(2, settings.querySettings.bufferSize)
+            stmt.bind(2, settings.bufferSize)
         }
         stmt
       },

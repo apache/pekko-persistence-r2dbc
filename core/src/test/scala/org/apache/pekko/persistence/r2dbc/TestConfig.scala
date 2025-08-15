@@ -17,7 +17,7 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
 object TestConfig {
-  lazy val config: Config = {
+  lazy val unresolvedConfig: Config = {
     val defaultConfig = ConfigFactory.load()
     val dialect = defaultConfig.getString("pekko.persistence.r2dbc.dialect")
 
@@ -46,7 +46,7 @@ object TestConfig {
           """)
       case "mysql" =>
         ConfigFactory.parseString("""
-          pekko.persistence.r2dbc{
+          pekko.persistence.r2dbc {
             connection-factory {
               driver = "mysql"
               host = "localhost"
@@ -61,26 +61,23 @@ object TestConfig {
           """)
     }
 
-    // using load here so that connection-factory can be overridden
-    ConfigFactory.load(dialectConfig.withFallback(ConfigFactory.parseString("""
+    dialectConfig.withFallback(ConfigFactory.parseString("""
     pekko.loglevel = DEBUG
     pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.journal"
     pekko.persistence.snapshot-store.plugin = "pekko.persistence.r2dbc.snapshot"
     pekko.persistence.state.plugin = "pekko.persistence.r2dbc.state"
-    pekko.persistence.r2dbc {
-      query {
-        refresh-interval = 1s
-      }
-    }
+    pekko.persistence.r2dbc.refresh-interval = 1s
     pekko.actor {
       serialization-bindings {
         "org.apache.pekko.persistence.r2dbc.CborSerializable" = jackson-cbor
       }
     }
     pekko.actor.testkit.typed.default-timeout = 10s
-    """)))
+    """))
   }
 
+  lazy val config: Config = ConfigFactory.load(unresolvedConfig)
+
   val backtrackingDisabledConfig: Config =
-    ConfigFactory.parseString("pekko.persistence.r2dbc.query.backtracking.enabled = off")
+    ConfigFactory.parseString("pekko.persistence.r2dbc.backtracking.enabled = off")
 }

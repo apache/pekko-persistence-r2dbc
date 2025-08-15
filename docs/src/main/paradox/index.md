@@ -8,7 +8,7 @@ The Pekko Persistence R2DBC plugin allows for using SQL database with R2DBC as a
 
 * [overview](overview.md)
 * [Getting Started](getting-started.md)
-* [Getting Started](connection-config.md)
+* [Configuration](config.md)
 * [License Report](license-report.md)
 * [Journal Plugin](journal.md)
 * [Snapshot Plugin](snapshots.md)

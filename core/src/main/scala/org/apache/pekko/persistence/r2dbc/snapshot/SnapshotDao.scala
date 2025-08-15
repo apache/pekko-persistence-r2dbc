@@ -15,8 +15,6 @@ package org.apache.pekko.persistence.r2dbc.snapshot
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -25,11 +23,14 @@ import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.R2dbcSettings
+import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
 import pekko.persistence.typed.PersistenceId
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -69,16 +70,16 @@ private[r2dbc] object SnapshotDao {
       })
 
   def fromConfig(
-      journalSettings: R2dbcSettings,
-      sharedConfigPath: String
+      settings: SnapshotSettings,
+      config: Config
   )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
     val connectionFactory =
-      ConnectionFactoryProvider(system).connectionFactoryFor(sharedConfigPath + ".connection-factory")
-    journalSettings.dialect match {
+      ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new SnapshotDao(journalSettings, connectionFactory)
+        new SnapshotDao(settings, connectionFactory)
       case Dialect.MySQL =>
-        new MySQLSnapshotDao(journalSettings, connectionFactory)
+        new MySQLSnapshotDao(settings, connectionFactory)
     }
   }
 }
@@ -89,7 +90,7 @@ private[r2dbc] object SnapshotDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class SnapshotDao(settings: R2dbcSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[_]) {

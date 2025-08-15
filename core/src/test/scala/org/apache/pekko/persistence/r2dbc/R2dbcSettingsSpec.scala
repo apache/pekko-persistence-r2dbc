@@ -13,25 +13,33 @@
 
 package org.apache.pekko.persistence.r2dbc
 
+import com.typesafe.config.ConfigException
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.postgresql.client.SSLMode
+import org.scalatest.Inspectors._
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
+  private lazy val configV1 = ConfigFactory.parseResources("config-v1.conf")
+
   "Settings" should {
     "have table names with schema" in {
-      val config = ConfigFactory.parseString("pekko.persistence.r2dbc.schema=s1").withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
-      settings.journalTableWithSchema shouldBe "s1.event_journal"
-      settings.snapshotsTableWithSchema shouldBe "s1.snapshot"
-      settings.durableStateTableWithSchema shouldBe "s1.durable_state"
+      val config = ConfigFactory.load(ConfigFactory.parseString("pekko.persistence.r2dbc.schema=s1"))
+      val journalSettings = JournalSettings(config.getConfig("pekko.persistence.r2dbc.journal"))
+      journalSettings.journalTableWithSchema shouldBe "s1.event_journal"
+      val snapshotSettings = SnapshotSettings(config.getConfig("pekko.persistence.r2dbc.snapshot"))
+      snapshotSettings.snapshotsTableWithSchema shouldBe "s1.snapshot"
+      val stateSettings = StateSettings(config.getConfig("pekko.persistence.r2dbc.state"))
+      stateSettings.durableStateTableWithSchema shouldBe "s1.durable_state"
 
       // by default connection is configured with options
-      settings.connectionFactorySettings shouldBe a[ConnectionFactorySettings]
-      settings.connectionFactorySettings.urlOption should not be defined
+      val connectionFactorySettings =
+        ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+      connectionFactorySettings shouldBe a[ConnectionFactorySettings]
+      connectionFactorySettings.urlOption should not be defined
     }
 
     "support connection settings build from url" in {
@@ -40,35 +48,55 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
           .parseString("pekko.persistence.r2dbc.connection-factory.url=whatever-url")
           .withFallback(ConfigFactory.load())
 
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
-      settings.connectionFactorySettings shouldBe a[ConnectionFactorySettings]
-      settings.connectionFactorySettings.urlOption shouldBe defined
+      val settings = ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+      settings shouldBe a[ConnectionFactorySettings]
+      settings.urlOption shouldBe defined
     }
 
     "support ssl-mode as enum name" in {
       val config = ConfigFactory
         .parseString("pekko.persistence.r2dbc.connection-factory.ssl.mode=VERIFY_FULL")
         .withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
-      settings.connectionFactorySettings.sslMode shouldBe "VERIFY_FULL"
-      SSLMode.fromValue(settings.connectionFactorySettings.sslMode) shouldBe SSLMode.VERIFY_FULL
+      val settings = ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+      settings.sslMode shouldBe "VERIFY_FULL"
+      SSLMode.fromValue(settings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
 
     "support ssl-mode values in lower and dashes" in {
       val config = ConfigFactory
         .parseString("pekko.persistence.r2dbc.connection-factory.ssl.mode=verify-full")
         .withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
-      settings.connectionFactorySettings.sslMode shouldBe "verify-full"
-      SSLMode.fromValue(settings.connectionFactorySettings.sslMode) shouldBe SSLMode.VERIFY_FULL
+      val settings = ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+      settings.sslMode shouldBe "verify-full"
+      SSLMode.fromValue(settings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
 
     "allow to specify ConnectionFactoryOptions customizer" in {
       val config = ConfigFactory
         .parseString("pekko.persistence.r2dbc.connection-factory.connection-factory-options-customizer=fqcn")
         .withFallback(ConfigFactory.load())
-      val settings = R2dbcSettings(config.getConfig("pekko.persistence.r2dbc"))
-      settings.connectionFactorySettings.connectionFactoryOptionsCustomizer shouldBe Some("fqcn")
+      val settings = ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+      settings.connectionFactoryOptionsCustomizer shouldBe Some("fqcn")
+    }
+
+    "not work when not merged with reference config for plugin config with v1 config" in {
+      assertThrows[ConfigException.Missing](JournalSettings(configV1.getConfig("pekko.persistence.r2dbc.journal")))
+      assertThrows[ConfigException.Missing](SnapshotSettings(configV1.getConfig("pekko.persistence.r2dbc.snapshot")))
+      assertThrows[ConfigException.Missing](StateSettings(configV1.getConfig("pekko.persistence.r2dbc.state")))
+    }
+
+    "work when merged with reference config for plugin config with v1 config" in {
+      val configWithReference = ConfigFactory.load(configV1)
+
+      forEvery(
+        List(
+          JournalSettings(configWithReference.getConfig("pekko.persistence.r2dbc.journal")),
+          SnapshotSettings(configWithReference.getConfig("pekko.persistence.r2dbc.snapshot")),
+          StateSettings(configWithReference.getConfig("pekko.persistence.r2dbc.state"))
+        )
+      ) { settings =>
+        settings.useConnectionFactory shouldBe "pekko.persistence.r2dbc.connection-factory"
+      }
     }
   }
 }
