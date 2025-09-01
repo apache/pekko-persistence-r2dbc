@@ -9,9 +9,9 @@ Release notes for Apache Pekko Persistence R2DBC 1.1.0. See [GitHub Milestone fo
 ### Breaking Changes
 
 * The dependency on org.postgresql:r2dbc-postgresql is no longer added to our dependency pom.xml
-    * Users need to add their own explicit dependency if they want to use Postgres (version 1.x release recommended)
+    * Users need to add their own explicit dependency if they want to use Postgres (release tested with r2dbc-postgresql 1.0.7.RELEASE)
     * We now support Postgres and MySQL in pekko-persistence-r2dbc and pekko-projection-r2dbc
-    * MySQL users will need to add their own explicit dependency on io.asyncer:r2dbc-mysql (latest 1.x release recommended) ([PR175](https://github.com/apache/pekko-persistence-r2dbc/pull/175), [PR177](https://github.com/apache/pekko-persistence-r2dbc/pull/177))
+    * MySQL users will need to add their own explicit dependency on io.asyncer:r2dbc-mysql (release tested with r2dbc-mysql 1.4.1) ([PR175](https://github.com/apache/pekko-persistence-r2dbc/pull/175), [PR177](https://github.com/apache/pekko-persistence-r2dbc/pull/177))
 * change R2dbcExecutor functions that work with getRowsUpdated to return Future[Long] ([PR90](https://github.com/apache/pekko-persistence-r2dbc/pull/90))
 * Durable State: support revision in deletes ([PR92](https://github.com/apache/pekko-persistence-r2dbc/pull/92))
 * Configuring persistence plugins at runtime ([PR194](https://github.com/apache/pekko-persistence-r2dbc/pull/194))
