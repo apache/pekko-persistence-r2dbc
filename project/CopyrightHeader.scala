@@ -7,8 +7,8 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
-import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport._
-import de.heikoseeberger.sbtheader.{ CommentCreator, HeaderPlugin, NewLine }
+import sbtheader.HeaderPlugin.autoImport._
+import sbtheader.{ CommentCreator, HeaderPlugin, NewLine }
 import org.apache.commons.lang3.StringUtils
 import sbt.Keys._
 import sbt._
