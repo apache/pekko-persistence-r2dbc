@@ -56,7 +56,7 @@ lazy val core = (project in file("core"))
     libraryDependencies ++= Dependencies.core)
 
 lazy val projection = (project in file("projection"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test")
   .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-projection-r2dbc",
@@ -84,7 +84,7 @@ lazy val migration = (project in file("migration"))
 
 lazy val docs = project
   .in(file("docs"))
-  .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, ScalaUnidocPlugin)
+  .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, ScalaUnidocPlugin, SitePreviewPlugin)
   .disablePlugins(MimaPlugin)
   .dependsOn(core, projection, migration)
   .settings(dontPublish)

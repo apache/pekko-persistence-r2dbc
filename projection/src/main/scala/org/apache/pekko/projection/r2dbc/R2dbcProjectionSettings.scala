@@ -53,6 +53,9 @@ object R2dbcProjectionSettings {
   def apply(system: ActorSystem[_]): R2dbcProjectionSettings =
     apply(system.settings.config.getConfig(DefaultConfigPath))
 
+  def apply(config: Config, system: ActorSystem[_]): R2dbcProjectionSettings =
+    apply(config.withFallback(system.settings.config.getConfig(DefaultConfigPath)))
+
   def apply(
       schema: Option[String],
       offsetTable: String,
