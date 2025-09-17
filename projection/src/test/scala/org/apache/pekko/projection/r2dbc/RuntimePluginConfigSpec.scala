@@ -26,7 +26,6 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import org.apache.pekko.projection.ProjectionContext
-import org.apache.pekko.projection.r2dbc.R2dbcProjectionSpec.Envelope
 import org.apache.pekko.projection.scaladsl.Handler
 import org.apache.pekko.stream.scaladsl.FlowWithContext
 import org.apache.pekko
@@ -196,7 +195,7 @@ class RuntimePluginConfigSpec extends ScalaTestWithActorTestKit(TestConfig.confi
       private val sourceProvider = EventSourcedProvider.eventsBySlices[String](
         system = system,
         readJournalPluginId = readJournalPluginIdentifier,
-        readJournalConfig = eventSourced.projectionConfig,
+        readJournalConfig = eventSourced.config,
         entityType = "",
         minSlice = range.min,
         maxSlice = range.max
