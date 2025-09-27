@@ -25,7 +25,7 @@ object CommonSettings extends AutoPlugin {
     scalaVersion := Dependencies.Scala213,
     crossVersion := CrossVersion.binary,
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
-    Compile / javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.8", "-target", "1.8"),
+    Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),
     Test / logBuffered := false,
     Test / parallelExecution := false,
     // show full stack traces and test case durations
