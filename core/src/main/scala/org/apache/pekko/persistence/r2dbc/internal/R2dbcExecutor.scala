@@ -26,7 +26,6 @@ import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalStableApi
-import pekko.dispatch.ExecutionContexts
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Result
@@ -58,7 +57,7 @@ import reactor.core.publisher.Mono
 
   def updateOneInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Long] =
     stmt.execute().asFuture().flatMap { result =>
-      result.getRowsUpdated.asFuture().map(_.longValue())(ExecutionContexts.parasitic)
+      result.getRowsUpdated.asFuture().map(_.longValue())(ExecutionContext.parasitic)
     }
 
   def updateBatchInTx(stmt: Statement)(implicit ec: ExecutionContext): Future[Long] = {
@@ -76,7 +75,7 @@ import reactor.core.publisher.Mono
     statements.foldLeft(Future.successful(immutable.IndexedSeq.empty[Long])) { (acc, stmt) =>
       acc.flatMap { seq =>
         stmt.execute().asFuture().flatMap { res =>
-          res.getRowsUpdated.asFuture().map(seq :+ _.longValue())(ExecutionContexts.parasitic)
+          res.getRowsUpdated.asFuture().map(seq :+ _.longValue())(ExecutionContext.parasitic)
         }
       }
     }
@@ -134,7 +133,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
         if (durationMicros >= logDbCallsExceedingMicros)
           log.info("{} - getConnection took [{}] µs", logPrefix, durationMicros)
         connection
-      }(ExecutionContexts.parasitic)
+      }(ExecutionContext.parasitic)
   }
 
   /**
@@ -217,7 +216,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
   def updateInBatchReturning[A](logPrefix: String)(
       statementFactory: Connection => Statement,
       mapRow: Row => A): Future[immutable.IndexedSeq[A]] = {
-    import pekko.util.ccompat.JavaConverters._
+    import scala.jdk.CollectionConverters._
     withConnection(logPrefix) { connection =>
       val stmt = statementFactory(connection)
       Flux

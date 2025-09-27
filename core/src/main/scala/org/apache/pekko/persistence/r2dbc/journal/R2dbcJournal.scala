@@ -16,11 +16,9 @@ package org.apache.pekko.persistence.r2dbc.journal
 import java.time.Instant
 
 import scala.collection.immutable
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.{ Failure, Success, Try }
+
 import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
@@ -28,7 +26,6 @@ import pekko.actor.ActorRef
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.event.Logging
 import pekko.persistence.AtomicWrite
 import pekko.persistence.Persistence
@@ -181,7 +178,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
     writeAndPublishResult.onComplete { _ =>
       self ! WriteFinished(persistenceId, writeAndPublishResult)
     }
-    writeAndPublishResult.map(_ => Nil)(ExecutionContexts.parasitic)
+    writeAndPublishResult.map(_ => Nil)(ExecutionContext.parasitic)
   }
 
   private def publish(messages: immutable.Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
@@ -196,7 +193,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
         }
 
       case None =>
-        dbTimestamp.map(_ => Done)(ExecutionContexts.parasitic)
+        dbTimestamp.map(_ => Done)(ExecutionContext.parasitic)
     }
 
   private def logEventsByTagsNotImplemented(): Unit = {
@@ -236,7 +233,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
       case Some(f) =>
         log.debug("Write in progress for [{}], deferring highest seq nr until write completed", persistenceId)
         // we only want to make write - replay sequential, not fail if previous write failed
-        f.recover { case _ => Done }(ExecutionContexts.parasitic)
+        f.recover { case _ => Done }(ExecutionContext.parasitic)
       case None => Future.successful(Done)
     }
     pendingWrite.flatMap(_ => journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr))

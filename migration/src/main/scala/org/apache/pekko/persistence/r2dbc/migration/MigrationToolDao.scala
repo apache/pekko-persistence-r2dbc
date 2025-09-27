@@ -13,15 +13,13 @@
 
 package org.apache.pekko.persistence.r2dbc.migration
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.journal.JournalDao.log
@@ -70,7 +68,7 @@ import io.r2dbc.spi.ConnectionFactory
           .bind(0, persistenceId)
           .bind(1, seqNr)
       }
-      .map(_ => Done)(ExecutionContexts.parasitic)
+      .map(_ => Done)(ExecutionContext.parasitic)
   }
 
   def updateSnapshotProgress(persistenceId: String, seqNr: Long): Future[Done] = {
@@ -87,7 +85,7 @@ import io.r2dbc.spi.ConnectionFactory
           .bind(0, persistenceId)
           .bind(1, seqNr)
       }
-      .map(_ => Done)(ExecutionContexts.parasitic)
+      .map(_ => Done)(ExecutionContext.parasitic)
   }
 
   def currentProgress(persistenceId: String): Future[Option[CurrentProgress]] = {

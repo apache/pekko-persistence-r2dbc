@@ -15,17 +15,15 @@ package org.apache.pekko.persistence.r2dbc.migration
 
 import java.time.Instant
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.util.{ Failure, Success, Try }
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
-import pekko.dispatch.ExecutionContexts
 import pekko.pattern.ask
 import pekko.persistence.Persistence
 import pekko.persistence.SelectedSnapshot
@@ -296,7 +294,7 @@ class MigrationTool(system: ActorSystem[_]) {
             val serializedRow = serializedSnapotRow(selectedSnapshot)
             targetSnapshotDao
               .store(serializedRow)
-              .map(_ => snapshotMetadata.sequenceNr)(ExecutionContexts.parasitic)
+              .map(_ => snapshotMetadata.sequenceNr)(ExecutionContext.parasitic)
           }
           _ <- migrationDao.updateSnapshotProgress(persistenceId, seqNr)
         } yield 1

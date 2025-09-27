@@ -22,14 +22,13 @@ import java.util.concurrent.atomic.AtomicReference
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.LoggerOps
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.Offset
@@ -291,8 +290,8 @@ private[projection] class R2dbcOffsetStore(
       case timestampQuery: EventTimestampQuery =>
         timestampQuery.timestampOf(persistenceId, sequenceNr)
       case timestampQuery: pekko.persistence.query.typed.javadsl.EventTimestampQuery =>
-        import pekko.util.FutureConverters._
-        import pekko.util.OptionConverters._
+        import scala.jdk.FutureConverters._
+        import scala.jdk.OptionConverters._
         timestampQuery.timestampOf(persistenceId, sequenceNr).asScala.map(_.toScala)
       case _ =>
         throw new IllegalArgumentException(
@@ -418,7 +417,7 @@ private[projection] class R2dbcOffsetStore(
       .withConnection("save offset") { conn =>
         saveOffsetInTx(conn, offset)
       }
-      .map(_ => Done)(ExecutionContexts.parasitic)
+      .map(_ => Done)(ExecutionContext.parasitic)
   }
 
   /**
@@ -440,7 +439,7 @@ private[projection] class R2dbcOffsetStore(
       .withConnection("save offsets") { conn =>
         saveOffsetsInTx(conn, offsets)
       }
-      .map(_ => Done)(ExecutionContexts.parasitic)
+      .map(_ => Done)(ExecutionContext.parasitic)
   }
 
   def saveOffsetsInTx[Offset](conn: Connection, offsets: immutable.IndexedSeq[Offset]): Future[Done] = {
@@ -604,7 +603,7 @@ private[projection] class R2dbcOffsetStore(
       case MultipleOffsets(many) => many.map(upsertStmt).toVector
     }
 
-    R2dbcExecutor.updateInTx(statements).map(_ => Done)(ExecutionContexts.parasitic)
+    R2dbcExecutor.updateInTx(statements).map(_ => Done)(ExecutionContext.parasitic)
   }
 
   def isDuplicate(record: Record): Boolean =
@@ -884,14 +883,14 @@ private[projection] class R2dbcOffsetStore(
               insertTimestampOffsetInTx(conn, records)
             }
           }
-          .map(_ => Done)(ExecutionContexts.parasitic)
+          .map(_ => Done)(ExecutionContext.parasitic)
 
       case _ =>
         r2dbcExecutor
           .withConnection("set offset") { conn =>
             savePrimitiveOffsetInTx(conn, offset)
           }
-          .map(_ => Done)(ExecutionContexts.parasitic)
+          .map(_ => Done)(ExecutionContext.parasitic)
     }
   }
 
@@ -1001,7 +1000,7 @@ private[projection] class R2dbcOffsetStore(
           .bind(2, paused)
           .bind(3, Instant.now(clock).toEpochMilli)
       }
-      .map(_ => Done)(ExecutionContexts.parasitic)
+      .map(_ => Done)(ExecutionContext.parasitic)
   }
 
   private def createRecordWithOffset[Envelope](envelope: Envelope): Option[RecordWithOffset] = {

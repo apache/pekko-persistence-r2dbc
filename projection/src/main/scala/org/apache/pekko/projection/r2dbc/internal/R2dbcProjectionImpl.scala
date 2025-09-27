@@ -102,7 +102,7 @@ private[projection] object R2dbcProjectionImpl {
           case loadEventQuery: LoadEventQuery =>
             loadEventQuery.loadEnvelope[Any](pid, seqNr)
           case loadEventQuery: pekko.persistence.query.typed.javadsl.LoadEventQuery =>
-            import pekko.util.FutureConverters._
+            import scala.jdk.FutureConverters._
             loadEventQuery.loadEnvelope[Any](pid, seqNr).asScala
           case _ =>
             throw new IllegalArgumentException(
@@ -127,7 +127,7 @@ private[projection] object R2dbcProjectionImpl {
           case store: DurableStateStore[_] =>
             store.getObject(pid)
           case store: pekko.persistence.state.javadsl.DurableStateStore[_] =>
-            import pekko.util.FutureConverters._
+            import scala.jdk.FutureConverters._
             store.getObject(pid).asScala.map(_.toScala)
         }).map {
           case GetObjectResult(Some(loadedValue), loadedRevision) =>

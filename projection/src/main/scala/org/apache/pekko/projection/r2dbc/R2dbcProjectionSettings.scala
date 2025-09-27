@@ -17,12 +17,13 @@ import java.time.{ Duration => JDuration }
 import java.util.Locale
 
 import scala.concurrent.duration._
+import scala.jdk.DurationConverters._
 import scala.util.hashing.MurmurHash3
+
 import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.Dialect
-import pekko.util.JavaDurationConverters._
 
 object R2dbcProjectionSettings {
 
@@ -32,7 +33,7 @@ object R2dbcProjectionSettings {
     val logDbCallsExceeding: FiniteDuration =
       config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
         case "off" => -1.millis
-        case _     => config.getDuration("log-db-calls-exceeding").asScala
+        case _     => config.getDuration("log-db-calls-exceeding").toScala
       }
 
     new R2dbcProjectionSettings(

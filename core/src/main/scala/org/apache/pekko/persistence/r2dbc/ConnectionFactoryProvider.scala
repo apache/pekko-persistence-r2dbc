@@ -18,8 +18,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.jdk.CollectionConverters._
 import scala.util.Failure
 import scala.util.Success
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.CoordinatedShutdown
@@ -29,7 +31,6 @@ import pekko.actor.typed.ExtensionId
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
-import pekko.util.ccompat.JavaConverters._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool

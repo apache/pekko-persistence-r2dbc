@@ -14,8 +14,8 @@
 package org.apache.pekko.persistence.r2dbc.state.scaladsl
 
 import scala.collection.immutable
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
+
 import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
@@ -23,7 +23,6 @@ import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.Offset
@@ -125,7 +124,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
           .foreach(throw _)
       }
       Done
-    }(ExecutionContexts.parasitic)
+    }(ExecutionContext.parasitic)
   }
 
   override def sliceForPersistenceId(persistenceId: String): Int =

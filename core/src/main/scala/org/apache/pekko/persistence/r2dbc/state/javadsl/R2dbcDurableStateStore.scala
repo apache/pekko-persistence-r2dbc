@@ -18,6 +18,7 @@ import java.util.Optional
 import java.util.concurrent.CompletionStage
 
 import scala.concurrent.ExecutionContext
+import scala.jdk.FutureConverters._
 
 import org.apache.pekko
 import pekko.Done
@@ -31,7 +32,6 @@ import pekko.persistence.r2dbc.state.scaladsl.{ R2dbcDurableStateStore => ScalaR
 import pekko.persistence.state.javadsl.DurableStateUpdateStore
 import pekko.persistence.state.javadsl.GetObjectResult
 import pekko.stream.javadsl.Source
-import pekko.util.FutureConverters._
 
 object R2dbcDurableStateStore {
   val Identifier: String = ScalaR2dbcDurableStateStore.Identifier
@@ -75,7 +75,7 @@ class R2dbcDurableStateStore[A](scalaStore: ScalaR2dbcDurableStateStore[A])(impl
     scalaStore.sliceForPersistenceId(persistenceId)
 
   override def sliceRanges(numberOfRanges: Int): util.List[Pair[Integer, Integer]] = {
-    import pekko.util.ccompat.JavaConverters._
+    import scala.jdk.CollectionConverters._
     scalaStore
       .sliceRanges(numberOfRanges)
       .map(range => Pair(Integer.valueOf(range.min), Integer.valueOf(range.max)))
@@ -83,7 +83,7 @@ class R2dbcDurableStateStore[A](scalaStore: ScalaR2dbcDurableStateStore[A])(impl
   }
 
   override def currentPersistenceIds(afterId: Optional[String], limit: Long): Source[String, NotUsed] = {
-    import pekko.util.OptionConverters._
+    import scala.jdk.OptionConverters._
     scalaStore.currentPersistenceIds(afterId.toScala, limit).asJava
   }
 

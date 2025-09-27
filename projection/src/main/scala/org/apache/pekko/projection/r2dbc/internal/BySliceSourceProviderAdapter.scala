@@ -18,24 +18,21 @@ import java.util.Optional
 import java.util.concurrent.CompletionStage
 import java.util.function.Supplier
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.jdk.CollectionConverters._
+import scala.jdk.FutureConverters._
+import scala.jdk.OptionConverters._
 
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.annotation.InternalApi
-import pekko.projection.javadsl
-import pekko.projection.scaladsl
-import pekko.dispatch.ExecutionContexts
-import pekko.stream.scaladsl.Source
-import pekko.util.ccompat.JavaConverters._
-import pekko.util.FutureConverters._
-import pekko.util.OptionConverters._
-import scala.concurrent.ExecutionContext
-
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
+import pekko.projection.javadsl
+import pekko.projection.scaladsl
 import pekko.projection.BySlicesSourceProvider
+import pekko.stream.scaladsl.Source
 
 /**
  * INTERNAL API: Adapter from javadsl.SourceProvider to scaladsl.SourceProvider
@@ -50,7 +47,7 @@ import pekko.projection.BySlicesSourceProvider
   def source(offset: () => Future[Option[Offset]]): Future[Source[Envelope, NotUsed]] = {
     // the parasitic context is used to convert the Optional to Option and a java streams Source to a scala Source,
     // it _should_ not be used for the blocking operation of getting offsets themselves
-    val ec = pekko.dispatch.ExecutionContexts.parasitic
+    val ec = ExecutionContext.parasitic
     val offsetAdapter = new Supplier[CompletionStage[Optional[Offset]]] {
       override def get(): CompletionStage[Optional[Offset]] = offset().map(_.toJava)(ec).asJava
     }
@@ -70,7 +67,7 @@ import pekko.projection.BySlicesSourceProvider
   override def timestampOf(persistenceId: String, sequenceNr: Long): Future[Option[Instant]] =
     delegate match {
       case timestampQuery: pekko.persistence.query.typed.javadsl.EventTimestampQuery =>
-        timestampQuery.timestampOf(persistenceId, sequenceNr).asScala.map(_.toScala)(ExecutionContexts.parasitic)
+        timestampQuery.timestampOf(persistenceId, sequenceNr).asScala.map(_.toScala)(ExecutionContext.parasitic)
       case _ =>
         Future.failed(
           new IllegalArgumentException(

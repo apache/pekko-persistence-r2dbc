@@ -17,15 +17,14 @@ import java.util.Optional
 import java.util.concurrent.CompletionStage
 
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters._
+import scala.jdk.FutureConverters._
+import scala.jdk.OptionConverters._
 
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.ApiMayChange
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
-import pekko.util.ccompat.JavaConverters._
-import pekko.util.FutureConverters._
-import pekko.util.OptionConverters._
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
@@ -37,14 +36,14 @@ final class R2dbcSession(connection: Connection)(implicit ec: ExecutionContext, 
     connection.createStatement(sql)
 
   def updateOne(statement: Statement): CompletionStage[java.lang.Long] =
-    R2dbcExecutor.updateOneInTx(statement).map(java.lang.Long.valueOf)(ExecutionContexts.parasitic).asJava
+    R2dbcExecutor.updateOneInTx(statement).map(java.lang.Long.valueOf)(ExecutionContext.parasitic).asJava
 
   def update(statements: java.util.List[Statement]): CompletionStage[java.util.List[java.lang.Long]] =
     R2dbcExecutor.updateInTx(statements.asScala.toVector).map(results =>
       results.map(java.lang.Long.valueOf).asJava).asJava
 
   def selectOne[A](statement: Statement)(mapRow: Row => A): CompletionStage[Optional[A]] =
-    R2dbcExecutor.selectOneInTx(statement, mapRow).map(_.toJava)(ExecutionContexts.parasitic).asJava
+    R2dbcExecutor.selectOneInTx(statement, mapRow).map(_.toJava)(ExecutionContext.parasitic).asJava
 
   def select[A](statement: Statement)(mapRow: Row => A): CompletionStage[java.util.List[A]] =
     R2dbcExecutor.selectInTx(statement, mapRow).map(_.asJava).asJava
