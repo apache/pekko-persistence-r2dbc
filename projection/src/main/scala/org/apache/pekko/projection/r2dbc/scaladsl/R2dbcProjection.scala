@@ -60,6 +60,7 @@ object R2dbcProjection {
       system: ActorSystem[_]): ExactlyOnceProjection[Offset, Envelope] =
     exactlyOnce(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
+  /** @since 2.0.0 */
   def exactlyOnce[Offset, Envelope](
       projectionId: ProjectionId,
       config: Config,
@@ -118,6 +119,7 @@ object R2dbcProjection {
       system: ActorSystem[_]): AtLeastOnceProjection[Offset, Envelope] =
     atLeastOnce(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
+  /** @since 2.0.0 */
   def atLeastOnce[Offset, Envelope](
       projectionId: ProjectionId,
       config: Config,
@@ -176,6 +178,7 @@ object R2dbcProjection {
       handler: () => Handler[Envelope])(implicit system: ActorSystem[_]): AtLeastOnceProjection[Offset, Envelope] =
     atLeastOnceAsync(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
+  /** @since 2.0.0 */
   def atLeastOnceAsync[Offset, Envelope](
       projectionId: ProjectionId,
       config: Config,
@@ -226,6 +229,7 @@ object R2dbcProjection {
       system: ActorSystem[_]): GroupedProjection[Offset, Envelope] =
     groupedWithin(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
+  /** @since 2.0.0 */
   def groupedWithin[Offset, Envelope](
       projectionId: ProjectionId,
       config: Config,
@@ -284,6 +288,7 @@ object R2dbcProjection {
       system: ActorSystem[_]): GroupedProjection[Offset, Envelope] =
     groupedWithinAsync(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
+  /** @since 2.0.0 */
   def groupedWithinAsync[Offset, Envelope](
       projectionId: ProjectionId,
       config: Config,
@@ -347,6 +352,7 @@ object R2dbcProjection {
       system: ActorSystem[_]): AtLeastOnceFlowProjection[Offset, Envelope] =
     atLeastOnceFlow(projectionId, ConfigFactory.empty(), settings, sourceProvider, handler)
 
+  /** @since 2.0.0 */
   def atLeastOnceFlow[Offset, Envelope](
       projectionId: ProjectionId,
       config: Config,
