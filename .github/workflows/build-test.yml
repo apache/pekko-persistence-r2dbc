@@ -46,7 +46,7 @@ jobs:
     strategy:
       matrix:
         SCALA_VERSION: [ 2.13, 3.3 ]
-        JAVA_VERSION: [ 8, 11 ]
+        JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Checkout
@@ -96,7 +96,7 @@ jobs:
     strategy:
       matrix:
         SCALA_VERSION: [ 2.13, 3.3 ]
-        JAVA_VERSION: [ 8, 11 ]
+        JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
       - name: Checkout
