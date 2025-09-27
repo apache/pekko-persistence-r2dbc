@@ -84,7 +84,7 @@ lazy val migration = (project in file("migration"))
 
 lazy val docs = project
   .in(file("docs"))
-  .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, ScalaUnidocPlugin, SitePreviewPlugin)
+  .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, ScalaUnidocPlugin)
   .disablePlugins(MimaPlugin)
   .dependsOn(core, projection, migration)
   .settings(dontPublish)
