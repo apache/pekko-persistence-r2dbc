@@ -15,13 +15,11 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import org.apache.pekko
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 
 /**
  * INTERNAL API
@@ -63,7 +61,7 @@ trait HighestSequenceNrDao {
           val seqNr = row.get[java.lang.Long](0, classOf[java.lang.Long])
           if (seqNr eq null) 0L else seqNr.longValue
         })
-      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContexts.parasitic)
+      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContext.parasitic)
 
     if (log.isDebugEnabled)
       result.foreach(seqNr => log.debug("Highest sequence nr for persistenceId [{}]: [{}]", persistenceId, seqNr))

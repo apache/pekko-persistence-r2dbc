@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.Promise
+import scala.jdk.CollectionConverters._
 
 import org.apache.pekko
 import pekko.NotUsed
@@ -35,7 +36,6 @@ import pekko.projection.BySlicesSourceProvider
 import pekko.projection.scaladsl.SourceProvider
 import pekko.stream.OverflowStrategy
 import pekko.stream.scaladsl.Source
-import pekko.util.ccompat.JavaConverters._
 
 class TestSourceProviderWithInput()(implicit val system: ActorSystem[_])
     extends SourceProvider[TimestampOffset, EventEnvelope[String]]

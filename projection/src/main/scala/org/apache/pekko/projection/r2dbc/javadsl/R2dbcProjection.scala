@@ -16,6 +16,8 @@ package org.apache.pekko.projection.r2dbc.javadsl
 import java.util.Optional
 import java.util.function.Supplier
 
+import scala.jdk.OptionConverters._
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
@@ -38,7 +40,6 @@ import pekko.projection.r2dbc.internal.R2dbcGroupedHandlerAdapter
 import pekko.projection.r2dbc.internal.R2dbcHandlerAdapter
 import pekko.projection.r2dbc.scaladsl
 import pekko.stream.javadsl.FlowWithContext
-import pekko.util.OptionConverters._
 
 @ApiMayChange
 object R2dbcProjection {

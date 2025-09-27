@@ -15,16 +15,14 @@ package org.apache.pekko.persistence.r2dbc.state.scaladsl
 
 import java.time.Instant
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-import scala.concurrent.duration.Duration
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.{ Duration, FiniteDuration }
+
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
@@ -302,7 +300,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     if (log.isDebugEnabled())
       result.foreach(_ => log.debug("Deleted durable state for persistenceId [{}]", persistenceId))
 
-    result.map(_ => Done)(ExecutionContexts.parasitic)
+    result.map(_ => Done)(ExecutionContext.parasitic)
   }
 
   /**

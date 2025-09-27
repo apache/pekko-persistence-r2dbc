@@ -13,12 +13,11 @@
 
 package org.apache.pekko.persistence.r2dbc.snapshot
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
@@ -193,7 +192,7 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
           statement
         },
         collectSerializedSnapshot)
-      .map(_.headOption)(ExecutionContexts.parasitic)
+      .map(_.headOption)(ExecutionContext.parasitic)
 
   }
 
@@ -231,7 +230,7 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
 
           statement
       }
-      .map(_ => ())(ExecutionContexts.parasitic)
+      .map(_ => ())(ExecutionContext.parasitic)
   }
 
   def delete(persistenceId: String, criteria: SnapshotSelectionCriteria): Future[Unit] = {
@@ -262,6 +261,6 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
       }
       statement
     }
-  }.map(_ => ())(ExecutionContexts.parasitic)
+  }.map(_ => ())(ExecutionContext.parasitic)
 
 }

@@ -16,11 +16,12 @@ package org.apache.pekko.persistence.r2dbc
 import java.util.Locale
 
 import scala.concurrent.duration._
+import scala.jdk.DurationConverters._
+
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
 import pekko.util.Helpers.toRootLowerCase
-import pekko.util.JavaDurationConverters._
 import com.typesafe.config.Config
 
 /**
@@ -151,7 +152,7 @@ trait ConnectionSettings {
   val logDbCallsExceeding: FiniteDuration =
     config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
       case "off" => -1.millis
-      case _     => config.getDuration("log-db-calls-exceeding").asScala
+      case _     => config.getDuration("log-db-calls-exceeding").toScala
     }
 }
 
@@ -205,7 +206,7 @@ trait BufferSize {
 trait RefreshInterval {
   def config: Config
 
-  val refreshInterval: FiniteDuration = config.getDuration("refresh-interval").asScala
+  val refreshInterval: FiniteDuration = config.getDuration("refresh-interval").toScala
 }
 
 /**
@@ -215,10 +216,10 @@ trait RefreshInterval {
 trait BySliceQuerySettings {
   def config: Config
 
-  val behindCurrentTime: FiniteDuration = config.getDuration("behind-current-time").asScala
+  val behindCurrentTime: FiniteDuration = config.getDuration("behind-current-time").toScala
   val backtrackingEnabled: Boolean = config.getBoolean("backtracking.enabled")
-  val backtrackingWindow: FiniteDuration = config.getDuration("backtracking.window").asScala
-  val backtrackingBehindCurrentTime: FiniteDuration = config.getDuration("backtracking.behind-current-time").asScala
+  val backtrackingWindow: FiniteDuration = config.getDuration("backtracking.window").toScala
+  val backtrackingBehindCurrentTime: FiniteDuration = config.getDuration("backtracking.behind-current-time").toScala
 }
 
 /**
@@ -254,11 +255,11 @@ final class ConnectionFactorySettings(config: Config) {
 
   val initialSize: Int = config.getInt("initial-size")
   val maxSize: Int = config.getInt("max-size")
-  val maxIdleTime: FiniteDuration = config.getDuration("max-idle-time").asScala
-  val maxLifeTime: FiniteDuration = config.getDuration("max-life-time").asScala
+  val maxIdleTime: FiniteDuration = config.getDuration("max-idle-time").toScala
+  val maxLifeTime: FiniteDuration = config.getDuration("max-life-time").toScala
 
-  val connectTimeout: FiniteDuration = config.getDuration("connect-timeout").asScala
-  val acquireTimeout: FiniteDuration = config.getDuration("acquire-timeout").asScala
+  val connectTimeout: FiniteDuration = config.getDuration("connect-timeout").toScala
+  val acquireTimeout: FiniteDuration = config.getDuration("acquire-timeout").toScala
   val acquireRetry: Int = config.getInt("acquire-retry")
 
   val validationQuery: String = config.getString("validation-query")

@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3 ]
         JAVA_VERSION: [ 8, 11, 17, 21 ]
     steps:
       - name: Checkout
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3 ]
         JAVA_VERSION: [ 8, 11 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3 ]
         JAVA_VERSION: [ 8, 11 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -145,13 +145,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.12, 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3 ]
         JAVA_VERSION: [ 11, 17, 21 ]
         # only compiling on JDK 8, because certain tests depend on the higher timestamp precision added in JDK 9
         include:
-          - JAVA_VERSION: 8
-            SCALA_VERSION: 2.12
-            COMPILE_ONLY: true
           - JAVA_VERSION: 8
             SCALA_VERSION: 2.13
             COMPILE_ONLY: true

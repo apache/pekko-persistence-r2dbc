@@ -15,12 +15,11 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
@@ -237,7 +236,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
       if (useTimestampFromDb) {
         result
       } else {
-        result.map(_ => events.head.dbTimestamp)(ExecutionContexts.parasitic)
+        result.map(_ => events.head.dbTimestamp)(ExecutionContext.parasitic)
       }
     } else {
       val result = r2dbcExecutor.updateInBatchReturning(s"batch insert [$persistenceId], [$totalEvents] events")(
@@ -254,9 +253,9 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
           log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
         }
       if (useTimestampFromDb) {
-        result.map(_.head)(ExecutionContexts.parasitic)
+        result.map(_.head)(ExecutionContext.parasitic)
       } else {
-        result.map(_ => events.head.dbTimestamp)(ExecutionContexts.parasitic)
+        result.map(_ => events.head.dbTimestamp)(ExecutionContext.parasitic)
       }
     }
   }
@@ -299,7 +298,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         result.foreach(updatedRows =>
           log.debug("Deleted [{}] events for persistenceId [{}]", updatedRows.head, persistenceId))
 
-      result.map(_ => ())(ExecutionContexts.parasitic)
+      result.map(_ => ())(ExecutionContext.parasitic)
     }
   }
 
