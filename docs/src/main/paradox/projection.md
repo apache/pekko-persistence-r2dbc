@@ -237,3 +237,11 @@ The supported offset types of the `R2dbcProjection` are:
 ## Publish events for lower latency
 
 To reduce the latency until the Projection finds and process new events you can enable the feature described in @ref:[eventsBySlices documentation](query.md#publish-events-for-lower-latency-of-eventsbyslices).
+
+## Compatibility with plugin configuration at runtime
+
+`R2dbcProjection` is compatible with @ref:[plugin configuration at runtime](config.md#plugin-configuration-at-runtime).
+
+The following example demonstrates how an `atLeastOnce` projection of `EventSourcedBehavior` events, which where persisted using plugin configuration at runtime, can be set up:
+
+@@snip [RuntimePluginConfigCompatibilityExample.scala](/docs/src/test/scala/docs/home/projection/RuntimePluginConfigCompatibilityExample.scala) { #runtime-plugin-config-compatibility }

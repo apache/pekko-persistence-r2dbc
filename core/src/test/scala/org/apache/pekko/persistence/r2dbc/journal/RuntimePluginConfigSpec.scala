@@ -69,12 +69,9 @@ object RuntimePluginConfigSpec {
     def configKey: String
     def database: String
 
-    lazy val config: Config =
-      ConfigFactory
-        .load(
-          ConfigFactory
-            .parseString(
-              s"""
+    lazy val unresolvedConfig = ConfigFactory
+      .parseString(
+        s"""
               $configKey = $${pekko.persistence.r2dbc}
               $configKey = {
                 connection-factory {
@@ -89,9 +86,9 @@ object RuntimePluginConfigSpec {
                 snapshot.use-connection-factory = "$configKey.connection-factory"
               }
               """
-            )
-            .withFallback(TestConfig.unresolvedConfig)
-        )
+      )
+
+    lazy val config: Config = ConfigFactory.load(unresolvedConfig.withFallback(TestConfig.unresolvedConfig))
 
     def apply(persistenceId: String): Behavior[Command] =
       EventSourcedBehavior[Command, String, String](

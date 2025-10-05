@@ -56,7 +56,7 @@ lazy val core = (project in file("core"))
     libraryDependencies ++= Dependencies.core)
 
 lazy val projection = (project in file("projection"))
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test")
   .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-projection-r2dbc",
