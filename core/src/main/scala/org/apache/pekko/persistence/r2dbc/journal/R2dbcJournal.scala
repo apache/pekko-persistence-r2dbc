@@ -63,7 +63,7 @@ private[r2dbc] object R2dbcJournal {
       sender = ActorRef.noSender)
 
     val reprWithMeta = row.metadata match {
-      case None => repr
+      case None       => repr
       case Some(meta) =>
         repr.withMetadata(serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
     }

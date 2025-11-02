@@ -124,7 +124,7 @@ object R2dbcTimestampOffsetProjectionSpec {
           env.asInstanceOf[EventEnvelope[Event]]
       } match {
         case Some(env) => Future.successful(env)
-        case None =>
+        case None      =>
           Future.failed(
             new NoSuchElementException(
               s"Event with persistenceId [$persistenceId] and sequenceNr [$sequenceNr] not found."))

@@ -47,7 +47,7 @@ object Dialect {
       case "yugabyte" => Dialect.Yugabyte
       case "postgres" => Dialect.Postgres
       case "mysql"    => Dialect.MySQL
-      case other =>
+      case other      =>
         throw new IllegalArgumentException(
           s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres, mysql].")
     }

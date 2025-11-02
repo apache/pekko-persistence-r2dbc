@@ -122,7 +122,7 @@ final private[r2dbc] class ContinuousQuery[S, T](
             subStreamFinished = false
 
             beforeQuery(state) match {
-              case None => runNextQuery()
+              case None                    => runNextQuery()
               case Some(beforeQueryFuture) =>
                 beforeQueryFuture.onComplete(beforeQueryCallback.invoke)(ExecutionContext.parasitic)
             }

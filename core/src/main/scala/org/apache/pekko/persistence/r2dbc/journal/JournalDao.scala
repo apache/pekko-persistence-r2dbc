@@ -65,7 +65,7 @@ private[r2dbc] object JournalDao {
 
   def readMetadata(row: Row): Option[SerializedEventMetadata] = {
     row.get("meta_payload", classOf[Array[Byte]]) match {
-      case null => None
+      case null        => None
       case metaPayload =>
         Some(
           SerializedEventMetadata(
