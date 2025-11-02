@@ -280,7 +280,7 @@ private[projection] class R2dbcOffsetStore(
   private def timestampOffsetBySlicesSourceProvider: BySlicesSourceProvider =
     sourceProvider match {
       case Some(provider) => provider
-      case None =>
+      case None           =>
         throw new IllegalArgumentException(
           "Expected BySlicesSourceProvider to be defined when TimestampOffset is used.")
     }

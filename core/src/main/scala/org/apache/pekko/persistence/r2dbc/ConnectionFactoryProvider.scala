@@ -109,12 +109,12 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
   private def createConnectionFactoryOptionsCustomizer(
       settings: ConnectionFactorySettings): ConnectionFactoryOptionsCustomizer = {
     settings.connectionFactoryOptionsCustomizer match {
-      case None => NoopCustomizer
+      case None       => NoopCustomizer
       case Some(fqcn) =>
         val args = List(classOf[ActorSystem[_]] -> system)
         system.dynamicAccess.createInstanceFor[ConnectionFactoryOptionsCustomizer](fqcn, args) match {
           case Success(customizer) => customizer
-          case Failure(cause) =>
+          case Failure(cause)      =>
             throw new IllegalArgumentException(s"Failed to create ConnectionFactoryOptionsCustomizer for class $fqcn",
               cause)
         }

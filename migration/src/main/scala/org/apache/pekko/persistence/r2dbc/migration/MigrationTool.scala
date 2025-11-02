@@ -287,7 +287,7 @@ class MigrationTool(system: ActorSystem[_]) {
   private def migrateSnapshot(persistenceId: String, currentProgress: Option[CurrentProgress]): Future[Int] = {
     val progressSeqNr = currentProgress.map(_.snapshotSeqNr).getOrElse(0L)
     loadSourceSnapshot(persistenceId, progressSeqNr + 1).flatMap {
-      case None => Future.successful(0)
+      case None                                                           => Future.successful(0)
       case Some(selectedSnapshot @ SelectedSnapshot(snapshotMetadata, _)) =>
         for {
           seqNr <- {

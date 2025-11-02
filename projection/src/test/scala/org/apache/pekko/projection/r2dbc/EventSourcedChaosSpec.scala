@@ -143,7 +143,7 @@ class EventSourcedChaosSpec
       def entity(i: Int): ActorRef[Persister.Command] = {
         startedEntities.get(i) match {
           case Some(ref) => ref
-          case None =>
+          case None      =>
             val persistenceId = PersistenceId(entityType, s"p$i")
             val ref = spawn(Persister(persistenceId), s"p$i")
             startedEntities = startedEntities.updated(i, ref)
@@ -161,7 +161,7 @@ class EventSourcedChaosSpec
       def startProjection(projectionIndex: Int): ActorRef[ProjectionBehavior.Command] = {
         runningProjections.get(projectionIndex) match {
           case Some(ref) => ref
-          case None =>
+          case None      =>
             val range = EventSourcedProvider.sliceRanges(system, R2dbcReadJournal.Identifier, numberOfProjections)(
               projectionIndex)
 

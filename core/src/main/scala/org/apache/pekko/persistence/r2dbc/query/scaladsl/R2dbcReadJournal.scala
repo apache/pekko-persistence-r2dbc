@@ -245,7 +245,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       .loadEvent(persistenceId, sequenceNr)
       .map {
         case Some(row) => deserializeBySliceRow(row)
-        case None =>
+        case None      =>
           throw new NoSuchElementException(
             s"Event with persistenceId [$persistenceId] and sequenceNr [$sequenceNr] not found.")
       }
@@ -334,7 +334,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     val offset = TimestampOffset(row.dbTimestamp, row.readDbTimestamp, Map(row.persistenceId -> row.seqNr))
     val envelope = ClassicEventEnvelope(offset, row.persistenceId, row.seqNr, event.get, row.dbTimestamp.toEpochMilli)
     row.metadata match {
-      case None => envelope
+      case None       => envelope
       case Some(meta) =>
         envelope.withMetadata(serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
     }
