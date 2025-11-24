@@ -85,7 +85,7 @@ class EventsBySliceBacktrackingSpec
       val pid2 = nextPid(entityType)
       val slice1 = query.sliceForPersistenceId(pid1)
       val slice2 = query.sliceForPersistenceId(pid2)
-      val sinkProbe = TestSink.probe[EventEnvelope[String]](system.classicSystem)
+      val sinkProbe = TestSink[EventEnvelope[String]]()(system.classicSystem)
 
       // don't let behind-current-time be a reason for not finding events
       val startTime = Instant.now().minusSeconds(10 * 60)

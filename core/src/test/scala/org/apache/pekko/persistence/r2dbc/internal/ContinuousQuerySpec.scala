@@ -89,7 +89,7 @@ class ContinuousQuerySpec extends ScalaTestWithActorTestKit with AnyWordSpecLike
           updateState = (state, _) => state.copy(value = "cats"),
           delayNextQuery = state => Some(1.second),
           nextQuery = state => state -> results.next())
-          .runWith(TestSink.probe[String])
+          .runWith(TestSink[String]())
 
       sub
         .request(1)
@@ -113,7 +113,7 @@ class ContinuousQuerySpec extends ScalaTestWithActorTestKit with AnyWordSpecLike
           delayNextQuery = state => Some(1.second),
           nextQuery = state => state -> results.next())
           .map(_.apply())
-          .runWith(TestSink.probe)
+          .runWith(TestSink())
 
       sub
         .requestNext("one")
@@ -131,7 +131,7 @@ class ContinuousQuerySpec extends ScalaTestWithActorTestKit with AnyWordSpecLike
           updateState = (state, _) => state.copy(value = "cats"),
           delayNextQuery = state => Some(1.second),
           nextQuery = state => state -> results.next())
-          .runWith(TestSink.probe[String])
+          .runWith(TestSink[String]())
 
       // give time for the startup to do the pull the buffer the element
       Thread.sleep(500)
