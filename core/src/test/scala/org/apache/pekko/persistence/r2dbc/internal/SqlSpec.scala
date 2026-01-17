@@ -23,7 +23,8 @@ class SqlSpec extends AnyWordSpec with TestSuite with Matchers {
   "SQL string interpolation" should {
     "replace ? bind parameters with numbered $" in {
       sql"select * from bar where a = ?" shouldBe "select * from bar where a = $1"
-      sql"select * from bar where a = ? and b = ? and c = ?" shouldBe "select * from bar where a = $1 and b = $2 and c = $3"
+      sql"select * from bar where a = ? and b = ? and c = ?" shouldBe
+      "select * from bar where a = $1 and b = $2 and c = $3"
       sql"select * from bar" shouldBe "select * from bar"
     }
 

@@ -51,8 +51,7 @@ class CurrentPersistenceIdsQuerySpec
   private val zeros = "0000"
   private val entityType = nextEntityType()
   private val numberOfPids = 100
-  private val pids =
-    (1 to numberOfPids).map(n => PersistenceId(entityType, "p" + zeros.drop(n.toString.length) + n))
+  private val pids = (1 to numberOfPids).map(n => PersistenceId(entityType, "p" + zeros.drop(n.toString.length) + n))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

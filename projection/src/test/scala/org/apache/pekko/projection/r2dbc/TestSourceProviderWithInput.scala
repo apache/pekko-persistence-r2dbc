@@ -88,7 +88,8 @@ class TestSourceProviderWithInput()(implicit val system: ActorSystem[_])
   override def timestampOf(persistenceId: String, sequenceNr: Long): Future[Option[Instant]] = {
     Future.successful(envelopes.iterator().asScala.collectFirst {
       case env
-          if env.persistenceId == persistenceId && env.sequenceNr == sequenceNr && env.offset
+          if env.persistenceId == persistenceId && env.sequenceNr == sequenceNr &&
+          env.offset
             .isInstanceOf[TimestampOffset] =>
         env.offset.asInstanceOf[TimestampOffset].timestamp
     })

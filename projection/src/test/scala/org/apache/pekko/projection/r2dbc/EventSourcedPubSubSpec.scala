@@ -234,16 +234,18 @@ class EventSourcedPubSubSpec
 
         val viaPubSub =
           processedByPid.filter(p =>
-            p.envelope.offset.asInstanceOf[TimestampOffset].timestamp == p.envelope.offset
-              .asInstanceOf[TimestampOffset]
-              .readTimestamp)
+            p.envelope.offset.asInstanceOf[TimestampOffset].timestamp ==
+              p.envelope.offset
+                .asInstanceOf[TimestampOffset]
+                .readTimestamp)
         log.info("via pub-sub {}: {}", pid: Any, viaPubSub.map(_.envelope.sequenceNr).mkString(", "): Any)
       }
 
       val countViaPubSub = processed.count(p =>
-        p.envelope.offset.asInstanceOf[TimestampOffset].timestamp == p.envelope.offset
-          .asInstanceOf[TimestampOffset]
-          .readTimestamp)
+        p.envelope.offset.asInstanceOf[TimestampOffset].timestamp ==
+          p.envelope.offset
+            .asInstanceOf[TimestampOffset]
+            .readTimestamp)
       log.info("Total via pub-sub: {}", countViaPubSub)
       countViaPubSub shouldBe >(0)
 
