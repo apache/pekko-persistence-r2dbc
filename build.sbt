@@ -104,7 +104,8 @@ lazy val docs = project
       "scala.binary.version" -> scalaBinaryVersion.value,
       "extref.pekko.base_url" -> s"https://pekko.apache.org/docs/pekko/${Dependencies.PekkoVersionInDocs}/%s",
       "extref.pekko-docs.base_url" -> s"https://pekko.apache.org/docs/pekko/${Dependencies.PekkoVersionInDocs}/%s",
-      "extref.pekko-projection.base_url" -> s"https://pekko.apache.org/docs/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}/%s",
+      "extref.pekko-projection.base_url" ->
+      s"https://pekko.apache.org/docs/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}/%s",
       "extref.java-docs.base_url" -> "https://docs.oracle.com/en/java/javase/11/%s",
       "scaladoc.scala.base_url" -> "https://www.scala-lang.org/api/current/",
       "scaladoc.org.apache.pekko.persistence.r2dbc.base_url" ->

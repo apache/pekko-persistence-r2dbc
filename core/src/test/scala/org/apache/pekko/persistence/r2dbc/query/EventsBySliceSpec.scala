@@ -290,18 +290,17 @@ class EventsBySliceSpec
       ranges(2) should be(512 to 767)
       ranges(3) should be(768 to 1023)
 
-      val allEnvelopes =
-        (0 until 4).flatMap { rangeIndex =>
-          val result =
-            query
-              .currentEventsBySlices[String](entityType, ranges(rangeIndex).min, ranges(rangeIndex).max, NoOffset)
-              .runWith(Sink.seq)
-              .futureValue
-          result.foreach { env =>
-            ranges(rangeIndex) should contain(query.sliceForPersistenceId(env.persistenceId))
-          }
-          result
+      val allEnvelopes = (0 until 4).flatMap { rangeIndex =>
+        val result =
+          query
+            .currentEventsBySlices[String](entityType, ranges(rangeIndex).min, ranges(rangeIndex).max, NoOffset)
+            .runWith(Sink.seq)
+            .futureValue
+        result.foreach { env =>
+          ranges(rangeIndex) should contain(query.sliceForPersistenceId(env.persistenceId))
         }
+        result
+      }
       allEnvelopes.size should be(numberOfPersisters * numberOfEvents)
     }
   }
@@ -347,15 +346,14 @@ class EventsBySliceSpec
       ranges(2) should be(512 to 767)
       ranges(3) should be(768 to 1023)
 
-      val queries: Seq[Source[EventEnvelope[String], NotUsed]] =
-        (0 until 4).map { rangeIndex =>
-          query
-            .eventsBySlices[String](entityType, ranges(rangeIndex).min, ranges(rangeIndex).max, NoOffset)
-            .map { env =>
-              ranges(rangeIndex) should contain(query.sliceForPersistenceId(env.persistenceId))
-              env
-            }
-        }
+      val queries: Seq[Source[EventEnvelope[String], NotUsed]] = (0 until 4).map { rangeIndex =>
+        query
+          .eventsBySlices[String](entityType, ranges(rangeIndex).min, ranges(rangeIndex).max, NoOffset)
+          .map { env =>
+            ranges(rangeIndex) should contain(query.sliceForPersistenceId(env.persistenceId))
+            env
+          }
+      }
       val allEnvelopes =
         queries(0)
           .merge(queries(1))

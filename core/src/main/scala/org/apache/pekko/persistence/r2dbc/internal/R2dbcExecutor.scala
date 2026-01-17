@@ -120,8 +120,7 @@ class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDb
   private def nanoTime(): Long =
     if (logDbCallsExceedingEnabled) System.nanoTime() else 0L
 
-  private def durationInMicros(startTime: Long): Long =
-    (nanoTime() - startTime) / 1000
+  private def durationInMicros(startTime: Long): Long = (nanoTime() - startTime) / 1000
 
   private def getConnection(logPrefix: String): Future[Connection] = {
     val startTime = nanoTime()

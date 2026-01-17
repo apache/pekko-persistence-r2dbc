@@ -353,7 +353,8 @@ import org.slf4j.Logger
       val newIdleCount = if (state.rowCount == 0) state.idleCount + 1 else 0
       val newState =
         if (settings.backtrackingEnabled && !state.backtracking && state.latest != TimestampOffset.Zero &&
-          (newIdleCount >= 5 || JDuration
+          (newIdleCount >= 5 ||
+          JDuration
             .between(state.latestBacktracking.timestamp, state.latest.timestamp)
             .compareTo(halfBacktrackingWindow) > 0)) {
           // FIXME config for newIdleCount >= 5 and maybe something like `newIdleCount % 5 == 0`
@@ -429,12 +430,14 @@ import org.slf4j.Logger
       maxSlice: Int,
       state: QueryState): Option[Future[QueryState]] = {
     // Don't run this too frequently
-    if ((state.buckets.isEmpty || JDuration
+    if ((state.buckets.isEmpty ||
+      JDuration
         .between(state.buckets.createdAt, Instant.now())
         .compareTo(eventBucketCountInterval) > 0) &&
       // For Durable State we always refresh the bucket counts at the interval. For Event Sourced we know
       // that they don't change because events are append only.
-      (dao.countBucketsMayChange || state.buckets
+      (dao.countBucketsMayChange ||
+      state.buckets
         .findTimeForLimit(state.latest.timestamp, settings.bufferSize)
         .isEmpty)) {
 
