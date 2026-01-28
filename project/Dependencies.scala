@@ -61,7 +61,7 @@ object Dependencies {
 
     val postgresql = "org.postgresql" % "postgresql" % "42.7.9" % Test
 
-    val logback = "ch.qos.logback" % "logback-classic" % "1.5.25" % Test
+    val logback = "ch.qos.logback" % "logback-classic" % "1.5.26" % Test
     val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19" % Test
     val junit = "junit" % "junit" % "4.13.2" % Test
     val junitInterface = "com.github.sbt" % "junit-interface" % "0.13.3" % Test
