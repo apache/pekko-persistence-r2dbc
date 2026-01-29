@@ -171,7 +171,9 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
               pubSub.eventTopic(entityType, slice) ! Topic.Subscribe(ref.toTyped[EventEnvelope[Event]])
             }
           }
-      dbSource.merge(pubSubSource).via(deduplicate(settings.deduplicateCapacity))
+      dbSource
+        .mergePrioritized(pubSubSource, leftPriority = 1, rightPriority = 10)
+        .via(deduplicate(settings.deduplicateCapacity))
     } else
       dbSource
   }
