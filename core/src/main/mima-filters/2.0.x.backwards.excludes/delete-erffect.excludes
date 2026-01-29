@@ -17,8 +17,9 @@
 
 # Caused by https://github.com/apache/pekko-persistence-r2dbc/pull/304
 ProblemFilters.exclude[IncompatibleResultTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.payload")
-ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.copy")
+ProblemFilters.exclude[IncompatibleResultTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow._5")
 ProblemFilters.exclude[IncompatibleResultTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.copy$default$5")
+ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.copy")
 ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.this")
 ProblemFilters.exclude[IncompatibleMethTypeProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.apply")
 ProblemFilters.exclude[IncompatibleSignatureProblem]("org.apache.pekko.persistence.r2dbc.state.scaladsl.DurableStateDao#SerializedStateRow.unapply")
