@@ -6,7 +6,7 @@ volumes:
 
 services:
   yb-master:
-    image: yugabytedb/yugabyte:2.20.4.0-b50
+    image: yugabytedb/yugabyte:2.20.12.0-b30
     container_name: yb-master-n1
     volumes:
       - yb-master-data-1:/mnt/master
@@ -21,7 +21,7 @@ services:
       SERVICE_7000_NAME: yb-master
 
   yb-tserver:
-    image: yugabytedb/yugabyte:2.20.4.0-b50
+    image: yugabytedb/yugabyte:2.20.12.0-b30
     container_name: yb-tserver-n1
     shm_size: '512mb'
     volumes:
