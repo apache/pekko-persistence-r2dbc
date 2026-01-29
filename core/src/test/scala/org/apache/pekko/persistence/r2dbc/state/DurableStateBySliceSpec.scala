@@ -42,7 +42,6 @@ import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.stream.KillSwitches
 import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
-import pekko.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -180,24 +179,23 @@ class DurableStateBySliceSpec
       }
 
       "emit DeletedDurableState for latest deleted state" in new Setup {
+        val timeout = 10.seconds
         for (i <- 1 to 3) {
           persister ! PersistWithAck(s"s-$i", probe.ref)
-          probe.expectMessage(10.seconds, Done)
+          probe.expectMessage(timeout, Done)
         }
 
         persister ! DeleteWithAck(probe.ref)
-        probe.expectMessage(10.seconds, Done)
-
+        probe.expectMessage(timeout, Done)
         val deletedDurableStateProbe = createTestProbe[DeletedDurableState[String]]()
 
-        implicit val timeout: Timeout = Timeout(10.seconds)
         val done =
           doQuery(entityType, slice, slice, NoOffset)
             .collect { case d: DeletedDurableState[String] => d }
             .via(killSwitch.flow)
             .runWith(Sink.foreach(deletedDurableStateProbe.ref.tell))
 
-        deletedDurableStateProbe.receiveMessage().revision shouldBe 4
+        deletedDurableStateProbe.receiveMessage(timeout).revision shouldBe 4
         assertFinished(updatedDurableStateProbe, done)
         killSwitch.shutdown()
       }
