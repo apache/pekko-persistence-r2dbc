@@ -42,6 +42,7 @@ import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.stream.KillSwitches
 import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
+import pekko.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -189,6 +190,7 @@ class DurableStateBySliceSpec
 
         val deletedDurableStateProbe = createTestProbe[DeletedDurableState[String]]()
 
+        implicit val timeout: Timeout = Timeout(10.seconds)
         val done =
           doQuery(entityType, slice, slice, NoOffset)
             .collect { case d: DeletedDurableState[String] => d }
@@ -205,7 +207,7 @@ class DurableStateBySliceSpec
   // tests just relevant for current query
   "Current changesBySlices" should {
     "filter states with the same timestamp based on seen sequence nrs" in new Setup {
-      persister ! PersistWithAck(s"s-1", probe.ref)
+      persister ! PersistWithAck("s-1", probe.ref)
       probe.expectMessage(Done)
       val singleState: UpdatedDurableState[String] =
         query
@@ -223,7 +225,7 @@ class DurableStateBySliceSpec
     }
 
     "not filter states with the same timestamp based on sequence nrs" in new Setup {
-      persister ! PersistWithAck(s"s-1", probe.ref)
+      persister ! PersistWithAck("s-1", probe.ref)
       probe.expectMessage(Done)
       val singleState: UpdatedDurableState[String] =
         query
@@ -286,7 +288,7 @@ class DurableStateBySliceSpec
             case u: UpdatedDurableState[String] => updatedDurableStateProbe.ref.tell(u)
             case u: DeletedDurableState[String] => deletedDurableStateProbe.ref.tell(u)
           })
-      fishForState(s"s-19", updatedDurableStateProbe).last.revision shouldBe 19
+      fishForState("s-19", updatedDurableStateProbe).last.revision shouldBe 19
 
       persister ! DeleteWithAck(probe.ref)
       probe.expectMessage(Done)
@@ -296,7 +298,7 @@ class DurableStateBySliceSpec
         persister ! PersistWithAck(s"s-$i", probe.ref)
         probe.expectMessage(Done)
       }
-      fishForState(s"s-40", updatedDurableStateProbe).last.revision shouldBe 40
+      fishForState("s-40", updatedDurableStateProbe).last.revision shouldBe 40
 
       persister ! DeleteWithAck(probe.ref)
       probe.expectMessage(Done)
