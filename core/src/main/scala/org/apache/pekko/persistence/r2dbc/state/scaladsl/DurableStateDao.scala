@@ -433,7 +433,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
           SerializedStateRow(
             persistenceId = row.get("persistence_id", classOf[String]),
-            revision = row.get("revision", classOf[java.lang.Long]),
+            revision = row.get("revision", classOf[Long]),
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             // payload = null => lazy loaded for backtracking (ugly, but not worth changing UpdatedDurableState in Akka)
