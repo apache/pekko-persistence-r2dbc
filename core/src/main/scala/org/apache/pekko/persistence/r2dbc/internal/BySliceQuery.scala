@@ -55,9 +55,6 @@ import org.slf4j.Logger
       latestBacktracking: TimestampOffset,
       buckets: Buckets) {
 
-    /**
-      * @since 2.0.0
-      */
     def backtracking: Boolean = backtrackingCount > 0
 
     def currentOffset: TimestampOffset =
