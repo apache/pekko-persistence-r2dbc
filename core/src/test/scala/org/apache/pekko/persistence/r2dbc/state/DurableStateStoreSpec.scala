@@ -134,20 +134,13 @@ class DurableStateStoreSpec
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
-    "fail deleteObject call when revision is unknown" in {
+    "ignore deleteObject call when revision is unknown" in {
       val entityType = nextEntityType()
       val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
       val value = "Genuinely Collaborative"
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
-      if (pekko.Version.current.startsWith("1.0")) {
-        store.deleteObject(persistenceId, 2L).futureValue
-      } else {
-        val ex = intercept[Exception] {
-          Await.result(store.deleteObject(persistenceId, 2L), 20.seconds)
-        }
-        ex.getClass.getName shouldEqual DurableStateExceptionSupport.DeleteRevisionExceptionClass
-      }
+      store.deleteObject(persistenceId, 2L).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
     }
 
