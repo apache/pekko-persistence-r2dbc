@@ -17,7 +17,7 @@
 
 services:
   mysql-db:
-    image: mysql:9.1.0
+    image: mysql:9.5.0
     container_name: docker-mysql-db-1
     ports:
       - 3306:3306
