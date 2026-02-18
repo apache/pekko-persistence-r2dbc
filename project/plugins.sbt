@@ -11,7 +11,7 @@ addSbtPlugin("com.github.sbt" % "sbt-header" % "5.11.0") // for maintenance of c
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.6")
 addSbtPlugin("com.github.sbt" % "sbt-java-formatter" % "0.10.0")
 addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.6.1")
-addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.1.4")
+addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.1.5")
 
 // for releasing
 addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.1.1")
