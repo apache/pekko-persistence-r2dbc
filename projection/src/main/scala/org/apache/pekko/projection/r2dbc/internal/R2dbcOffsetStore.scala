@@ -8,7 +8,7 @@
  */
 
 /*
- * Copyright (C) 2021 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2021-2022 Lightbend Inc. <https://www.lightbend.com>
  */
 
 package org.apache.pekko.projection.r2dbc.internal
@@ -30,6 +30,7 @@ import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.LoggerOps
 import pekko.annotation.InternalApi
 import pekko.persistence.Persistence
+import pekko.persistence.query.DeletedDurableState
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
@@ -1021,8 +1022,16 @@ private[projection] class R2dbcOffsetStore(
             timestampOffset,
             strictSeqNr = false,
             envelopeLoaded = change.value != null))
+      case change: DeletedDurableState[_] if change.offset.isInstanceOf[TimestampOffset] =>
+        val timestampOffset = change.offset.asInstanceOf[TimestampOffset]
+        Some(
+          RecordWithOffset(
+            Record(change.persistenceId, change.revision, timestampOffset.timestamp),
+            timestampOffset,
+            strictSeqNr = false,
+            envelopeLoaded = true))
       case change: DurableStateChange[_] if change.offset.isInstanceOf[TimestampOffset] =>
-        // FIXME case DeletedDurableState when that is added
+        // in case additional types are added
         throw new IllegalArgumentException(
           s"DurableStateChange [${change.getClass.getName}] not implemented yet. Please report bug at https://github.com/apache/pekko-persistence-r2dbc/issues")
       case _ => None

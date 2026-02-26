@@ -8,7 +8,7 @@
  */
 
 /*
- * Copyright (C) 2021 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2021-2022 Lightbend Inc. <https://www.lightbend.com>
  */
 
 package org.apache.pekko.projection.r2dbc.internal
@@ -28,6 +28,7 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.event.Logging
 import pekko.event.LoggingAdapter
+import pekko.persistence.query.DeletedDurableState
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
@@ -122,7 +123,6 @@ private[projection] object R2dbcProjectionImpl {
 
       case upd: UpdatedDurableState[_] if upd.value == null =>
         val pid = upd.persistenceId
-        val revision = upd.revision
         (sourceProvider match {
           case store: DurableStateStore[_] =>
             store.getObject(pid)
@@ -146,10 +146,9 @@ private[projection] object R2dbcProjectionImpl {
                 count: java.lang.Long)
             new UpdatedDurableState(pid, loadedRevision, loadedValue, upd.offset, upd.timestamp)
               .asInstanceOf[Envelope]
-          case GetObjectResult(None, _) =>
-            // FIXME use DeletedDurableState here when that is added
-            throw new IllegalStateException(
-              s"Durable state not found when loaded lazily, persistenceId [$pid], revision [$revision]")
+          case GetObjectResult(None, loadedRevision) =>
+            new DeletedDurableState(pid, loadedRevision, upd.offset, upd.timestamp)
+              .asInstanceOf[Envelope]
         }
 
       case _ =>

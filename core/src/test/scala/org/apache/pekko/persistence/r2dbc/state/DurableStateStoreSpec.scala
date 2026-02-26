@@ -8,7 +8,7 @@
  */
 
 /*
- * Copyright (C) 2021 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2021-2022 Lightbend Inc. <https://www.lightbend.com>
  */
 
 package org.apache.pekko.persistence.r2dbc.state
@@ -114,31 +114,79 @@ class DurableStateStoreSpec
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
-    "support deletions with revision" in {
+    "hard delete when revision=0" in {
       val entityType = nextEntityType()
       val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
       val value = "Genuinely Collaborative"
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
-      store.deleteObject(persistenceId, 1L).futureValue
+      store.deleteObject(persistenceId, revision = 0).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
-    "fail deleteObject call when revision is unknown" in {
+    "delete payload but keep revision" in {
       val entityType = nextEntityType()
       val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
+      val value1 = "value1"
+      store.upsertObject(persistenceId, 1L, value1, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value1), 1L))
+      store.deleteObject(persistenceId, revision = 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
+
+      val value2 = "value2"
+      store.upsertObject(persistenceId, 3L, value2, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value2), 3L))
+    }
+
+    "update revision when deleting" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-removed").id
+
+      store.deleteObject(persistenceId, revision = 1L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 1L))
+      store.deleteObject(persistenceId, revision = 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
+
+      val value1 = "value1"
+      store.upsertObject(persistenceId, 3L, value1, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value1), 3L))
+
+      store.deleteObject(persistenceId, revision = 4L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 4L))
+      store.deleteObject(persistenceId, revision = 5L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 5L))
+    }
+
+    "detect and reject concurrent delete of revision 1" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "id-to-be-deleted-concurrently")
       val value = "Genuinely Collaborative"
-      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
-      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
-      if (pekko.Version.current.startsWith("1.0")) {
-        store.deleteObject(persistenceId, 2L).futureValue
-      } else {
-        val ex = intercept[Exception] {
-          Await.result(store.deleteObject(persistenceId, 2L), 20.seconds)
-        }
-        ex.getClass.getName shouldEqual DurableStateExceptionSupport.DeleteRevisionExceptionClass
-      }
-      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+      store.upsertObject(persistenceId.id, revision = 1L, value, entityType).futureValue
+      store.getObject(persistenceId.id).futureValue should be(GetObjectResult(Some(value), 1L))
+
+      val failure =
+        store.deleteObject(persistenceId.id, revision = 1L).failed.futureValue
+      failure.getMessage should include(
+        s"Insert delete marker with revision 1 failed: durable state for persistence id [${persistenceId.id}] already exists")
+    }
+
+    "detect and reject concurrent deletes" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "id-to-be-updated-concurrently")
+      val value = "Genuinely Collaborative"
+      store.upsertObject(persistenceId.id, revision = 1L, value, entityType).futureValue
+      store.getObject(persistenceId.id).futureValue should be(GetObjectResult(Some(value), 1L))
+
+      val updatedValue = "Open to Feedback"
+      store.upsertObject(persistenceId.id, revision = 2L, updatedValue, entityType).futureValue
+      store.getObject(persistenceId.id).futureValue should be(GetObjectResult(Some(updatedValue), 2L))
+
+      // simulate a delete by a different node that didn't see the first one:
+      val updatedValue2 = "Genuine and Sincere in all Communications"
+      val failure =
+        store.deleteObject(persistenceId.id, revision = 2L).failed.futureValue
+      failure.getMessage should include(
+        s"Failed to delete object with persistenceId [${persistenceId.id}] and revision [2]")
     }
 
   }

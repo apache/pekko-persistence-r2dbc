@@ -117,6 +117,7 @@ object TestActors {
     sealed trait Command
     final case class Persist(payload: Any) extends Command
     final case class PersistWithAck(payload: Any, replyTo: ActorRef[Done]) extends Command
+    final case class DeleteWithAck(replyTo: ActorRef[Done]) extends Command
     final case class Ping(replyTo: ActorRef[Done]) extends Command
     final case class Stop(replyTo: ActorRef[Done]) extends Command
 
@@ -144,6 +145,10 @@ object TestActors {
                   pid.id: Object,
                   (DurableStateBehavior.lastSequenceNumber(context) + 1: java.lang.Long): Object)
                 Effect.persist(command.payload).thenRun(_ => command.replyTo ! Done)
+              case command: DeleteWithAck =>
+                context.log
+                  .debug("Delete pid [{}], seqNr [{}]", pid.id, DurableStateBehavior.lastSequenceNumber(context) + 1)
+                Effect.delete[Any]().thenRun(_ => command.replyTo ! Done)
               case Ping(replyTo) =>
                 replyTo ! Done
                 Effect.none
