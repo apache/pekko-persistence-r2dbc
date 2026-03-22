@@ -142,7 +142,7 @@ It will emit an `UpdatedDurableState` when the durable state is updated. When th
 but there is no guarantee that all intermediate changes are emitted if the state is updated several times. Note that
 `UpdatedDurableState` contains the full current state, and it is not a delta from previous revision of state.
 
-It will emit an `DeletedDurableState` when the durable state is deleted. When the state is updated again a new
+It will emit a `DeletedDurableState` when the durable state is deleted. When the state is updated again a new
 `UpdatedDurableState` is emitted. There is no guarantee that all intermediate changes are emitted if the state is
 updated or deleted several times.
 
