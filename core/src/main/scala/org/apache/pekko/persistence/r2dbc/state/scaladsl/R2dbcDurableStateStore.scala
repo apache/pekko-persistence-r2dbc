@@ -91,7 +91,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   override def getObject(persistenceId: String): Future[GetObjectResult[A]] = {
     implicit val ec: ExecutionContext = system.dispatcher
     stateDao.readState(persistenceId).map {
-      case None => GetObjectResult(None, 0L)
+      case None                => GetObjectResult(None, 0L)
       case Some(serializedRow) =>
         val payload =
           serializedRow.payload.map { bytes =>
