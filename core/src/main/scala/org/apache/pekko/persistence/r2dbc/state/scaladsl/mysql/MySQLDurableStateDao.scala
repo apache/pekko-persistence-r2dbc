@@ -74,7 +74,7 @@ private[r2dbc] class MySQLDurableStateDao(
 
     val selectColumns =
       if (backtracking)
-        "SELECT persistence_id, revision, db_timestamp, NOW(6) AS read_db_timestamp "
+        "SELECT persistence_id, revision, db_timestamp, NOW(6) AS read_db_timestamp, state_ser_id "
       else
         "SELECT persistence_id, revision, db_timestamp, NOW(6) AS read_db_timestamp, state_ser_id, state_ser_manifest, state_payload "
 

@@ -24,6 +24,7 @@ import pekko.actor.ExtendedActorSystem
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.persistence.Persistence
+import pekko.persistence.query.DeletedDurableState
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
@@ -65,8 +66,21 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
 
   private val bySlice: BySliceQuery[SerializedStateRow, DurableStateChange[A]] = {
     val createEnvelope: (TimestampOffset, SerializedStateRow) => DurableStateChange[A] = (offset, row) => {
-      val payload = serialization.deserialize(row.payload, row.serId, row.serManifest).get.asInstanceOf[A]
-      new UpdatedDurableState(row.persistenceId, row.revision, payload, offset, row.dbTimestamp.toEpochMilli)
+      row.payload match {
+        case null =>
+          // payload = null => lazy loaded for backtracking (ugly, but not worth changing UpdatedDurableState in Pekko)
+          new UpdatedDurableState(
+            row.persistenceId,
+            row.revision,
+            null.asInstanceOf[A],
+            offset,
+            row.dbTimestamp.toEpochMilli)
+        case Some(bytes) =>
+          val payload = serialization.deserialize(bytes, row.serId, row.serManifest).get.asInstanceOf[A]
+          new UpdatedDurableState(row.persistenceId, row.revision, payload, offset, row.dbTimestamp.toEpochMilli)
+        case None =>
+          new DeletedDurableState(row.persistenceId, row.revision, offset, row.dbTimestamp.toEpochMilli)
+      }
     }
 
     val extractOffset: DurableStateChange[A] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
@@ -77,16 +91,25 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   override def getObject(persistenceId: String): Future[GetObjectResult[A]] = {
     implicit val ec: ExecutionContext = system.dispatcher
     stateDao.readState(persistenceId).map {
-      case None                => GetObjectResult(None, 0L)
+      case None => GetObjectResult(None, 0L)
       case Some(serializedRow) =>
-        val payload = serialization
-          .deserialize(serializedRow.payload, serializedRow.serId, serializedRow.serManifest)
-          .get
-          .asInstanceOf[A]
-        GetObjectResult(Some(payload), serializedRow.revision)
+        val payload =
+          serializedRow.payload.map { bytes =>
+            serialization
+              .deserialize(bytes, serializedRow.serId, serializedRow.serManifest)
+              .get
+              .asInstanceOf[A]
+          }
+        GetObjectResult(payload, serializedRow.revision)
     }
   }
 
+  /**
+   * Insert the value if `revision` is 1, which will fail with `IllegalStateException` if there is already a stored
+   * value for the given `persistenceId`. Otherwise update the value, which will fail with `IllegalStateException` if
+   * the existing stored `revision` + 1 isn't equal to the given `revision`. This optimistic locking check can be
+   * disabled with configuration `assert-single-writer`.
+   */
   override def upsertObject(persistenceId: String, revision: Long, value: A, tag: String): Future[Done] = {
     val valueAnyRef = value.asInstanceOf[AnyRef]
     val serialized = serialization.serialize(valueAnyRef).get
@@ -98,33 +121,28 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
       revision,
       DurableStateDao.EmptyDbTimestamp,
       DurableStateDao.EmptyDbTimestamp,
-      serialized,
+      Some(serialized),
       serializer.identifier,
       manifest,
       if (tag.isEmpty) Set.empty else Set(tag))
 
-    stateDao.writeState(serializedRow)
+    stateDao.upsertState(serializedRow)
 
   }
   override def deleteObject(persistenceId: String): Future[Done] =
-    stateDao.deleteState(persistenceId)
+    deleteObject(persistenceId, revision = 0)
 
+  /**
+   * Delete the value, which will fail with `IllegalStateException` if the existing stored `revision` + 1 isn't equal
+   * to the given `revision`. This optimistic locking check can be disabled with configuration `assert-single-writer`.
+   * The stored revision for the persistenceId is updated and next call to [[getObject]] will return the revision, but
+   * with no value.
+   *
+   * If the given revision is `0` it will fully delete the value and revision from the database without any optimistic
+   * locking check. Next call to [[getObject]] will then return revision 0 and no value.
+   */
   override def deleteObject(persistenceId: String, revision: Long): Future[Done] = {
-    stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
-      if (count != 1) {
-        // if you run this code with Pekko 1.0.x, no exception will be thrown here
-        // this matches the behavior of pekko-connectors-jdbc 1.0.x
-        // if you run this code with Pekko 1.1.x, a DeleteRevisionException will be thrown here
-        val msg = if (count == 0) {
-          s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
-        } else {
-          s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
-        }
-        DurableStateExceptionSupport.createDeleteRevisionExceptionIfSupported(msg)
-          .foreach(throw _)
-      }
-      Done
-    }(ExecutionContext.parasitic)
+    stateDao.deleteState(persistenceId, revision)
   }
 
   override def sliceForPersistenceId(persistenceId: String): Int =
