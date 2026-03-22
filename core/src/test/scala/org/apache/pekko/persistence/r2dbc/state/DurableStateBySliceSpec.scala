@@ -185,8 +185,11 @@ class DurableStateBySliceSpec
           probe.expectMessage(timeout, Done)
         }
 
-        persister ! DeleteWithAck(probe.ref)
-        probe.expectMessage(timeout, Done)
+        // Use store directly to ensure delete is committed before query runs.
+        // (Effect.delete() in Pekko DurableStateBehavior is fire-and-forget: side effects
+        // like thenRun fire before the DB write completes, creating a race for Current queries.)
+        query.deleteObject(persistenceId, 4L).futureValue
+
         val deletedDurableStateProbe = createTestProbe[DeletedDurableState[String]]()
 
         val done =
