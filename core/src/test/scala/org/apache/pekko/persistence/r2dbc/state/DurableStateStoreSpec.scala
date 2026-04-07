@@ -39,6 +39,7 @@ class DurableStateStoreSpec
     .durableStateStoreFor[R2dbcDurableStateStore[String]](R2dbcDurableStateStore.Identifier)
 
   private val unusedTag = "n/a"
+  private val emptyTag = ""
 
   "The R2DBC durable state store" should {
     "save and retrieve a value" in {
@@ -47,6 +48,15 @@ class DurableStateStoreSpec
       val value = "Genuinely Collaborative"
 
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+    }
+
+    "save and retrieve a value with empty tag" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "my-persistenceId-empty-tag").id
+      val value = "Genuinely Collaborative"
+
+      store.upsertObject(persistenceId, 1L, value, emptyTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
     }
 
