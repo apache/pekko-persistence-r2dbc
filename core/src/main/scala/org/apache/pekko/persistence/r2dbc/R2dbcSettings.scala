@@ -172,7 +172,7 @@ trait ConnectionSettings {
     config.getString(configKey).toUpperCase match {
       case "BYTEA"          => false
       case "JSONB" | "JSON" => true
-      case t =>
+      case t                =>
         throw new IllegalStateException(
           s"Expected $configKey to be one of 'BYTEA', 'JSON' or 'JSONB' but found '$t'")
     }
