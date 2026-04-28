@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory
  * When a list of `persistenceIds` are given they are deleted sequentially in the order of the list. It's possible to
  * parallelize the deletes by running several cleanup operations at the same time operating on different sets of
  * `persistenceIds`.
- * 
+ *
  * @since 2.0.0
  */
 @ApiMayChange
