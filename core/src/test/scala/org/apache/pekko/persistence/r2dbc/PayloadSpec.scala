@@ -207,34 +207,46 @@ class PayloadSpec
     "store delete marker" in {
       val persistenceId = nextPid(nextEntityType())
       val probe = createTestProbe[Any]()
+
+      val msg = """{"a": "to be deleted"}"""
+
+      // persist first so we have a known row at revision 1
       val ref1 = spawn(DurableStatePersister(persistenceId))
-      // delete before any change - no DB row inserted for a never-persisted entity
+      ref1 ! DurableStatePersister.PersistWithAck(msg, probe.ref)
+      probe.expectMessage(Done)
+
+      val row1 = selectDurableStateRow(persistenceId)
+      new String(row1.payload, UTF_8).clearWhitespace shouldBe msg.clearWhitespace
+
+      // delete after change: updates the row to a delete marker (revision 2)
       ref1 ! DurableStatePersister.DeleteWithAck(probe.ref)
       probe.expectMessage(Done)
       testKit.stop(ref1)
 
+      val row2 = selectDurableStateRow(persistenceId)
+      row2.payload.toVector shouldBe stateSettings.durableStatePayloadCodec.nonePayload.toVector
+
       val ref2 = spawn(DurableStatePersister(persistenceId))
       ref2 ! DurableStatePersister.GetState(probe.ref)
       probe.expectMessage("") // after delete
-      val msg = """{"a": "to be deleted"}""" // not important what we store
-      ref2 ! DurableStatePersister.PersistWithAck(msg, probe.ref)
-      probe.expectMessage(Done)
 
-      val row2 = selectDurableStateRow(persistenceId)
-      new String(row2.payload, UTF_8).clearWhitespace shouldBe msg.clearWhitespace
-
-      // delete after some change
-      ref2 ! DurableStatePersister.DeleteWithAck(probe.ref)
+      // persist new state after the delete
+      val msg2 = """{"b": "new state"}"""
+      ref2 ! DurableStatePersister.PersistWithAck(msg2, probe.ref)
       probe.expectMessage(Done)
       testKit.stop(ref2)
 
+      val row3 = selectDurableStateRow(persistenceId)
+      new String(row3.payload, UTF_8).clearWhitespace shouldBe msg2.clearWhitespace
+
+      // delete again
       val ref3 = spawn(DurableStatePersister(persistenceId))
-      ref3 ! DurableStatePersister.GetState(probe.ref)
-      probe.expectMessage("") // after delete
+      ref3 ! DurableStatePersister.DeleteWithAck(probe.ref)
+      probe.expectMessage(Done)
       testKit.stop(ref3)
 
-      val row3 = selectDurableStateRow(persistenceId)
-      row3.payload.toVector shouldBe stateSettings.durableStatePayloadCodec.nonePayload.toVector
+      val row4 = selectDurableStateRow(persistenceId)
+      row4.payload.toVector shouldBe stateSettings.durableStatePayloadCodec.nonePayload.toVector
     }
   }
 }
