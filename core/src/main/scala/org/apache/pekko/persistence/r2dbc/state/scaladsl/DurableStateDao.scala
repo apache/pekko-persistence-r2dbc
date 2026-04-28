@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.state.scaladsl
 
 import java.time.Instant
+import java.util
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
@@ -227,7 +228,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   private def getPayload(row: Row): Option[Array[Byte]] = {
     val serId = row.get("state_ser_id", classOf[Integer])
     val rowPayload = row.getPayload("state_payload")
-    if (serId == 0 && (rowPayload == null || rowPayload.isEmpty))
+    if (serId == 0 && (rowPayload == null || util.Arrays.equals(statePayloadCodec.nonePayload, rowPayload)))
       None // delete marker
     else
       Option(rowPayload)
@@ -258,7 +259,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
               .bind(3, state.revision)
               .bind(4, state.serId)
               .bind(5, state.serManifest)
-              .bindPayload(6, state.payload.getOrElse(Array.emptyByteArray))
+              .bindPayloadOption(6, state.payload)
             bindTags(stmt, 7)
           }
           .recoverWith { case _: R2dbcDataIntegrityViolationException =>
@@ -275,7 +276,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
             .bind(0, state.revision)
             .bind(1, state.serId)
             .bind(2, state.serManifest)
-            .bindPayload(3, state.payload.getOrElse(Array.emptyByteArray))
+            .bindPayloadOption(3, state.payload)
           bindTags(stmt, 4)
 
           if (settings.dbTimestampMonotonicIncreasing) {
@@ -351,7 +352,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
                 .bind(3, revision)
                 .bind(4, 0)
                 .bind(5, "")
-                .bind(6, Array.emptyByteArray)
+                .bindPayloadOption(6, None)
                 .bindNull(7, classOf[Array[String]])
             }
             .recoverWith { case _: R2dbcDataIntegrityViolationException =>
@@ -367,7 +368,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
               .bind(0, revision)
               .bind(1, 0)
               .bind(2, "")
-              .bind(3, Array.emptyByteArray)
+              .bindPayloadOption(3, None)
 
             if (settings.dbTimestampMonotonicIncreasing) {
               if (settings.durableStateAssertSingleWriter)

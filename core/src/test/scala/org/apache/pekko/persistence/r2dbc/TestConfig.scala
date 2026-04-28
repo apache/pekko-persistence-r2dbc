@@ -70,6 +70,7 @@ object TestConfig {
     pekko.actor {
       serialization-bindings {
         "org.apache.pekko.persistence.r2dbc.CborSerializable" = jackson-cbor
+        "org.apache.pekko.persistence.r2dbc.JsonSerializable" = jackson-json
       }
     }
     pekko.actor.testkit.typed.default-timeout = 10s

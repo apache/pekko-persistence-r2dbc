@@ -293,7 +293,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
           .bind(5, "")
           .bind(6, 0)
           .bind(7, "")
-          .bindPayload(8, Array.emptyByteArray)
+          .bindPayloadOption(8, None)
           .bind(9, true)
       }
 

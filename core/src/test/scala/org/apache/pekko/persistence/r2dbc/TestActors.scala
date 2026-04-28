@@ -119,6 +119,7 @@ object TestActors {
     final case class PersistWithAck(payload: Any, replyTo: ActorRef[Done]) extends Command
     final case class DeleteWithAck(replyTo: ActorRef[Done]) extends Command
     final case class Ping(replyTo: ActorRef[Done]) extends Command
+    final case class GetState(replyTo: ActorRef[Any]) extends Command
     final case class Stop(replyTo: ActorRef[Done]) extends Command
 
     def apply(pid: String): Behavior[Command] =
@@ -129,7 +130,7 @@ object TestActors {
         DurableStateBehavior[Command, Any](
           persistenceId = pid,
           "",
-          { (_, command) =>
+          { (state, command) =>
             command match {
               case command: Persist =>
                 context.log.debug(
@@ -149,6 +150,9 @@ object TestActors {
                 context.log
                   .debug("Delete pid [{}], seqNr [{}]", pid.id, DurableStateBehavior.lastSequenceNumber(context) + 1)
                 Effect.delete[Any]().thenRun(_ => command.replyTo ! Done)
+              case GetState(replyTo) =>
+                replyTo ! state
+                Effect.none
               case Ping(replyTo) =>
                 replyTo ! Done
                 Effect.none
