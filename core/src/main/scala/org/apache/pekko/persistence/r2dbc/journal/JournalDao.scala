@@ -20,7 +20,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.dispatch.ExecutionContexts
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
@@ -323,7 +322,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
           val seqNr = row.get(0, classOf[java.lang.Long])
           if (seqNr eq null) 0L else seqNr.longValue
         })
-      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContexts.parasitic)
+      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContext.parasitic)
 
     if (log.isDebugEnabled)
       result.foreach(seqNr =>
