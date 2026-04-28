@@ -21,3 +21,5 @@ ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.pekko.persistence
 ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.pekko.persistence.r2dbc.internal.BySliceQuery#QueryState.apply")
 ProblemFilters.exclude[IncompatibleSignatureProblem]("org.apache.pekko.persistence.r2dbc.internal.BySliceQuery#QueryState.unapply")
 ProblemFilters.exclude[IncompatibleResultTypeProblem]("org.apache.pekko.persistence.r2dbc.internal.BySliceQuery#QueryState.copy*")
+ProblemFilters.exclude[IncompatibleResultTypeProblem]("org.apache.pekko.persistence.r2dbc.internal.BySliceQuery#QueryState._6")
+ProblemFilters.exclude[IncompatibleResultTypeProblem]("org.apache.pekko.persistence.r2dbc.internal.BySliceQuery#QueryState._7")
