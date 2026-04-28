@@ -408,7 +408,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
             persistenceId,
             from: java.lang.Long,
             to: java.lang.Long)
-        })(ExecutionContexts.parasitic)
+        })(ExecutionContext.parasitic)
     }
 
     def deleteInBatches(from: Long, maxTo: Long): Future[Unit] = {
