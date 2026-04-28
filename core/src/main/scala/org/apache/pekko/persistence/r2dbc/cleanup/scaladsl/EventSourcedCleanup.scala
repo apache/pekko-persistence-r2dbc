@@ -51,8 +51,6 @@ import org.slf4j.LoggerFactory
  * When a list of `persistenceIds` are given they are deleted sequentially in the order of the list. It's possible to
  * parallelize the deletes by running several cleanup operations at the same time operating on different sets of
  * `persistenceIds`.
- *
- * @since 2.0.0
  */
 @ApiMayChange
 final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, configPath: String) {
@@ -184,7 +182,7 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
 
     def loop(remaining: List[String], n: Int): Future[Done] = {
       remaining match {
-        case Nil         => Future.successful(Done)
+        case Nil => Future.successful(Done)
         case pid :: tail =>
           pidOperation(pid).flatMap { _ =>
             if (n % cleanupSettings.logProgressEvery == 0)
@@ -200,7 +198,7 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
       case Success(_) =>
         log.info("Cleanup completed {} of [{}] persistenceId.", operationName, size: java.lang.Integer)
       case Failure(e) =>
-        log.error(s"Cleanup $operationName failed.", e)
+        log.error(s"Cleanup {$operationName} failed.", e)
     }
 
     result
