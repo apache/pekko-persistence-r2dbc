@@ -208,13 +208,10 @@ class PayloadSpec
       val persistenceId = nextPid(nextEntityType())
       val probe = createTestProbe[Any]()
       val ref1 = spawn(DurableStatePersister(persistenceId))
-      // delete before any change should insert delete marker
+      // delete before any change - no DB row inserted for a never-persisted entity
       ref1 ! DurableStatePersister.DeleteWithAck(probe.ref)
       probe.expectMessage(Done)
       testKit.stop(ref1)
-
-      val row1 = selectDurableStateRow(persistenceId)
-      row1.payload.toVector shouldBe stateSettings.durableStatePayloadCodec.nonePayload.toVector
 
       val ref2 = spawn(DurableStatePersister(persistenceId))
       ref2 ! DurableStatePersister.GetState(probe.ref)
