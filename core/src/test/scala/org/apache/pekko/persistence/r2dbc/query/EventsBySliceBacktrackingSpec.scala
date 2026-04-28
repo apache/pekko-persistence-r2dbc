@@ -34,11 +34,20 @@ import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
+import com.typesafe.config.ConfigFactory
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
 
+object EventsBySliceBacktrackingSpec {
+  private val config = ConfigFactory
+    .parseString("""
+    pekko.persistence.r2dbc.journal.publish-events = off
+    """)
+    .withFallback(TestConfig.config)
+}
+
 class EventsBySliceBacktrackingSpec
-    extends ScalaTestWithActorTestKit(TestConfig.config)
+    extends ScalaTestWithActorTestKit(EventsBySliceBacktrackingSpec.config)
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData

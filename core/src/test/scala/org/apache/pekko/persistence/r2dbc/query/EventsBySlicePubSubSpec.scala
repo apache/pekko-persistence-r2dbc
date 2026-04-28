@@ -15,9 +15,13 @@ package org.apache.pekko.persistence.r2dbc.query
 
 import java.time.Instant
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.internal.pubsub.TopicImpl
@@ -39,6 +43,7 @@ import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
+import pekko.stream.typed.scaladsl.ActorFlow
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -50,9 +55,15 @@ object EventsBySlicePubSubSpec {
         .parseString("""
     pekko.persistence.r2dbc {
       journal.publish-events = on
+      journal.publish-events-dynamic {
+        throughput-threshold = 50
+        throughput-collect-interval = 1 second
+      }
+
       # no events from database query, only via pub-sub
       behind-current-time = 5 minutes
     }
+    pekko.actor.testkit.typed.filter-leeway = 20.seconds
     """)
         .withFallback(TestConfig.backtrackingDisabledConfig.withFallback(TestConfig.unresolvedConfig))
     )
@@ -176,6 +187,65 @@ class EventsBySlicePubSubSpec
         .runWith(Sink.seq)
         .futureValue
       out shouldBe List(envA1, envA2, envA3, envB1, envA1, envB2) // envA1 was evicted and therefore duplicate
+    }
+
+    "dynamically enable/disable publishing based on throughput" in new Setup {
+      import pekko.actor.typed.scaladsl.adapter._
+
+      val consumerProbe = createTestProbe[EventEnvelope[String]]()
+
+      query
+        .eventsBySlices[String](setupEntityType, slice, slice, NoOffset)
+        .runWith(
+          Sink.actorRef(consumerProbe.ref.toClassic, onCompleteMessage = "done", onFailureMessage = _.getMessage))
+
+      val topicStatsProbe = createTestProbe[TopicImpl.TopicStats]()
+      eventually {
+        PubSub(typedSystem).eventTopic[String](setupEntityType, slice) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
+        topicStatsProbe.receiveMessage().localSubscriberCount shouldBe 1
+      }
+
+      for (i <- 1 to 10) {
+        persister ! PersistWithAck(s"e-$i", probe.ref)
+        probe.expectMessage(Done)
+      }
+
+      consumerProbe.receiveMessages(10)
+
+      LoggingTestKit.info("Disabled publishing of events").expect {
+        val done1 = Source(11 to 600)
+          .throttle(200, 1.second)
+          .via(ActorFlow.ask[Int, PersistWithAck, Done](1)(persister) { case (i, replyTo) =>
+            PersistWithAck(s"e-$i", replyTo)
+          })
+          .runWith(Sink.ignore)
+
+        Await.result(done1, 20.seconds)
+      }
+
+      var count = 0
+      var lookForMore = true
+      while (lookForMore) {
+        try {
+          consumerProbe.receiveMessage(1.second)
+          count += 1
+        } catch {
+          case _: AssertionError => lookForMore = false // timeout
+        }
+      }
+      count should be <= 500
+
+      LoggingTestKit.info("Enabled publishing of events").expect {
+        val done2 = Source(601 to 800)
+          .throttle(20, 1.second)
+          .via(ActorFlow.ask[Int, PersistWithAck, Done](1)(persister) { case (i, replyTo) =>
+            PersistWithAck(s"e-$i", replyTo)
+          })
+          .runWith(Sink.ignore)
+
+        Await.result(done2, 20.seconds)
+      }
+
     }
 
   }
