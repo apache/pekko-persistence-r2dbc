@@ -36,6 +36,7 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.query.scaladsl.mysql.MySQLQueryDao
+import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
@@ -143,8 +144,14 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
   private val allPersistenceIdsSql =
     sql"SELECT DISTINCT(persistence_id) from $journalTable ORDER BY persistence_id LIMIT ?"
 
+  private val persistenceIdsForEntityTypeSql =
+    sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id LIKE ? ORDER BY persistence_id LIMIT ?"
+
   private val allPersistenceIdsAfterSql =
     sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id > ? ORDER BY persistence_id LIMIT ?"
+
+  private val persistenceIdsForEntityTypeAfterSql =
+    sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id LIKE ? AND persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
   protected val r2dbcExecutor =
     new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
@@ -304,6 +311,31 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
           writerUuid = "", // not need in this query
           tags = Set.empty, // tags not fetched in queries (yet)
           metadata = readMetadata(row)))
+
+  def persistenceIds(entityType: String, afterId: Option[String], limit: Long): Source[String, NotUsed] = {
+    val likeStmtPostfix = PersistenceId.DefaultSeparator + "%"
+    val result = r2dbcExecutor.select(s"select persistenceIds by entity type")(
+      connection =>
+        afterId match {
+          case Some(after) =>
+            connection
+              .createStatement(persistenceIdsForEntityTypeAfterSql)
+              .bind(0, entityType + likeStmtPostfix)
+              .bind(1, after)
+              .bind(2, limit)
+          case None =>
+            connection
+              .createStatement(persistenceIdsForEntityTypeSql)
+              .bind(0, entityType + likeStmtPostfix)
+              .bind(1, limit)
+        },
+      row => row.get("persistence_id", classOf[String]))
+
+    if (log.isDebugEnabled)
+      result.foreach(rows => log.debug("Read [{}] persistence ids by entity type [{}]", rows.size, entityType))
+
+    Source.futureSource(result.map(Source(_))).mapMaterializedValue(_ => NotUsed)
+  }
 
   def persistenceIds(afterId: Option[String], limit: Long): Source[String, NotUsed] = {
     val result = r2dbcExecutor.select(s"select persistenceIds")(
