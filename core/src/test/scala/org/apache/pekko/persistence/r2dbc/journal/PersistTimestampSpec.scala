@@ -21,6 +21,8 @@ import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.internal.PayloadCodec
+import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
@@ -40,6 +42,7 @@ class PersistTimestampSpec
   override def typedSystem: ActorSystem[_] = system
   private val settings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
   private val serialization = SerializationExtension(system)
+  private implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec
 
   case class Row(pid: String, seqNr: Long, dbTimestamp: Instant, event: String)
 
@@ -79,7 +82,7 @@ class PersistTimestampSpec
             row => {
               val event = serialization
                 .deserialize(
-                  row.get("event_payload", classOf[Array[Byte]]),
+                  row.getPayload("event_payload"),
                   row.get[Integer]("event_ser_id", classOf[Integer]),
                   row.get("event_ser_manifest", classOf[String]))
                 .get

@@ -21,6 +21,7 @@ import scala.jdk.DurationConverters._
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
+import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.util.Helpers.toRootLowerCase
 import com.typesafe.config.Config
 
@@ -63,6 +64,9 @@ final class JournalSettings(val config: Config) extends ConnectionSettings with 
 
   val journalTable: String = config.getString("table")
   val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
+
+  val journalPayloadCodec: PayloadCodec =
+    if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
 }
 
 /**
@@ -82,6 +86,9 @@ final class SnapshotSettings(val config: Config) extends ConnectionSettings with
 
   val snapshotsTable: String = config.getString("table")
   val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
+
+  val snapshotPayloadCodec: PayloadCodec =
+    if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
 }
 
 /**
@@ -105,6 +112,9 @@ final class StateSettings(val config: Config) extends ConnectionSettings with Us
   val durableStateTableWithSchema: String = schema.map(_ + ".").getOrElse("") + durableStateTable
 
   val durableStateAssertSingleWriter: Boolean = config.getBoolean("assert-single-writer")
+
+  val durableStatePayloadCodec: PayloadCodec =
+    if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
 }
 
 /**
@@ -127,6 +137,9 @@ final class QuerySettings(val config: Config) extends ConnectionSettings with Us
   val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
 
   val deduplicateCapacity: Int = config.getInt("deduplicate-capacity")
+
+  val journalPayloadCodec: PayloadCodec =
+    if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
 }
 
 /**
@@ -153,6 +166,15 @@ trait ConnectionSettings {
     config.getString("log-db-calls-exceeding").toLowerCase(Locale.ROOT) match {
       case "off" => -1.millis
       case _     => config.getDuration("log-db-calls-exceeding").toScala
+    }
+
+  protected def useJsonPayload(configKey: String): Boolean =
+    config.getString(configKey).toUpperCase match {
+      case "BYTEA"          => false
+      case "JSONB" | "JSON" => true
+      case t =>
+        throw new IllegalStateException(
+          s"Expected $configKey to be one of 'BYTEA', 'JSON' or 'JSONB' but found '$t'")
     }
 }
 

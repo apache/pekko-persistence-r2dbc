@@ -26,6 +26,8 @@ import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.QuerySettings
+import pekko.persistence.r2dbc.internal.PayloadCodec
+import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -58,6 +60,7 @@ class EventsBySliceBacktrackingSpec
 
   override def typedSystem: ActorSystem[_] = system
   private val settings = QuerySettings(system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
+  private implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec
 
   private val query = PersistenceQuery(testKit.system)
     .readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
@@ -83,7 +86,7 @@ class EventsBySliceBacktrackingSpec
         .bind(3, seqNr)
         .bind(4, timestamp)
         .bind(5, stringSerializer.identifier)
-        .bind(6, stringSerializer.toBinary(event))
+        .bindPayload(6, stringSerializer.toBinary(event))
     }
     result.futureValue shouldBe 1
   }

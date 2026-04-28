@@ -20,6 +20,8 @@ import pekko.NotUsed
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.BufferSize
 import pekko.persistence.r2dbc.Dialect
+import pekko.persistence.r2dbc.internal.PayloadCodec
+import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.journal.JournalDao.readMetadata
@@ -60,6 +62,8 @@ private[r2dbc] trait EventsByPersistenceIdDao {
   protected def r2dbcExecutor: R2dbcExecutor
 
   protected def settings: BufferSize
+
+  implicit protected def journalPayloadCodec: PayloadCodec
 
   private lazy val selectEventsSql = sql"""
     SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload, tags
@@ -141,7 +145,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
           seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
           dbTimestamp = row.get("db_timestamp", classOf[Instant]),
           readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
-          payload = Some(row.get("event_payload", classOf[Array[Byte]])),
+          payload = Some(row.getPayload("event_payload")),
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
           serManifest = row.get("event_ser_manifest", classOf[String]),
           writerUuid = row.get("writer", classOf[String]),
