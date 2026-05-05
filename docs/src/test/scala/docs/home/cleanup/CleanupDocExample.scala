@@ -28,7 +28,7 @@ object CleanupDocExample {
 
   implicit val system: ActorSystem[_] = ???
 
-  //#cleanup
+  // #cleanup
   val queries = PersistenceQuery(system).readJournalFor[CurrentPersistenceIdsQuery](R2dbcReadJournal.Identifier)
   val cleanup = new EventSourcedCleanup(system)
 
@@ -41,6 +41,6 @@ object CleanupDocExample {
     .mapAsync(persistenceIdParallelism)(pid => cleanup.cleanupBeforeSnapshot(pid))
     .run()
 
-  //#cleanup
+  // #cleanup
 
 }
