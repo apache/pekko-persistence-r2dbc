@@ -15,7 +15,7 @@ The Pekko Persistence R2DBC plugin allows for using SQL database with R2DBC as a
 * [Durable State Plugin](durable-state-store.md)
 * [Query Plugin](query.md)
 * [Projection](projection.md)
-* [Cleanup tool](cleanup.md)
+* [Cleanup Tool](cleanup.md)
 * [Migration Tool](migration.md)
 * [Migration Guides](migration-guides.md)
 * [Release Notes](release-notes/index.md)
