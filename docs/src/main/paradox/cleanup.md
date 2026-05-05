@@ -1,6 +1,6 @@
 # Database Cleanup
 
-## Event Sourced cleanup tool
+## Event Sourced Cleanup Tool
 
 @@@ warning
 
@@ -39,7 +39,7 @@ Java
 Scala
 : @@snip [cleanup](/docs/src/test/scala/docs/home/cleanup/CleanupDocExample.scala) { #cleanup }
 
-## Durable State cleanup tool
+## Durable State Cleanup Tool
 
 @@@ warning
 
