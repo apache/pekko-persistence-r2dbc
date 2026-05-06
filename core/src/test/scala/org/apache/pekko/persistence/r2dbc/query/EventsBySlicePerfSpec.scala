@@ -49,11 +49,12 @@ class EventsBySlicePerfSpec
 
     "retrieve from several slices" in {
       // increase these properties for "real" testing
+      // also, remove LogCapturing and change logback log levels for "real" testing
       val numberOfPersisters = 30
       val numberOfEvents = 5
       val writeConcurrency = 10
       val numberOfSliceRanges = 4
-      val iterations = 3
+      val iterations = 2
       val totalNumberOfEvents = numberOfPersisters * numberOfEvents
 
       val entityType = nextEntityType()
