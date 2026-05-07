@@ -62,6 +62,8 @@ object EventsBySliceSpec {
     pekko.persistence.r2dbc.query.behind-current-time = 500 millis
     pekko.persistence.r2dbc-small-buffer = $${pekko.persistence.r2dbc}
 
+    pekko.persistence.r2dbc.journal.publish-events = off
+
     # this is used by the "read in chunks" test
     pekko.persistence.r2dbc-small-buffer.query {
       buffer-size = 4

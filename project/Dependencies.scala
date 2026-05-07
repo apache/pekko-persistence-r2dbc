@@ -51,6 +51,7 @@ object Dependencies {
     val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
     val pekkoStream = "org.apache.pekko" %% "pekko-stream" % PekkoVersion % Test
     val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
+    val pekkoStreamTyped = "org.apache.pekko" %% "pekko-stream-typed" % PekkoVersion % Test
     val pekkoTestkit = "org.apache.pekko" %% "pekko-testkit" % PekkoVersion % Test
 
     val pekkoProjectionEventSourced =
@@ -78,6 +79,7 @@ object Dependencies {
     r2dbcMysql % "provided,test",
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
+    TestDeps.pekkoStreamTyped,
     TestDeps.pekkoActorTestkitTyped,
     TestDeps.pekkoJackson,
     TestDeps.logback,
@@ -122,6 +124,7 @@ object Dependencies {
     TestDeps.pekkoSlf4j,
     TestDeps.pekkoStream,
     TestDeps.pekkoStreamTestkit,
+    TestDeps.pekkoStreamTyped,
     TestDeps.pekkoTestkit)
 
 }

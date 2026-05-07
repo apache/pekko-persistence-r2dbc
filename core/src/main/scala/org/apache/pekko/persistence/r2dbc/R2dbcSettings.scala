@@ -291,3 +291,12 @@ trait UseConnnectionFactory {
 
   val useConnectionFactory: String = config.getString("use-connection-factory")
 }
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+final class PublishEventsDynamicSettings(config: Config) {
+  val throughputThreshold: Int = config.getInt("throughput-threshold")
+  val throughputCollectInterval: FiniteDuration = config.getDuration("throughput-collect-interval").toScala
+}
