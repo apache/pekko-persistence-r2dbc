@@ -164,7 +164,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
             completionMatcher = PartialFunction.empty,
             failureMatcher = PartialFunction.empty,
             bufferSize = settings.bufferSize,
-            overflowStrategy = OverflowStrategy.dropNew)
+            overflowStrategy = OverflowStrategy.dropHead)
           .mapMaterializedValue { ref =>
             (minSlice to maxSlice).foreach { slice =>
               import pekko.actor.typed.scaladsl.adapter._
