@@ -166,7 +166,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
             bufferSize = settings.bufferSize,
             // dropHead drops the oldest buffered event when full; any dropped pub/sub events are
             // recovered from the database source which is merged below, and deduplication handles
-            // any events received via both paths. OverflowStrategy.dropNew is deprecated.
+            // any events received via both paths.
+            // OverflowStrategy.dropNew is long deprecated and removed in Pekko 2.0.0.
             overflowStrategy = OverflowStrategy.dropHead)
           .mapMaterializedValue { ref =>
             (minSlice to maxSlice).foreach { slice =>
