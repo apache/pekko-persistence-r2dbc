@@ -94,6 +94,26 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
   override def currentPersistenceIds(afterId: Optional[String], limit: Long): Source[String, NotUsed] =
     delegate.currentPersistenceIds(afterId.toScala, limit).asJava
 
+  /**
+   * Get the current persistence ids.
+   *
+   * Note: to reuse existing index, the actual query filters entity types based on persistence_id column and sql LIKE
+   * operator. Hence the persistenceId must start with an entity type followed by default separator ("|") from
+   * [[pekko.persistence.typed.PersistenceId]].
+   *
+   * @param entityType
+   *   The entity type name.
+   * @param afterId
+   *   The ID to start returning results from, or empty to return all ids. This should be an id returned from a previous
+   *   invocation of this command. Callers should not assume that ids are returned in sorted order.
+   * @param limit
+   *   The maximum results to return. Use Long.MAX_VALUE to return all results. Must be greater than zero.
+   * @return
+   *   A source containing all the persistence ids, limited as specified.
+   */
+  def currentPersistenceIds(entityType: String, afterId: Optional[String], limit: Long): Source[String, NotUsed] =
+    delegate.currentPersistenceIds(entityType, afterId.toScala, limit).asJava
+
   override def timestampOf(persistenceId: String, sequenceNr: Long): CompletionStage[Optional[Instant]] =
     delegate.timestampOf(persistenceId, sequenceNr).map(_.toJava)(ExecutionContext.parasitic).asJava
 
