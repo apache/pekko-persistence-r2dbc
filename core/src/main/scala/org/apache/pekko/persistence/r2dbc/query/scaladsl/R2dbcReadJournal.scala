@@ -216,7 +216,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
                     env.persistenceId,
                     env.sequenceNr: java.lang.Long)
                   Nil
-                } else if (EnvelopeOrigin.fromPubSub(env) && JDuration
+                } else if (EnvelopeOrigin.fromPubSub(env) &&
+                  JDuration
                     .between(latestBacktracking, t.timestamp)
                     .compareTo(maxAheadOfBacktracking) > 0) {
                   // drop from pubsub when too far ahead from backtracking

@@ -122,7 +122,7 @@ class EventsBySlicePerfSpec
               if (EnvelopeOrigin.fromQuery(env)) {
                 if (acc > 0 && acc % 100 == 0)
                   println(s"#$iteration Reading [$acc] events from slices [${range.min}-${range.max}] " +
-                  s"took [${(System.nanoTime() - t1) / 1000 / 1000}] ms")
+                    s"took [${(System.nanoTime() - t1) / 1000 / 1000}] ms")
                 acc + 1
               } else {
                 acc
@@ -190,7 +190,7 @@ class EventsBySlicePerfSpec
 
               if (newAcc.size != acc.size && (newAcc.size % 100 == 0))
                 println(s"#$iteration Reading [${newAcc.size}] events " +
-                s"took [${(System.nanoTime() - t0) / 1000 / 1000}] ms")
+                  s"took [${(System.nanoTime() - t0) / 1000 / 1000}] ms")
               newAcc
 
             }
