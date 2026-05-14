@@ -15,19 +15,21 @@
  * limitations under the License.
  */
 
-import sbt.Keys._
-import sbt._
-import org.mdedetrich.apache.sonatype.ApacheSonatypePlugin
-import org.mdedetrich.apache.sonatype.ApacheSonatypePlugin.autoImport._
+package org.apache.pekko.persistence.r2dbc.state
 
-/**
- * Copies LICENSE and NOTICE files into jar META-INF dir
- */
-object MetaInfLicenseNoticeCopy extends AutoPlugin {
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.scaladsl.adapter._
+import pekko.persistence.CapabilityFlag
+import pekko.persistence.r2dbc.TestConfig
+import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.state.DurableStateStoreSpec
 
-  private lazy val baseDir = LocalRootProject / baseDirectory
+class R2dbcDurableStateStoreTCKSpec
+    extends DurableStateStoreSpec(TestConfig.config)
+    with TestDbLifecycle {
 
-  override def trigger = allRequirements
+  override def typedSystem: ActorSystem[_] = system.toTyped
 
-  override def requires = ApacheSonatypePlugin
+  override protected def supportsDeleteWithRevisionCheck: CapabilityFlag = CapabilityFlag.on()
 }
