@@ -15,6 +15,7 @@ sourceDistIncubating := false
 
 ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
 ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
+ThisBuild / evictionErrorLevel := Level.Info
 
 GlobalScope / parallelExecution := false
 Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
