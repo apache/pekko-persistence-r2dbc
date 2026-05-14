@@ -14,7 +14,6 @@
 package org.apache.pekko.projection.r2dbc
 
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.time.{ Duration => JDuration }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -252,7 +251,7 @@ class R2dbcTimestampOffsetProjectionSpec
 
   }
 
-  private val clock = new TestClock
+  private val clock = TestClock.nowMicros()
   def tick(): TestClock = {
     clock.tick(JDuration.ofMillis(1))
     clock
@@ -289,8 +288,7 @@ class R2dbcTimestampOffsetProjectionSpec
   }
 
   def now(): Instant = {
-    // supported databases do not store more than 6 fractional digits
-    Instant.now().truncatedTo(ChronoUnit.MICROS)
+    TestClock.nowMicros().instant()
   }
 
   def createEnvelopesWithDuplicates(pid1: Pid, pid2: Pid): Vector[EventEnvelope[String]] = {
