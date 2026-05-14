@@ -38,6 +38,7 @@ import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.r2dbc.Dialect
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.typed.PersistenceId
@@ -63,7 +64,8 @@ object R2dbcOffsetStore {
       record: Record,
       offset: TimestampOffset,
       strictSeqNr: Boolean,
-      envelopeLoaded: Boolean)
+      fromBacktracking: Boolean,
+      fromPubSub: Boolean)
 
   object State {
     val empty: State = State(Map.empty, Vector.empty, Instant.EPOCH)
@@ -658,14 +660,14 @@ private[projection] class R2dbcOffsetStore(
       val prevSeqNr = currentInflight.getOrElse(pid, currentState.byPid.get(pid).map(_.seqNr).getOrElse(0L))
 
       def logUnexpected(): Unit = {
-        if (viaPubSub(recordWithOffset.offset))
+        if (recordWithOffset.fromPubSub)
           logger.debug(
             "Rejecting pub-sub envelope, unexpected sequence number [{}] for pid [{}], previous sequence number [{}]. Offset: {}",
             seqNr: java.lang.Long,
             pid,
             prevSeqNr: java.lang.Long,
             recordWithOffset.offset)
-        else if (recordWithOffset.envelopeLoaded)
+        else if (!recordWithOffset.fromBacktracking)
           logger.debug(
             "Rejecting unexpected sequence number [{}] for pid [{}], previous sequence number [{}]. Offset: {}",
             seqNr: java.lang.Long,
@@ -682,13 +684,13 @@ private[projection] class R2dbcOffsetStore(
       }
 
       def logUnknown(): Unit = {
-        if (viaPubSub(recordWithOffset.offset)) {
+        if (recordWithOffset.fromPubSub) {
           logger.debug(
             "Rejecting pub-sub envelope, unknown sequence number [{}] for pid [{}] (might be accepted later): {}",
             seqNr: java.lang.Long,
             pid,
             recordWithOffset.offset)
-        } else if (recordWithOffset.envelopeLoaded) {
+        } else if (!recordWithOffset.fromBacktracking) {
           // This may happen rather frequently when using `publish-events`, after reconnecting and such.
           logger.debug(
             "Rejecting unknown sequence number [{}] for pid [{}] (might be accepted later): {}",
@@ -713,7 +715,7 @@ private[projection] class R2dbcOffsetStore(
           // currentInFlight contains those that have been processed or about to be processed in Flow,
           // but offset not saved yet => ok to handle as duplicate
           FutureFalse
-        } else if (recordWithOffset.envelopeLoaded) {
+        } else if (!recordWithOffset.fromBacktracking) {
           logUnexpected()
           FutureFalse
         } else {
@@ -745,7 +747,7 @@ private[projection] class R2dbcOffsetStore(
                 previousTimestamp,
                 before)
               true
-            } else if (recordWithOffset.envelopeLoaded) {
+            } else if (!recordWithOffset.fromBacktracking) {
               logUnknown()
               false
             } else {
@@ -774,13 +776,6 @@ private[projection] class R2dbcOffsetStore(
           prevSeqNr: java.lang.Long)
         FutureFalse
       }
-    }
-  }
-
-  private def viaPubSub(offset: Offset): Boolean = {
-    offset match {
-      case t: TimestampOffset => t.timestamp == t.readTimestamp
-      case _                  => false
     }
   }
 
@@ -1013,7 +1008,8 @@ private[projection] class R2dbcOffsetStore(
             Record(eventEnvelope.persistenceId, eventEnvelope.sequenceNr, timestampOffset.timestamp),
             timestampOffset,
             strictSeqNr = true,
-            envelopeLoaded = eventEnvelope.eventOption.isDefined))
+            fromBacktracking = EnvelopeOrigin.fromBacktracking(eventEnvelope),
+            fromPubSub = EnvelopeOrigin.fromPubSub(eventEnvelope)))
       case change: UpdatedDurableState[_] if change.offset.isInstanceOf[TimestampOffset] =>
         val timestampOffset = change.offset.asInstanceOf[TimestampOffset]
         Some(
@@ -1021,7 +1017,8 @@ private[projection] class R2dbcOffsetStore(
             Record(change.persistenceId, change.revision, timestampOffset.timestamp),
             timestampOffset,
             strictSeqNr = false,
-            envelopeLoaded = change.value != null))
+            fromBacktracking = change.value == null,
+            fromPubSub = false))
       case change: DeletedDurableState[_] if change.offset.isInstanceOf[TimestampOffset] =>
         val timestampOffset = change.offset.asInstanceOf[TimestampOffset]
         Some(
@@ -1029,7 +1026,8 @@ private[projection] class R2dbcOffsetStore(
             Record(change.persistenceId, change.revision, timestampOffset.timestamp),
             timestampOffset,
             strictSeqNr = false,
-            envelopeLoaded = true))
+            fromBacktracking = false,
+            fromPubSub = false))
       case change: DurableStateChange[_] if change.offset.isInstanceOf[TimestampOffset] =>
         // in case additional types are added
         throw new IllegalArgumentException(

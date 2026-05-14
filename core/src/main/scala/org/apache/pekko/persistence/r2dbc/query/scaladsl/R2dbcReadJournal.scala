@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.query.scaladsl
 
 import java.time.Instant
+import java.time.{ Duration => JDuration }
 
 import scala.collection.immutable
 import scala.collection.mutable
@@ -40,6 +41,7 @@ import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.ContinuousQuery
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.typed.PersistenceId
@@ -84,6 +86,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     val createEnvelope: (TimestampOffset, SerializedJournalRow) => EventEnvelope[Any] = (offset, row) => {
       val event = row.payload.map(payload => serialization.deserialize(payload, row.serId, row.serManifest).get)
       val metadata = row.metadata.map(meta => serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
+      val source = if (event.isDefined) EnvelopeOrigin.SourceQuery else EnvelopeOrigin.SourceBacktracking
       new EventEnvelope(
         offset,
         row.persistenceId,
@@ -92,7 +95,9 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
         row.dbTimestamp.toEpochMilli,
         metadata,
         row.entityType,
-        row.slice)
+        row.slice,
+        filtered = false,
+        source)
     }
 
     val extractOffset: EventEnvelope[Any] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
@@ -177,9 +182,57 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
           }
       dbSource
         .mergePrioritized(pubSubSource, leftPriority = 1, rightPriority = 10)
+        .via(
+          skipPubSubTooFarAhead(
+            settings.backtrackingEnabled,
+            JDuration.ofMillis(settings.backtrackingWindow.toMillis)))
         .via(deduplicate(settings.deduplicateCapacity))
     } else
       dbSource
+  }
+
+  /**
+   * INTERNAL API
+   */
+  @InternalApi private[pekko] def skipPubSubTooFarAhead[Event](
+      enabled: Boolean,
+      maxAheadOfBacktracking: JDuration): Flow[EventEnvelope[Event], EventEnvelope[Event], NotUsed] = {
+    if (!enabled)
+      Flow[EventEnvelope[Event]]
+    else
+      Flow[EventEnvelope[Event]]
+        .statefulMapConcat(() => {
+          // track backtracking offset
+          var latestBacktracking = Instant.EPOCH
+          env => {
+            env.offset match {
+              case t: TimestampOffset =>
+                if (EnvelopeOrigin.fromBacktracking(env)) {
+                  latestBacktracking = t.timestamp
+                  env :: Nil
+                } else if (EnvelopeOrigin.fromPubSub(env) && latestBacktracking == Instant.EPOCH) {
+                  log.trace(
+                    "Dropping pubsub event for persistenceId [{}] seqNr [{}] because no event from backtracking yet.",
+                    env.persistenceId,
+                    env.sequenceNr: java.lang.Long)
+                  Nil
+                } else if (EnvelopeOrigin.fromPubSub(env) && JDuration
+                    .between(latestBacktracking, t.timestamp)
+                    .compareTo(maxAheadOfBacktracking) > 0) {
+                  // drop from pubsub when too far ahead from backtracking
+                  log.debug(
+                    "Dropping pubsub event for persistenceId [{}] seqNr [{}] because too far ahead of backtracking.",
+                    env.persistenceId,
+                    env.sequenceNr: java.lang.Long)
+                  Nil
+                } else {
+                  env :: Nil
+                }
+              case _ =>
+                env :: Nil
+            }
+          }
+        })
   }
 
   /**
@@ -196,7 +249,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
           // cache of seen pid/seqNr
           var seen = mutable.LinkedHashSet.empty[(String, Long)]
           env => {
-            if (env.eventOption.isEmpty) {
+            if (EnvelopeOrigin.fromBacktracking(env)) {
               // don't deduplicate from backtracking
               env :: Nil
             } else {
@@ -322,6 +375,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       row.payload.map(payload => serialization.deserialize(payload, row.serId, row.serManifest).get.asInstanceOf[Event])
     val offset = TimestampOffset(row.dbTimestamp, row.readDbTimestamp, Map(row.persistenceId -> row.seqNr))
     val metadata = row.metadata.map(meta => serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
+    val source = if (event.isDefined) EnvelopeOrigin.SourceQuery else EnvelopeOrigin.SourceBacktracking
     new EventEnvelope(
       offset,
       row.persistenceId,
@@ -330,7 +384,9 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       row.dbTimestamp.toEpochMilli,
       metadata,
       row.entityType,
-      row.slice)
+      row.slice,
+      filtered = false,
+      source)
   }
 
   private def deserializeRow(row: SerializedJournalRow): ClassicEventEnvelope = {
