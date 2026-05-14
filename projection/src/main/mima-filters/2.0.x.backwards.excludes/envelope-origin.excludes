@@ -16,6 +16,7 @@
 # under the License.
 
 # Caused by porting https://github.com/akka/akka-persistence-r2dbc/pull/348
+ProblemFilters.exclude[MissingTypesProblem]("org.apache.pekko.projection.r2dbc.internal.R2dbcOffsetStore$RecordWithOffset$")
 ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.pekko.projection.r2dbc.internal.R2dbcOffsetStore#RecordWithOffset.copy")
 ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.pekko.projection.r2dbc.internal.R2dbcOffsetStore#RecordWithOffset.this")
 ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.pekko.projection.r2dbc.internal.R2dbcOffsetStore#RecordWithOffset.apply")
