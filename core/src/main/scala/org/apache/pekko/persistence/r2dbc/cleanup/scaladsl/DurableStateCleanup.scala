@@ -105,7 +105,7 @@ final class DurableStateCleanup(systemProvider: ClassicActorSystemProvider, conf
 
     def loop(remaining: List[String], n: Int): Future[Done] = {
       remaining match {
-        case Nil => Future.successful(Done)
+        case Nil         => Future.successful(Done)
         case pid :: tail =>
           pidOperation(pid).flatMap { _ =>
             if (n % cleanupSettings.logProgressEvery == 0)
