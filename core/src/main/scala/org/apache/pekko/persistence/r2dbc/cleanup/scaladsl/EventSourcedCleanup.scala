@@ -190,7 +190,7 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
       case Success(_) =>
         log.info2("Cleanup completed {} of [{}] persistenceId.", operationName, size: java.lang.Integer)
       case Failure(e) =>
-        log.error(s"Cleanup {$operationName} failed.", e)
+        log.error(s"Cleanup $operationName failed.", e)
     }
 
     result
