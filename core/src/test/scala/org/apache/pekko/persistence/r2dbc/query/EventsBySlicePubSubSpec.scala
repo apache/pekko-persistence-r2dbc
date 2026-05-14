@@ -276,7 +276,7 @@ class EventsBySlicePubSubSpec
             query.skipPubSubTooFarAhead(
               enabled = true,
               maxAheadOfBacktracking = JDuration.ofMillis(r2dbcQuerySettings.backtrackingWindow.toMillis)))
-          .toMat(TestSink[EventEnvelope[String]])(Keep.both)
+          .toMat(TestSink[EventEnvelope[String]]())(Keep.both)
           .run()
       out.request(100)
       in.sendNext(envA1)
