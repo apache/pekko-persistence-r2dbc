@@ -300,3 +300,12 @@ final class PublishEventsDynamicSettings(config: Config) {
   val throughputThreshold: Int = config.getInt("throughput-threshold")
   val throughputCollectInterval: FiniteDuration = config.getDuration("throughput-collect-interval").toScala
 }
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+final class CleanupSettings(config: Config) {
+  val logProgressEvery: Int = config.getInt("log-progress-every")
+  val eventsJournalDeleteBatchSize: Int = config.getInt("events-journal-delete-batch-size")
+}
