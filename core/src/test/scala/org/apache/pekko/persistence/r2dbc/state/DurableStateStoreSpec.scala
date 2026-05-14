@@ -167,6 +167,74 @@ class DurableStateStoreSpec
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 5L))
     }
 
+    "upsert with correct revision after delete succeeds" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-deleted-then-re-inserted").id
+      val value1 = "initial value"
+      store.upsertObject(persistenceId, 1L, value1, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value1), 1L))
+      store.deleteObject(persistenceId, revision = 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
+
+      val value2 = "new value after delete"
+      store.upsertObject(persistenceId, 3L, value2, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value2), 3L))
+    }
+
+    "reject upsert with revision 1 (insert attempt) after soft delete" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-deleted-then-bad-insert").id
+      val value = "initial value"
+      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+      store.deleteObject(persistenceId, revision = 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
+
+      // revision=1 triggers an INSERT but the row already exists after the soft delete
+      val failure =
+        store.upsertObject(persistenceId, revision = 1L, "wrong value", unusedTag).failed.futureValue
+      failure.getMessage should include(
+        s"Insert failed: durable state for persistence id [$persistenceId] already exists")
+    }
+
+    "reject upsert with same revision as delete revision" in {
+      if (!stateSettings.durableStateAssertSingleWriter)
+        pending
+
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-deleted-then-bad-update-same-rev").id
+      val value = "initial value"
+      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+      store.deleteObject(persistenceId, revision = 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
+
+      // revision=2 is already used by the delete; next valid revision is 3
+      val failure =
+        store.upsertObject(persistenceId, revision = 2L, "wrong value", unusedTag).failed.futureValue
+      failure.getMessage should include(
+        s"Update failed: durable state for persistence id [$persistenceId] could not be updated to revision [2]")
+    }
+
+    "reject upsert with skipped revision after delete" in {
+      if (!stateSettings.durableStateAssertSingleWriter)
+        pending
+
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "to-be-deleted-then-bad-update-skipped-rev").id
+      val value = "initial value"
+      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+      store.deleteObject(persistenceId, revision = 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
+
+      // revision=4 skips revision 3; the correct next revision after delete at 2 is 3
+      val failure =
+        store.upsertObject(persistenceId, revision = 4L, "wrong value", unusedTag).failed.futureValue
+      failure.getMessage should include(
+        s"Update failed: durable state for persistence id [$persistenceId] could not be updated to revision [4]")
+    }
+
     "detect and reject concurrent delete of revision 1" in {
       val entityType = nextEntityType()
       val persistenceId = PersistenceId(entityType, "id-to-be-deleted-concurrently")
