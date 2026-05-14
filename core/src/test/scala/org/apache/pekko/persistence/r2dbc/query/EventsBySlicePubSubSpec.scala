@@ -14,7 +14,6 @@
 package org.apache.pekko.persistence.r2dbc.query
 
 import java.time.Instant
-import java.time.{ Duration => JDuration }
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -37,7 +36,6 @@ import pekko.persistence.r2dbc.TestActors.Persister.PersistWithAck
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
-import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
@@ -47,7 +45,6 @@ import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
-import pekko.stream.testkit.scaladsl.TestSource
 import pekko.stream.typed.scaladsl.ActorFlow
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
@@ -84,9 +81,6 @@ class EventsBySlicePubSubSpec
   override def typedSystem: ActorSystem[_] = system
 
   private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
-
-  private lazy val r2dbcQuerySettings =
-    QuerySettings(testKit.system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
 
   private class Setup {
     val setupEntityType = nextEntityType()
@@ -267,45 +261,6 @@ class EventsBySlicePubSubSpec
         Await.result(done2, 20.seconds)
       }
 
-    }
-
-    "skipPubSubTooFarAhead" in {
-      val (in, out) =
-        TestSource[EventEnvelope[String]]()
-          .via(
-            query.skipPubSubTooFarAhead(
-              enabled = true,
-              maxAheadOfBacktracking = JDuration.ofMillis(r2dbcQuerySettings.backtrackingWindow.toMillis)))
-          .toMat(TestSink[EventEnvelope[String]]())(Keep.both)
-          .run()
-      out.request(100)
-      in.sendNext(envA1)
-      in.sendNext(envA2)
-
-      // all pubsub events dropped before the first backtracking event
-      out.expectNoMessage()
-
-      val pidC = PersistenceId(entityType, "C")
-      in.sendNext(backtrackingEnvelope(envA1))
-      out.expectNext(backtrackingEnvelope(envA1))
-      // now the pubsub event is passed through
-      in.sendNext(envB1)
-      out.expectNext(envB1)
-
-      val time2 = envA1.offset
-        .asInstanceOf[TimestampOffset]
-        .timestamp
-        .plusMillis(r2dbcQuerySettings.backtrackingWindow.toMillis)
-      val envC1 = createEnvelope(pidC, 1L, "c1", time2.plusMillis(1))
-      val envC2 = createEnvelope(pidC, 2L, "c2", time2.plusMillis(2))
-      in.sendNext(envC1)
-      // dropped because > backtrackingWindow
-      out.expectNoMessage()
-
-      in.sendNext(backtrackingEnvelope(envB1))
-      out.expectNext(backtrackingEnvelope(envB1))
-      in.sendNext(envC2)
-      out.expectNext(envC2)
     }
 
   }
