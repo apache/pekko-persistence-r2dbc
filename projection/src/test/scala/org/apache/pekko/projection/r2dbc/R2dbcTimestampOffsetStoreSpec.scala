@@ -687,7 +687,8 @@ class R2dbcTimestampOffsetStoreSpec
       offsetStore.getState().size shouldBe 6
 
       offsetStore
-        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(10)), Map("p7" -> 1L)), "p7", 1L))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(10)), Map("p7" -> 1L)), "p7",
+          1L))
         .futureValue
       offsetStore.getState().size shouldBe 7 // nothing evicted yet
 
@@ -743,10 +744,12 @@ class R2dbcTimestampOffsetStoreSpec
       offsetStore.getState().size shouldBe 4
 
       offsetStore
-        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(2)), Map("p5" -> 1L)), "p5", 1L))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(2)), Map("p5" -> 1L)), "p5",
+          1L))
         .futureValue
       offsetStore
-        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(1)), Map("p6" -> 1L)), "p6", 1L))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(1)), Map("p6" -> 1L)), "p6",
+          1L))
         .futureValue
       // nothing deleted yet
       offsetStore.deleteOldTimestampOffsets().futureValue shouldBe 0
@@ -754,10 +757,12 @@ class R2dbcTimestampOffsetStoreSpec
       offsetStore.getState().size shouldBe 6
 
       offsetStore
-        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p7" -> 1L)), "p7", 1L))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p7" -> 1L)), "p7",
+          1L))
         .futureValue
       offsetStore
-        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(2)), Map("p8" -> 1L)), "p8", 1L))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(2)), Map("p8" -> 1L)), "p8",
+          1L))
         .futureValue
       offsetStore.deleteOldTimestampOffsets().futureValue shouldBe 2
       offsetStore.readOffset().futureValue // this will load from database
@@ -775,7 +780,8 @@ class R2dbcTimestampOffsetStoreSpec
 
       offsetStore.saveOffset(OffsetPidSeqNr(TimestampOffset(startTime, Map("p1" -> 1L)), "p1", 1L)).futureValue
       offsetStore
-        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p2" -> 1L)), "p2", 1L))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p2" -> 1L)), "p2",
+          1L))
         .futureValue
       eventually {
         offsetStore.readOffset().futureValue // this will load from database
