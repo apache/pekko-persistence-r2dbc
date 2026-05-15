@@ -32,6 +32,7 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.typed.PersistenceId
 import com.typesafe.config.Config
+import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
@@ -145,6 +146,14 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
   private val deleteEventsSql = sql"""
     DELETE FROM $journalTable
     WHERE persistence_id = ? AND seq_nr <= ?"""
+
+  private val deleteEventsFromToSql = sql"""
+    DELETE FROM $journalTable
+    WHERE persistence_id = ? AND seq_nr >= ? AND seq_nr <= ?"""
+
+  private val selectLowestSequenceNrSql = sql"""
+    SELECT MIN(seq_nr) from $journalTable WHERE persistence_id = ?"""
+
   private val insertDeleteMarkerSql = sql"""
     INSERT INTO $journalTable
     (slice, entity_type, persistence_id, seq_nr, db_timestamp, writer, adapter_manifest, event_ser_id, event_ser_manifest, event_payload, deleted)
@@ -300,6 +309,122 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
 
       result.map(_ => ())(ExecutionContext.parasitic)
     }
+  }
+
+  private[r2dbc] def readLowestSequenceNr(persistenceId: String): Future[Long] = {
+    val result = r2dbcExecutor
+      .select(s"select lowest seqNr [$persistenceId]")(
+        connection =>
+          connection
+            .createStatement(selectLowestSequenceNrSql)
+            .bind(0, persistenceId),
+        row => {
+          val seqNr = row.get(0, classOf[java.lang.Long])
+          if (seqNr eq null) 0L else seqNr.longValue
+        })
+      .map(r => if (r.isEmpty) 0L else r.head)(ExecutionContext.parasitic)
+
+    if (log.isDebugEnabled)
+      result.foreach(seqNr =>
+        log.debug("Lowest sequence nr for persistenceId [{}]: [{}]", persistenceId, seqNr: java.lang.Long))
+
+    result
+  }
+
+  private def highestSeqNrForDelete(persistenceId: String, toSequenceNr: Long): Future[Long] = {
+    if (toSequenceNr == Long.MaxValue) readHighestSequenceNr(persistenceId, 0L)
+    else Future.successful(toSequenceNr)
+  }
+
+  private def lowestSequenceNrForDelete(persistenceId: String, toSeqNr: Long, batchSize: Int): Future[Long] = {
+    if (toSeqNr <= batchSize) {
+      Future.successful(1L)
+    } else {
+      readLowestSequenceNr(persistenceId)
+    }
+  }
+
+  /**
+   * Delete events up to and including `toSequenceNr` for `persistenceId` in batches.
+   *
+   * If `resetSequenceNumber` is `false` a delete marker is left at the highest deleted sequence number, so that the
+   * actor can continue from the next sequence number. This is the typical use case for cleanup of older events.
+   *
+   * If `resetSequenceNumber` is `true` the sequence number will be reset to 1 when the actor is started again with
+   * the same `persistenceId`. WARNING: reusing the same `persistenceId` after resetting the sequence number should
+   * be avoided, since it might be confusing to reuse the same sequence number for new events.
+   *
+   * @param batchSize number of events to delete per batch (use `CleanupSettings.eventsJournalDeleteBatchSize`)
+   */
+  def deleteEventsTo(
+      persistenceId: String,
+      toSequenceNr: Long,
+      resetSequenceNumber: Boolean,
+      batchSize: Int): Future[Unit] = {
+    def insertDeleteMarkerStmt(deleteMarkerSeqNr: Long, connection: Connection): Statement = {
+      val entityType = PersistenceId.extractEntityType(persistenceId)
+      val slice = persistenceExt.sliceForPersistenceId(persistenceId)
+      connection
+        .createStatement(insertDeleteMarkerSql)
+        .bind(0, slice)
+        .bind(1, entityType)
+        .bind(2, persistenceId)
+        .bind(3, deleteMarkerSeqNr)
+        .bind(4, "")
+        .bind(5, "")
+        .bind(6, 0)
+        .bind(7, "")
+        .bind(8, Array.emptyByteArray)
+        .bind(9, true)
+    }
+
+    def deleteBatch(from: Long, to: Long, lastBatch: Boolean): Future[Unit] = {
+      (if (lastBatch && !resetSequenceNumber) {
+         r2dbcExecutor
+           .update(s"delete [$persistenceId] and insert marker") { connection =>
+             Vector(
+               connection
+                 .createStatement(deleteEventsFromToSql)
+                 .bind(0, persistenceId)
+                 .bind(1, from)
+                 .bind(2, to),
+               insertDeleteMarkerStmt(to, connection))
+           }
+           .map(_.head)
+       } else {
+         r2dbcExecutor
+           .updateOne(s"delete [$persistenceId]") { connection =>
+             connection
+               .createStatement(deleteEventsFromToSql)
+               .bind(0, persistenceId)
+               .bind(1, from)
+               .bind(2, to)
+           }
+       }).map(deletedRows =>
+        if (log.isDebugEnabled) {
+          log.debug(
+            "Deleted [{}] events for persistenceId [{}], from seq num [{}] to [{}]",
+            deletedRows: java.lang.Long,
+            persistenceId,
+            from: java.lang.Long,
+            to: java.lang.Long)
+        })(ExecutionContext.parasitic)
+    }
+
+    def deleteInBatches(from: Long, maxTo: Long): Future[Unit] = {
+      if (from + batchSize > maxTo) {
+        deleteBatch(from, maxTo, lastBatch = true)
+      } else {
+        val to = from + batchSize - 1
+        deleteBatch(from, to, lastBatch = false).flatMap(_ => deleteInBatches(to + 1, maxTo))
+      }
+    }
+
+    for {
+      toSeqNr <- highestSeqNrForDelete(persistenceId, toSequenceNr)
+      fromSeqNr <- lowestSequenceNrForDelete(persistenceId, toSeqNr, batchSize)
+      _ <- deleteInBatches(fromSeqNr, toSeqNr)
+    } yield ()
   }
 
 }
