@@ -44,6 +44,12 @@ private[r2dbc] class MySQLQueryDao(
 
   override lazy val statementTimestampSql: String = "NOW(6)"
 
+  override protected def selectColumns(backtracking: Boolean): String =
+    if (backtracking)
+      s"SELECT slice, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, tags "
+    else
+      s"SELECT slice, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, tags, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload "
+
   override protected def behindCurrentTimeIntervalCondition(behindCurrentTime: FiniteDuration): String =
     if (behindCurrentTime > Duration.Zero)
       s"AND db_timestamp < DATE_SUB($statementTimestampSql, INTERVAL '${behindCurrentTime.toMicros}' MICROSECOND)"
