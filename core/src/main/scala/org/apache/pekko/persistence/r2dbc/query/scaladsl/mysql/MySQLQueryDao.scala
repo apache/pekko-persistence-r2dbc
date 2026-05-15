@@ -60,7 +60,8 @@ private[r2dbc] class MySQLQueryDao(
       FROM $journalTable
       WHERE entity_type = ?
       AND slice BETWEEN $minSlice AND $maxSlice
-      AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(behindCurrentTime)}
+      AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(
+        behindCurrentTime)}
       AND deleted = false
       ORDER BY db_timestamp, seq_nr
       LIMIT ?"""

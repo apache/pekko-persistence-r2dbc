@@ -111,7 +111,8 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
       FROM $journalTable
       WHERE entity_type = ?
       AND ${sliceCondition(minSlice, maxSlice)}
-      AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(behindCurrentTime)}
+      AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(
+        behindCurrentTime)}
       AND deleted = false
       ORDER BY db_timestamp, seq_nr
       LIMIT ?"""
