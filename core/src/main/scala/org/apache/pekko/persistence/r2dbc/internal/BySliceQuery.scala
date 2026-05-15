@@ -31,6 +31,7 @@ import pekko.persistence.r2dbc.BufferSize
 import pekko.persistence.r2dbc.BySliceQuerySettings
 import pekko.persistence.r2dbc.RefreshInterval
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
+import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
 import org.slf4j.Logger
@@ -107,7 +108,7 @@ import org.slf4j.Logger
     import Buckets.Count
     import Buckets.EpochSeconds
 
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = InstantFactory.now()
 
     def findTimeForLimit(from: Instant, atLeastCounts: Int): Option[Instant] = {
       val fromEpochSeconds = from.toEpochMilli / 1000
@@ -461,7 +462,7 @@ import org.slf4j.Logger
     // Don't run this too frequently
     if ((state.buckets.isEmpty ||
       JDuration
-        .between(state.buckets.createdAt, Instant.now())
+        .between(state.buckets.createdAt, InstantFactory.now())
         .compareTo(eventBucketCountInterval) > 0) &&
       // For Durable State we always refresh the bucket counts at the interval. For Event Sourced we know
       // that they don't change because events are append only.
