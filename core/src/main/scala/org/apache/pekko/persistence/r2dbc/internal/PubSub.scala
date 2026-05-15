@@ -109,7 +109,7 @@ import org.slf4j.LoggerFactory
 
       val offset = TimestampOffset(timestamp, timestamp, Map(pid -> pr.sequenceNr))
 
-      val (event, tags) = pr.payload match {
+      val (eventPayload, tags) = pr.payload match {
         case Tagged(payload, tags) =>
           (payload, tags)
         case other =>
@@ -120,7 +120,7 @@ import org.slf4j.LoggerFactory
         offset,
         pid,
         pr.sequenceNr,
-        Option(event),
+        Option(eventPayload),
         timestamp.toEpochMilli,
         pr.metadata,
         entityType,
