@@ -44,7 +44,8 @@ object DurableStateStoreAdditionalColumnSpec {
         "CustomEntity" = durable_state_test
       }
       additional-columns {
-        "CustomEntity" = ["${classOf[Column1].getName}", "${classOf[Column2].getName}", "${classOf[JavadslColumn].getName}"]
+        "CustomEntity" = ["${classOf[Column1].getName}", "${classOf[Column2].getName}", "${classOf[
+        JavadslColumn].getName}"]
       }
     }
     """)

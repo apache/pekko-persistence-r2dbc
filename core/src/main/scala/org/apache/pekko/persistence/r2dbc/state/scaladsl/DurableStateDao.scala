@@ -364,7 +364,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
     val result = {
       val additionalBindings = additionalColumns.get(entityType) match {
-        case None => Vector.empty[EvaluatedAdditionalColumnBindings]
+        case None          => Vector.empty[EvaluatedAdditionalColumnBindings]
         case Some(columns) =>
           val slice = persistenceExt.sliceForPersistenceId(state.persistenceId)
           val upsert = AdditionalColumn.Upsert(state.persistenceId, entityType, slice, state.revision, value)
@@ -480,8 +480,9 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     }
 
     try handler.process(session, change).recoverWith { case cause =>
-      Future.failed[Done](new ChangeHandlerException(excMessage(cause), cause))
-    } catch {
+        Future.failed[Done](new ChangeHandlerException(excMessage(cause), cause))
+      }
+    catch {
       case NonFatal(cause) => throw new ChangeHandlerException(excMessage(cause), cause)
     }
   }
@@ -608,7 +609,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
               .createStatement(hardDeleteStateSql(entityType))
               .bind(0, persistenceId))
           _ <- changeHandler match {
-            case None => FutureDone
+            case None          => FutureDone
             case Some(handler) =>
               val change = new DeletedDurableState[Any](persistenceId, 0L, NoOffset, EmptyDbTimestamp.toEpochMilli)
               processChange(handler, connection, change)
