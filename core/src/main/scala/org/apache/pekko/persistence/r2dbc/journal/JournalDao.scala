@@ -27,6 +27,8 @@ import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
 import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
+import pekko.persistence.r2dbc.internal.PayloadCodec
+import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
@@ -112,6 +114,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
   protected val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
 
   protected val journalTable: String = settings.journalTableWithSchema
+  protected implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec
 
   protected val (insertEventWithParameterTimestampSql: String, insertEventWithTransactionTimestampSql: String) = {
     val baseSql =
@@ -189,7 +192,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         .bind(5, "") // FIXME event adapter
         .bind(6, write.serId)
         .bind(7, write.serManifest)
-        .bind(8, write.payload.get)
+        .bindPayload(8, write.payload.get)
 
       if (write.tags.isEmpty)
         stmt.bindNull(9, classOf[Array[String]])
@@ -290,7 +293,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
           .bind(5, "")
           .bind(6, 0)
           .bind(7, "")
-          .bind(8, Array.emptyByteArray)
+          .bindPayloadOption(8, None)
           .bind(9, true)
       }
 

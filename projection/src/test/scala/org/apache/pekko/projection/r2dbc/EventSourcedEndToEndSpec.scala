@@ -30,7 +30,8 @@ import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.Behaviors
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.internal.PayloadCodec
+import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
@@ -145,6 +146,7 @@ class EventSourcedEndToEndSpec
   private val querySettings = QuerySettings(system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
   private val projectionSettings = R2dbcProjectionSettings(system)
   private val stringSerializer = SerializationExtension(system).serializerFor(classOf[String])
+  private implicit val journalPayloadCodec: PayloadCodec = querySettings.journalPayloadCodec
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -171,7 +173,7 @@ class EventSourcedEndToEndSpec
         .bind(3, seqNr)
         .bind(4, timestamp)
         .bind(5, stringSerializer.identifier)
-        .bind(6, stringSerializer.toBinary(event))
+        .bindPayload(6, stringSerializer.toBinary(event))
     }
     result.futureValue shouldBe 1
   }
