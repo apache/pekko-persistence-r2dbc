@@ -547,7 +547,7 @@ private[projection] class R2dbcProjectionImpl[Offset, Envelope](
       val envelope = projectionContext.envelope
 
       if (offsetStore.isInflight(envelope) || isExactlyOnceWithSkip) {
-        val offset = extractOffsetPidSeqNr(projectionContext.offset, envelope)
+        val offset = R2dbcProjectionImpl.extractOffsetPidSeqNr(projectionContext.offset, envelope)
         offsetStore
           .saveOffset(offset)
           .map { done =>
@@ -582,7 +582,7 @@ private[projection] class R2dbcProjectionImpl[Offset, Envelope](
       if (acceptedContexts.isEmpty) {
         FutureDone
       } else {
-        val offsets = acceptedContexts.map(ctx => extractOffsetPidSeqNr(ctx.offset, ctx.envelope))
+        val offsets = acceptedContexts.map(ctx => R2dbcProjectionImpl.extractOffsetPidSeqNr(ctx.offset, ctx.envelope))
         offsetStore
           .saveOffsets(offsets)
           .map { done =>
