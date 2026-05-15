@@ -133,24 +133,21 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
     stateDao.upsertState(serializedRow, value)
   }
 
+  @deprecated(message = "Use the deleteObject overload with revision instead.", since = "1.0.0")
   override def deleteObject(persistenceId: String): Future[Done] =
-    stateDao.deleteState(persistenceId, 0L)
-      .map(_ => Done)(ExecutionContext.parasitic)
+    deleteObject(persistenceId, revision = 0)
 
+  /**
+   * Delete the value, which will fail with `IllegalStateException` if the existing stored `revision` + 1 isn't equal to
+   * the given `revision`. This optimistic locking check can be disabled with configuration `assert-single-writer`. The
+   * stored revision for the persistenceId is updated and next call to [[getObject]] will return the revision, but with
+   * no value.
+   *
+   * If the given revision is `0` it will fully delete the value and revision from the database without any optimistic
+   * locking check. Next call to [[getObject]] will then return revision 0 and no value.
+   */
   override def deleteObject(persistenceId: String, revision: Long): Future[Done] = {
-    stateDao.deleteState(persistenceId, revision).map { count =>
-      if (count != 1) {
-        val msg = if (count == 0) {
-          s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
-        } else {
-          s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
-        }
-        // Use DeleteRevisionException if available (Pekko 1.1+), otherwise fall back to IllegalStateException
-        throw DurableStateExceptionSupport.createDeleteRevisionExceptionIfSupported(msg)
-          .getOrElse(new IllegalStateException(msg))
-      }
-      Done
-    }(ExecutionContext.parasitic)
+    stateDao.deleteState(persistenceId, revision)
   }
 
   override def sliceForPersistenceId(persistenceId: String): Int =
