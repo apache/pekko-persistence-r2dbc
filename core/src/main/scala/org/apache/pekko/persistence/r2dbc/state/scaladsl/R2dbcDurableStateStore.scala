@@ -45,7 +45,11 @@ import org.slf4j.LoggerFactory
 object R2dbcDurableStateStore {
   val Identifier = "pekko.persistence.r2dbc.state"
 
-  private final case class PersistenceIdsQueryState(queryCount: Int, rowCount: Int, latestPid: String)
+  private final case class PersistenceIdsQueryState(
+      queryCount: Int,
+      rowCount: Int,
+      latestPid: String,
+      tables: List[String])
 }
 
 class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfgPath: String)
@@ -126,15 +130,15 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
       manifest,
       if (tag.isEmpty) Set.empty else Set(tag))
 
-    stateDao.upsertState(serializedRow)
+    stateDao.upsertState(serializedRow, value)
   }
 
   override def deleteObject(persistenceId: String): Future[Done] =
-    stateDao.deleteStateForRevision(persistenceId, 0L)
+    stateDao.deleteState(persistenceId, 0L)
       .map(_ => Done)(ExecutionContext.parasitic)
 
   override def deleteObject(persistenceId: String, revision: Long): Future[Done] = {
-    stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
+    stateDao.deleteState(persistenceId, revision).map { count =>
       if (count != 1) {
         val msg = if (count == 0) {
           s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
@@ -198,19 +202,28 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
       state.copy(rowCount = state.rowCount + 1, latestPid = pid)
 
     def nextQuery(state: PersistenceIdsQueryState): (PersistenceIdsQueryState, Option[Source[String, NotUsed]]) = {
-      if (state.queryCount == 0L || state.rowCount >= persistenceIdsBufferSize) {
-        val newState = state.copy(rowCount = 0, queryCount = state.queryCount + 1)
+      def next(newState: PersistenceIdsQueryState) = {
+        val newState2 = newState.copy(rowCount = 0, queryCount = newState.queryCount + 1)
 
-        if (state.queryCount != 0 && log.isDebugEnabled())
+        if (newState.queryCount != 0 && log.isDebugEnabled())
           log.debug(
             "persistenceIds query [{}] after [{}]. Found [{}] rows in previous query.",
-            state.queryCount: java.lang.Integer,
-            state.latestPid,
-            state.rowCount: java.lang.Integer)
+            newState.queryCount: java.lang.Integer,
+            newState.latestPid,
+            newState.rowCount: java.lang.Integer)
 
-        newState -> Some(
+        val afterPid = if (newState.latestPid == "") None else Some(newState.latestPid)
+
+        newState2 -> Some(
           stateDao
-            .persistenceIds(if (state.latestPid == "") None else Some(state.latestPid), persistenceIdsBufferSize))
+            .persistenceIdsFromTable(afterPid, persistenceIdsBufferSize, newState.tables.head))
+      }
+
+      if (state.queryCount == 0L || state.rowCount >= persistenceIdsBufferSize) {
+        next(state)
+      } else if (state.tables.tail.nonEmpty) {
+        // continue with next custom table
+        next(state.copy(tables = state.tables.tail, latestPid = ""))
       } else {
         if (log.isDebugEnabled)
           log.debug(
@@ -222,8 +235,11 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
       }
     }
 
+    val customTables = settings.durableStateTableByEntityTypeWithSchema.toList.sortBy(_._1).map(_._2)
+    val tables = settings.durableStateTableWithSchema :: customTables
+
     ContinuousQuery[PersistenceIdsQueryState, String](
-      initialState = PersistenceIdsQueryState(0, 0, ""),
+      initialState = PersistenceIdsQueryState(0, 0, "", tables),
       updateState = updateState,
       delayNextQuery = _ => None,
       nextQuery = state => nextQuery(state))
