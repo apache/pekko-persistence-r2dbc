@@ -489,7 +489,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
   def deleteState(persistenceId: String, revision: Long): Future[Done] = {
     if (revision == 0) {
-      hardDeleteState(persistenceId)
+      hardDeleteState(persistenceId).map(_ => Done)(ExecutionContext.parasitic)
     } else {
       val result = {
         val entityType = PersistenceId.extractEntityType(persistenceId)
