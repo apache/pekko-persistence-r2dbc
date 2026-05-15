@@ -38,6 +38,7 @@ import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
 import pekko.persistence.typed.PersistenceId
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.projection.BySlicesSourceProvider
 import pekko.projection.HandlerRecoveryStrategy
 import pekko.projection.ProjectionBehavior
@@ -279,7 +280,9 @@ class R2dbcTimestampOffsetProjectionSpec
       env.timestamp,
       env.eventMetadata,
       env.entityType,
-      env.slice)
+      env.slice,
+      env.filtered,
+      source = EnvelopeOrigin.SourceBacktracking)
 
   def createEnvelopes(pid: Pid, numberOfEvents: Int): immutable.IndexedSeq[EventEnvelope[String]] = {
     (1 to numberOfEvents).map { n =>
@@ -360,16 +363,18 @@ class R2dbcTimestampOffsetProjectionSpec
     }
   }
 
-  def markAsNotUsed[A](env: EventEnvelope[A]): EventEnvelope[A] = {
-    new EventEnvelope(
+  def markAsFilteredEvent[A](env: EventEnvelope[A]): EventEnvelope[A] = {
+    new EventEnvelope[A](
       env.offset,
       env.persistenceId,
       env.sequenceNr,
       env.eventOption,
       env.timestamp,
-      eventMetadata = Some(NotUsed),
+      env.eventMetadata,
       env.entityType,
-      env.slice)
+      env.slice,
+      filtered = true,
+      env.source)
   }
 
   "A R2DBC exactly-once projection with TimestampOffset" must {
@@ -590,7 +595,7 @@ class R2dbcTimestampOffsetProjectionSpec
 
       val envelopes = createEnvelopes(pid, 6).map { env =>
         if (env.event == "e3" || env.event == "e4" || env.event == "e6")
-          markAsNotUsed(env)
+          markAsFilteredEvent(env)
         else
           env
       }
@@ -715,7 +720,7 @@ class R2dbcTimestampOffsetProjectionSpec
       val projectionId = genRandomProjectionId()
       val envelopes = createEnvelopes(pid, 6).map { env =>
         if (env.event == "e3" || env.event == "e4" || env.event == "e6")
-          markAsNotUsed(env)
+          markAsFilteredEvent(env)
         else
           env
       }
@@ -874,7 +879,7 @@ class R2dbcTimestampOffsetProjectionSpec
       val projectionId = genRandomProjectionId()
       val envelopes = createEnvelopes(pid, 6).map { env =>
         if (env.event == "e3" || env.event == "e4" || env.event == "e6")
-          markAsNotUsed(env)
+          markAsFilteredEvent(env)
         else
           env
       }
@@ -1025,7 +1030,7 @@ class R2dbcTimestampOffsetProjectionSpec
       val projectionId = genRandomProjectionId()
       val envelopes = createEnvelopes(pid, 6).map { env =>
         if (env.event == "e3" || env.event == "e4" || env.event == "e6")
-          markAsNotUsed(env)
+          markAsFilteredEvent(env)
         else
           env
       }
@@ -1214,7 +1219,7 @@ class R2dbcTimestampOffsetProjectionSpec
 
       val envelopes = createEnvelopes(pid, 6).map { env =>
         if (env.event == "e3" || env.event == "e4" || env.event == "e6")
-          markAsNotUsed(env)
+          markAsFilteredEvent(env)
         else
           env
       }
@@ -1350,7 +1355,7 @@ class R2dbcTimestampOffsetProjectionSpec
       val projectionId = genRandomProjectionId()
       val envelopes = createEnvelopes(pid, 6).map { env =>
         if (env.event == "e3" || env.event == "e4" || env.event == "e6")
-          markAsNotUsed(env)
+          markAsFilteredEvent(env)
         else
           env
       }

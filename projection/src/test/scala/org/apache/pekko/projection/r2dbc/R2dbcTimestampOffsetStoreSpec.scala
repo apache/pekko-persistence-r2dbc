@@ -30,6 +30,7 @@ import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.EventTimestampQuery
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
 import pekko.persistence.typed.PersistenceId
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.projection.BySlicesSourceProvider
 import pekko.projection.ProjectionId
 import pekko.projection.internal.ManagementState
@@ -110,7 +111,22 @@ class R2dbcTimestampOffsetStoreSpec
       env.timestamp,
       env.eventMetadata,
       env.entityType,
-      env.slice)
+      env.slice,
+      env.filtered,
+      source = EnvelopeOrigin.SourceBacktracking)
+
+  def filteredEnvelope(env: EventEnvelope[String]): EventEnvelope[String] =
+    new EventEnvelope[String](
+      env.offset,
+      env.persistenceId,
+      env.sequenceNr,
+      env.eventOption,
+      env.timestamp,
+      env.eventMetadata,
+      env.entityType,
+      env.slice,
+      filtered = true,
+      env.source)
 
   def createUpdatedDurableState(
       pid: Pid,
@@ -379,7 +395,22 @@ class R2dbcTimestampOffsetStoreSpec
       offsetStore.isAccepted(backtrackingEnvelope(env2)).futureValue shouldBe true
       offsetStore.addInflight(env2)
       // but not when gap
-      offsetStore.isAccepted(createEnvelope("p4", 4L, startTime.plusMillis(3), "e4-4")).futureValue shouldBe false
+      val envP4SeqNr4 = createEnvelope("p4", 4L, startTime.plusMillis(3), "e4-4")
+      offsetStore.isAccepted(envP4SeqNr4).futureValue shouldBe false
+      // hard reject when gap from backtracking
+      (offsetStore
+        .isAccepted(backtrackingEnvelope(envP4SeqNr4))
+        .failed
+        .futureValue
+        .getMessage should fullyMatch).regex("Rejected envelope from backtracking.*unexpected sequence number.*")
+      // reject filtered event when gap
+      offsetStore.isAccepted(filteredEnvelope(envP4SeqNr4)).futureValue shouldBe false
+      // hard reject when filtered event with gap from backtracking
+      (offsetStore
+        .isAccepted(backtrackingEnvelope(filteredEnvelope(envP4SeqNr4)))
+        .failed
+        .futureValue
+        .getMessage should fullyMatch).regex("Rejected envelope from backtracking.*unexpected sequence number.*")
       // and not if later already inflight, seqNr 2 was accepted
       offsetStore.isAccepted(createEnvelope("p4", 1L, startTime.plusMillis(1), "e4-1")).futureValue shouldBe false
 
@@ -414,6 +445,8 @@ class R2dbcTimestampOffsetStoreSpec
       // reject unknown
       val env7 = createEnvelope("p5", 7L, startTime.plusMillis(8), "e5-7")
       offsetStore.isAccepted(env7).futureValue shouldBe false
+      (offsetStore.isAccepted(backtrackingEnvelope(env7)).failed.futureValue.getMessage should fullyMatch)
+        .regex("Rejected envelope from backtracking.*unknown sequence number.*")
       // but ok when previous is old
       eventTimestampQueryClock.setInstant(startTime.minusSeconds(3600))
       val env8 = createEnvelope("p5", 7L, startTime.plusMillis(5), "e5-7")
@@ -424,6 +457,22 @@ class R2dbcTimestampOffsetStoreSpec
       val env9 = createEnvelope("p5", 8L, startTime.plusMillis(9), "e5-8")
       offsetStore.isAccepted(env9).futureValue shouldBe true
       offsetStore.addInflight(env9)
+
+      // reject unknown filtered
+      val env10 = filteredEnvelope(createEnvelope("p6", 7L, startTime.plusMillis(10), "e6-7"))
+      offsetStore.isAccepted(env10).futureValue shouldBe false
+      // hard reject when unknown from backtracking
+      (offsetStore
+        .isAccepted(backtrackingEnvelope(env10))
+        .failed
+        .futureValue
+        .getMessage should fullyMatch).regex("Rejected envelope from backtracking.*unknown sequence number.*")
+      // hard reject when unknown filtered event from backtracking
+      (offsetStore
+        .isAccepted(backtrackingEnvelope(filteredEnvelope(env10)))
+        .failed
+        .futureValue
+        .getMessage should fullyMatch).regex("Rejected envelope from backtracking.*unknown sequence number.*")
 
       // it's keeping the inflight that are not in the "stored" state
       offsetStore.getInflight() shouldBe Map("p1" -> 4L, "p3" -> 8, "p4" -> 2L, "p5" -> 8)
