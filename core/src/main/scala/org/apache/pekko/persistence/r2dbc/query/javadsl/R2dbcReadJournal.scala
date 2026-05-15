@@ -29,10 +29,14 @@ import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.query.Offset
 import pekko.persistence.query.javadsl._
 import pekko.persistence.query.typed.EventEnvelope
-import pekko.persistence.query.typed.javadsl.CurrentEventsBySliceQuery
-import pekko.persistence.query.typed.javadsl.EventTimestampQuery
-import pekko.persistence.query.typed.javadsl.EventsBySliceQuery
-import pekko.persistence.query.typed.javadsl.LoadEventQuery
+import pekko.persistence.query.typed.javadsl.{
+  CurrentEventsByPersistenceIdTypedQuery,
+  CurrentEventsBySliceQuery,
+  EventTimestampQuery,
+  EventsByPersistenceIdTypedQuery,
+  EventsBySliceQuery,
+  LoadEventQuery
+}
 import pekko.persistence.r2dbc.query.scaladsl
 import pekko.stream.javadsl.Source
 
@@ -47,7 +51,9 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
     with EventTimestampQuery
     with LoadEventQuery
     with CurrentEventsByPersistenceIdQuery
+    with CurrentEventsByPersistenceIdTypedQuery
     with EventsByPersistenceIdQuery
+    with EventsByPersistenceIdTypedQuery
     with CurrentPersistenceIdsQuery
     with PagedPersistenceIdsQuery {
 
@@ -82,11 +88,23 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
       toSequenceNr: Long): Source[ClassicEventEnvelope, NotUsed] =
     delegate.currentEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr).asJava
 
+  override def currentEventsByPersistenceIdTyped[Event](
+      persistenceId: String,
+      fromSequenceNr: Long,
+      toSequenceNr: Long): Source[EventEnvelope[Event], NotUsed] =
+    delegate.currentEventsByPersistenceIdTyped[Event](persistenceId, fromSequenceNr, toSequenceNr).asJava
+
   override def eventsByPersistenceId(
       persistenceId: String,
       fromSequenceNr: Long,
       toSequenceNr: Long): Source[ClassicEventEnvelope, NotUsed] =
     delegate.eventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr).asJava
+
+  override def eventsByPersistenceIdTyped[Event](
+      persistenceId: String,
+      fromSequenceNr: Long,
+      toSequenceNr: Long): Source[EventEnvelope[Event], NotUsed] =
+    delegate.eventsByPersistenceIdTyped[Event](persistenceId, fromSequenceNr, toSequenceNr).asJava
 
   override def currentPersistenceIds(): Source[String, NotUsed] =
     delegate.currentPersistenceIds().asJava

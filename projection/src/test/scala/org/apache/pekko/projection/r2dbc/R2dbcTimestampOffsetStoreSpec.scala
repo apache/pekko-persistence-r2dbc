@@ -34,6 +34,7 @@ import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.projection.BySlicesSourceProvider
 import pekko.projection.ProjectionId
 import pekko.projection.internal.ManagementState
+import pekko.projection.r2dbc.internal.OffsetPidSeqNr
 import pekko.projection.r2dbc.internal.R2dbcOffsetStore
 import pekko.projection.r2dbc.internal.R2dbcOffsetStore.Pid
 import pekko.projection.r2dbc.internal.R2dbcOffsetStore.Record
@@ -150,33 +151,34 @@ class R2dbcTimestampOffsetStoreSpec
 
       tick()
       val offset1 = TimestampOffset(clock.instant(), Map("p1" -> 3L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
       val readOffset1 = offsetStore.readOffset[TimestampOffset]()
       readOffset1.futureValue shouldBe Some(offset1)
 
       tick()
       val offset2 = TimestampOffset(clock.instant(), Map("p1" -> 4L))
-      offsetStore.saveOffset(offset2).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p1", 4L)).futureValue
       val readOffset2 = offsetStore.readOffset[TimestampOffset]()
       readOffset2.futureValue shouldBe Some(offset2) // yep, saveOffset overwrites previous
     }
 
-    "save TimestampOffset with several entries" in {
+    "save TimestampOffset with several seen entries" in {
       val projectionId = genRandomProjectionId()
       val offsetStore = createOffsetStore(projectionId)
 
       tick()
       val offset1 = TimestampOffset(clock.instant(), Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
       val readOffset1 = offsetStore.readOffset[TimestampOffset]()
-      readOffset1.futureValue shouldBe Some(offset1)
+      val expectedOffset1 = offset1.copy(seen = Map("p1" -> 3L))
+      readOffset1.futureValue shouldBe Some(expectedOffset1)
 
       tick()
       val offset2 = TimestampOffset(clock.instant(), Map("p1" -> 4L, "p3" -> 6L, "p4" -> 9L))
-      offsetStore.saveOffset(offset2).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p3", 6L)).futureValue
       val readOffset2 = offsetStore.readOffset[TimestampOffset]()
-      // p2 is not included in read offset because it wasn't updated and has earlier timestamp
-      readOffset2.futureValue shouldBe Some(offset2)
+      val expectedOffset2 = offset2.copy(seen = Map("p3" -> 6L))
+      readOffset2.futureValue shouldBe Some(expectedOffset2)
     }
 
     "save TimestampOffset when same timestamp" in {
@@ -185,13 +187,16 @@ class R2dbcTimestampOffsetStoreSpec
 
       tick()
       val offset1 = TimestampOffset(clock.instant(), Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p2", 1L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p3", 5L)).futureValue
       val readOffset1 = offsetStore.readOffset[TimestampOffset]()
       readOffset1.futureValue shouldBe Some(offset1)
 
       // not tick, same timestamp
       val offset2 = TimestampOffset(clock.instant(), Map("p2" -> 2L, "p4" -> 9L))
-      offsetStore.saveOffset(offset2).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p2", 2L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p4", 9L)).futureValue
       val readOffset2 = offsetStore.readOffset[TimestampOffset]()
       // all should be included since same timestamp
       val expectedOffset2 = TimestampOffset(clock.instant(), Map("p1" -> 3L, "p2" -> 2L, "p3" -> 5L, "p4" -> 9L))
@@ -200,7 +205,7 @@ class R2dbcTimestampOffsetStoreSpec
       // saving new with later timestamp
       tick()
       val offset3 = TimestampOffset(clock.instant(), Map("p1" -> 4L))
-      offsetStore.saveOffset(offset3).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset3, "p1", 4L)).futureValue
       val readOffset3 = offsetStore.readOffset[TimestampOffset]()
       // then it should only contain that entry
       readOffset3.futureValue shouldBe Some(offset3)
@@ -218,11 +223,19 @@ class R2dbcTimestampOffsetStoreSpec
       val offset3 = TimestampOffset(clock.instant(), Map("p6" -> 6L))
       tick()
       val offset4 = TimestampOffset(clock.instant(), Map("p1" -> 4L, "p3" -> 6L, "p4" -> 9L))
-      val offsetsBatch1 = Vector(offset1, offset2, offset3, offset4)
+      val offsetsBatch1 = Vector(
+        OffsetPidSeqNr(offset1, "p1", 3L),
+        OffsetPidSeqNr(offset1, "p2", 1L),
+        OffsetPidSeqNr(offset1, "p3", 5L),
+        OffsetPidSeqNr(offset2, "p5", 1L),
+        OffsetPidSeqNr(offset3, "p6", 6L),
+        OffsetPidSeqNr(offset4, "p1", 4L),
+        OffsetPidSeqNr(offset4, "p3", 6L),
+        OffsetPidSeqNr(offset4, "p4", 9L))
 
       offsetStore.saveOffsets(offsetsBatch1).futureValue
       val readOffset1 = offsetStore.readOffset[TimestampOffset]()
-      readOffset1.futureValue shouldBe Some(offsetsBatch1.last)
+      readOffset1.futureValue shouldBe Some(offsetsBatch1.last.offset)
       offsetStore.getState().byPid("p1").seqNr shouldBe 4L
       offsetStore.getState().byPid("p2").seqNr shouldBe 1L
       offsetStore.getState().byPid("p3").seqNr shouldBe 6L
@@ -232,12 +245,12 @@ class R2dbcTimestampOffsetStoreSpec
 
       tick()
       val offset5 = TimestampOffset(clock.instant(), Map("p1" -> 5L))
-      offsetStore.saveOffsets(Vector(offset5)).futureValue
+      offsetStore.saveOffsets(Vector(OffsetPidSeqNr(offset5, "p1", 5L))).futureValue
 
       tick()
       // duplicate
       val offset6 = TimestampOffset(clock.instant(), Map("p2" -> 1L))
-      offsetStore.saveOffsets(Vector(offset6)).futureValue
+      offsetStore.saveOffsets(Vector(OffsetPidSeqNr(offset6, "p2", 1L))).futureValue
 
       tick()
       val offset7 = TimestampOffset(clock.instant(), Map("p1" -> 6L))
@@ -245,11 +258,12 @@ class R2dbcTimestampOffsetStoreSpec
       val offset8 = TimestampOffset(clock.instant(), Map("p1" -> 7L))
       tick()
       val offset9 = TimestampOffset(clock.instant(), Map("p1" -> 8L))
-      val offsetsBatch2 = Vector(offset7, offset8, offset9)
+      val offsetsBatch2 =
+        Vector(OffsetPidSeqNr(offset7, "p1", 6L), OffsetPidSeqNr(offset8, "p1", 7L), OffsetPidSeqNr(offset9, "p1", 8L))
 
       offsetStore.saveOffsets(offsetsBatch2).futureValue
       val readOffset2 = offsetStore.readOffset[TimestampOffset]()
-      readOffset2.futureValue shouldBe Some(offsetsBatch2.last)
+      readOffset2.futureValue shouldBe Some(offsetsBatch2.last.offset)
       offsetStore.getState().byPid("p1").seqNr shouldBe 8L
       offsetStore.getState().byPid("p2").seqNr shouldBe 1L
       offsetStore.getState().byPid("p3").seqNr shouldBe 6L
@@ -264,13 +278,13 @@ class R2dbcTimestampOffsetStoreSpec
 
       tick()
       val offset1 = TimestampOffset(clock.instant(), Map("p1" -> 3L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
       val readOffset1 = offsetStore.readOffset[TimestampOffset]()
       readOffset1.futureValue shouldBe Some(offset1)
 
       clock.setInstant(clock.instant().minusMillis(1))
       val offset2 = TimestampOffset(clock.instant(), Map("p1" -> 2L))
-      offsetStore.saveOffset(offset2).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p1", 2L)).futureValue
       val readOffset2 = offsetStore.readOffset[TimestampOffset]()
       readOffset2.futureValue shouldBe Some(offset1) // keeping offset1
     }
@@ -306,16 +320,16 @@ class R2dbcTimestampOffsetStoreSpec
 
       tick()
       val offset1 = TimestampOffset(clock.instant(), Map(p1 -> 3L))
-      offsetStore0.saveOffset(offset1).futureValue
+      offsetStore0.saveOffset(OffsetPidSeqNr(offset1, p1, 3L)).futureValue
       tick()
       val offset2 = TimestampOffset(clock.instant(), Map(p2 -> 4L))
-      offsetStore0.saveOffset(offset2).futureValue
+      offsetStore0.saveOffset(OffsetPidSeqNr(offset2, p2, 4L)).futureValue
       tick()
       val offset3 = TimestampOffset(clock.instant(), Map(p3 -> 7L))
-      offsetStore0.saveOffset(offset3).futureValue
+      offsetStore0.saveOffset(OffsetPidSeqNr(offset3, p3, 7L)).futureValue
       tick()
       val offset4 = TimestampOffset(clock.instant(), Map(p4 -> 5L))
-      offsetStore0.saveOffset(offset4).futureValue
+      offsetStore0.saveOffset(OffsetPidSeqNr(offset4, p4, 5L)).futureValue
 
       val offsetStore1 =
         R2dbcOffsetStore.fromConfig(
@@ -344,13 +358,17 @@ class R2dbcTimestampOffsetStoreSpec
 
       tick()
       val offset1 = TimestampOffset(clock.instant(), Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p2", 1L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p3", 5L)).futureValue
       tick()
       val offset2 = TimestampOffset(clock.instant(), Map("p1" -> 4L, "p3" -> 6L, "p4" -> 9L))
-      offsetStore.saveOffset(offset2).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p1", 4L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p3", 6L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset2, "p4", 9L)).futureValue
       tick()
       val offset3 = TimestampOffset(clock.instant(), Map("p5" -> 10L))
-      offsetStore.saveOffset(offset3).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset3, "p5", 10L)).futureValue
 
       offsetStore.isDuplicate(Record("p5", 10, offset3.timestamp)) shouldBe true
       offsetStore.isDuplicate(Record("p1", 4, offset2.timestamp)) shouldBe true
@@ -378,7 +396,9 @@ class R2dbcTimestampOffsetStoreSpec
 
       val startTime = TestClock.nowMicros().instant()
       val offset1 = TimestampOffset(startTime, Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p2", 1L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p3", 5L)).futureValue
 
       // seqNr 1 is always accepted
       val env1 = createEnvelope("p4", 1L, startTime.plusMillis(1), "e4-1")
@@ -477,8 +497,12 @@ class R2dbcTimestampOffsetStoreSpec
       // it's keeping the inflight that are not in the "stored" state
       offsetStore.getInflight() shouldBe Map("p1" -> 4L, "p3" -> 8, "p4" -> 2L, "p5" -> 8)
       // and they are removed from inflight once they have been stored
-      offsetStore.saveOffset(TimestampOffset(startTime.plusMillis(2), Map("p4" -> 2L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plusMillis(9), Map("p5" -> 8L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plusMillis(2), Map("p4" -> 2L)), "p4", 2L))
+        .futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plusMillis(9), Map("p5" -> 8L)), "p5", 8L))
+        .futureValue
       offsetStore.getInflight() shouldBe Map("p1" -> 4L, "p3" -> 8)
     }
 
@@ -496,7 +520,9 @@ class R2dbcTimestampOffsetStoreSpec
       offsetStore.isAccepted(envelope1).futureValue shouldBe true
       offsetStore.addInflight(envelope1)
       offsetStore.getInflight() shouldBe Map("p1" -> 1L)
-      offsetStore.saveOffset(TimestampOffset(startTime.plusMillis(1), Map("p1" -> 1L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plusMillis(1), Map("p1" -> 1L)), "p1", 1L))
+        .futureValue
       offsetStore.getInflight() shouldBe empty
 
       // seqNr 2 is accepts since it follows seqNr 1 that is stored in state
@@ -517,7 +543,9 @@ class R2dbcTimestampOffsetStoreSpec
       offsetStore.getInflight() shouldBe Map("p1" -> 3L)
 
       // and they are removed from inflight once they have been stored
-      offsetStore.saveOffset(TimestampOffset(startTime.plusMillis(2), Map("p1" -> 3L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plusMillis(2), Map("p1" -> 3L)), "p1", 3L))
+        .futureValue
       offsetStore.getInflight() shouldBe empty
     }
 
@@ -527,7 +555,9 @@ class R2dbcTimestampOffsetStoreSpec
       val offsetStore = createOffsetStore(projectionId)
 
       val offset1 = TimestampOffset(startTime, Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p2", 1L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p3", 5L)).futureValue
 
       // seqNr 1 is always accepted
       val env1 = createEnvelope("p4", 1L, startTime.plusMillis(1), "e4-1")
@@ -550,7 +580,9 @@ class R2dbcTimestampOffsetStoreSpec
 
       val startTime = TestClock.nowMicros().instant()
       val offset1 = TimestampOffset(startTime, Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
-      offsetStore.saveOffset(offset1).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p1", 3L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p2", 1L)).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(offset1, "p3", 5L)).futureValue
 
       // seqNr 1 is always accepted
       val env1 = createUpdatedDurableState("p4", 1L, startTime.plusMillis(1), "s4-1")
@@ -603,8 +635,12 @@ class R2dbcTimestampOffsetStoreSpec
       // it's keeping the inflight that are not in the "stored" state
       offsetStore.getInflight() shouldBe Map("p1" -> 4L, "p3" -> 20, "p4" -> 2L, "p5" -> 7)
       // and they are removed from inflight once they have been stored
-      offsetStore.saveOffset(TimestampOffset(startTime.plusMillis(2), Map("p4" -> 2L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plusMillis(9), Map("p5" -> 8L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plusMillis(2), Map("p4" -> 2L)), "p4", 2L))
+        .futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plusMillis(9), Map("p5" -> 8L)), "p5", 8L))
+        .futureValue
       offsetStore.getInflight() shouldBe Map("p1" -> 4L, "p3" -> 20)
     }
 
@@ -617,36 +653,68 @@ class R2dbcTimestampOffsetStoreSpec
       val startTime = TestClock.nowMicros().instant()
       log.debug("Start time [{}]", startTime)
 
-      offsetStore.saveOffset(TimestampOffset(startTime, Map("p1" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(JDuration.ofSeconds(1)), Map("p2" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(JDuration.ofSeconds(2)), Map("p3" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(evictInterval), Map("p4" -> 1L))).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(TimestampOffset(startTime, Map("p1" -> 1L)), "p1", 1L)).futureValue
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(evictInterval).plus(JDuration.ofSeconds(1)), Map("p4" -> 1L)))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(JDuration.ofSeconds(1)), Map("p2" -> 1L)), "p2", 1L))
         .futureValue
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(evictInterval).plus(JDuration.ofSeconds(2)), Map("p5" -> 1L)))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(JDuration.ofSeconds(2)), Map("p3" -> 1L)), "p3", 1L))
         .futureValue
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(evictInterval).plus(JDuration.ofSeconds(3)), Map("p6" -> 1L)))
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(evictInterval), Map("p4" -> 1L)), "p4", 1L))
+        .futureValue
+      offsetStore
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(evictInterval).plus(JDuration.ofSeconds(1)), Map("p4" -> 1L)),
+            "p4",
+            1L))
+        .futureValue
+      offsetStore
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(evictInterval).plus(JDuration.ofSeconds(2)), Map("p5" -> 1L)),
+            "p5",
+            1L))
+        .futureValue
+      offsetStore
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(evictInterval).plus(JDuration.ofSeconds(3)), Map("p6" -> 1L)),
+            "p6",
+            1L))
         .futureValue
       offsetStore.getState().size shouldBe 6
 
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(timeWindow.minusSeconds(10)), Map("p7" -> 1L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(10)), Map("p7" -> 1L)), "p7", 1L))
+        .futureValue
       offsetStore.getState().size shouldBe 7 // nothing evicted yet
 
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(timeWindow.plus(evictInterval).minusSeconds(3)), Map("p8" -> 1L)))
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(timeWindow.plus(evictInterval).minusSeconds(3)), Map("p8" -> 1L)),
+            "p8",
+            1L))
         .futureValue
       offsetStore.getState().size shouldBe 8 // still nothing evicted yet
 
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(timeWindow.plus(evictInterval).plusSeconds(1)), Map("p8" -> 2L)))
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(timeWindow.plus(evictInterval).plusSeconds(1)), Map("p8" -> 2L)),
+            "p8",
+            2L))
         .futureValue
       offsetStore.getState().byPid.keySet shouldBe Set("p5", "p6", "p7", "p8")
 
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(timeWindow.plus(evictInterval).plusSeconds(20)), Map("p8" -> 3L)))
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(timeWindow.plus(evictInterval).plusSeconds(20)), Map("p8" -> 3L)),
+            "p8",
+            3L))
         .futureValue
       offsetStore.getState().byPid.keySet shouldBe Set("p7", "p8")
     }
@@ -660,23 +728,37 @@ class R2dbcTimestampOffsetStoreSpec
       val startTime = TestClock.nowMicros().instant()
       log.debug("Start time [{}]", startTime)
 
-      offsetStore.saveOffset(TimestampOffset(startTime, Map("p1" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(JDuration.ofSeconds(1)), Map("p2" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(JDuration.ofSeconds(2)), Map("p3" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(JDuration.ofSeconds(3)), Map("p4" -> 1L))).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(TimestampOffset(startTime, Map("p1" -> 1L)), "p1", 1L)).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(JDuration.ofSeconds(1)), Map("p2" -> 1L)), "p2", 1L))
+        .futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(JDuration.ofSeconds(2)), Map("p3" -> 1L)), "p3", 1L))
+        .futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(JDuration.ofSeconds(3)), Map("p4" -> 1L)), "p4", 1L))
+        .futureValue
       offsetStore.deleteOldTimestampOffsets().futureValue shouldBe 0
       offsetStore.readOffset().futureValue // this will load from database
       offsetStore.getState().size shouldBe 4
 
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(timeWindow.minusSeconds(2)), Map("p5" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(timeWindow.minusSeconds(1)), Map("p6" -> 1L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(2)), Map("p5" -> 1L)), "p5", 1L))
+        .futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.minusSeconds(1)), Map("p6" -> 1L)), "p6", 1L))
+        .futureValue
       // nothing deleted yet
       offsetStore.deleteOldTimestampOffsets().futureValue shouldBe 0
       offsetStore.readOffset().futureValue // this will load from database
       offsetStore.getState().size shouldBe 6
 
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p7" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(timeWindow.plusSeconds(2)), Map("p8" -> 1L))).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p7" -> 1L)), "p7", 1L))
+        .futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(2)), Map("p8" -> 1L)), "p8", 1L))
+        .futureValue
       offsetStore.deleteOldTimestampOffsets().futureValue shouldBe 2
       offsetStore.readOffset().futureValue // this will load from database
       offsetStore.getState().byPid.keySet shouldBe Set("p3", "p4", "p5", "p6", "p7", "p8")
@@ -691,15 +773,21 @@ class R2dbcTimestampOffsetStoreSpec
       val startTime = TestClock.nowMicros().instant()
       log.debug("Start time [{}]", startTime)
 
-      offsetStore.saveOffset(TimestampOffset(startTime, Map("p1" -> 1L))).futureValue
-      offsetStore.saveOffset(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p2" -> 1L))).futureValue
+      offsetStore.saveOffset(OffsetPidSeqNr(TimestampOffset(startTime, Map("p1" -> 1L)), "p1", 1L)).futureValue
+      offsetStore
+        .saveOffset(OffsetPidSeqNr(TimestampOffset(startTime.plus(timeWindow.plusSeconds(1)), Map("p2" -> 1L)), "p2", 1L))
+        .futureValue
       eventually {
         offsetStore.readOffset().futureValue // this will load from database
         offsetStore.getState().byPid.keySet shouldBe Set("p2")
       }
 
       offsetStore
-        .saveOffset(TimestampOffset(startTime.plus(timeWindow.multipliedBy(2).plusSeconds(2)), Map("p3" -> 1L)))
+        .saveOffset(
+          OffsetPidSeqNr(
+            TimestampOffset(startTime.plus(timeWindow.multipliedBy(2).plusSeconds(2)), Map("p3" -> 1L)),
+            "p3",
+            1L))
         .futureValue
       eventually {
         offsetStore.readOffset().futureValue // this will load from database
@@ -720,7 +808,9 @@ class R2dbcTimestampOffsetStoreSpec
       tick()
       val offset4 = TimestampOffset(clock.instant(), Map("p4" -> 40L))
 
-      offsetStore.saveOffsets(Vector(offset1, offset4)).futureValue
+      offsetStore
+        .saveOffsets(Vector(OffsetPidSeqNr(offset1, "p1", 10L), OffsetPidSeqNr(offset4, "p4", 40L)))
+        .futureValue
 
       // offset without any seen pid/seqNr
       offsetStore.managementSetOffset(TimestampOffset(t2, seen = Map.empty)).futureValue
@@ -745,7 +835,7 @@ class R2dbcTimestampOffsetStoreSpec
       tick()
       val offset2 = TimestampOffset(clock.instant(), Map("p2" -> 4L))
 
-      offsetStore.saveOffsets(Vector(offset1, offset2)).futureValue
+      offsetStore.saveOffsets(Vector(OffsetPidSeqNr(offset1, "p1", 3L), OffsetPidSeqNr(offset2, "p2", 4L))).futureValue
 
       offsetStore.managementClearOffset().futureValue
       offsetStore.readOffset[TimestampOffset]().futureValue shouldBe None

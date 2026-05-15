@@ -28,6 +28,7 @@ import pekko.annotation.InternalApi
 import pekko.event.Logging
 import pekko.event.LoggingAdapter
 import pekko.persistence.query.DeletedDurableState
+import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.LoadEventQuery
@@ -158,6 +159,25 @@ private[projection] object R2dbcProjectionImpl {
     }
   }
 
+  private def extractOffsetPidSeqNr[Offset, Envelope](
+      sourceProvider: SourceProvider[Offset, Envelope],
+      envelope: Envelope): OffsetPidSeqNr =
+    extractOffsetPidSeqNr(sourceProvider.extractOffset(envelope), envelope)
+
+  private def extractOffsetPidSeqNr[Offset, Envelope](offset: Offset, envelope: Envelope): OffsetPidSeqNr = {
+    // we could define a new trait for the SourceProvider to implement this in case other (custom) envelope types are needed
+    envelope match {
+      case env: EventEnvelope[_]         => OffsetPidSeqNr(offset, env.persistenceId, env.sequenceNr)
+      case chg: UpdatedDurableState[_]   => OffsetPidSeqNr(offset, chg.persistenceId, chg.revision)
+      case del: DeletedDurableState[_]   => OffsetPidSeqNr(offset, del.persistenceId, del.revision)
+      case change: DurableStateChange[_] =>
+        // in case additional types are added
+        throw new IllegalArgumentException(
+          s"DurableStateChange [${change.getClass.getName}] not implemented yet. Please report bug at https://github.com/apache/pekko-persistence-r2dbc/issues")
+      case _ => OffsetPidSeqNr(offset)
+    }
+  }
+
   private[projection] def adaptedHandlerForExactlyOnce[Offset, Envelope](
       sourceProvider: SourceProvider[Offset, Envelope],
       handlerFactory: () => R2dbcHandler[Envelope],
@@ -169,11 +189,11 @@ private[projection] object R2dbcProjectionImpl {
           offsetStore.isAccepted(envelope).flatMap {
             case true =>
               if (isFilteredEvent(envelope)) {
-                val offset = sourceProvider.extractOffset(envelope)
+                val offset = extractOffsetPidSeqNr(sourceProvider, envelope)
                 offsetStore.saveOffset(offset)
               } else {
                 loadEnvelope(envelope, sourceProvider).flatMap { loadedEnvelope =>
-                  val offset = sourceProvider.extractOffset(loadedEnvelope)
+                  val offset = extractOffsetPidSeqNr(sourceProvider, loadedEnvelope)
                   r2dbcExecutor.withConnection("exactly-once handler") { conn =>
                     // run users handler
                     val session = new R2dbcSession(conn)
@@ -208,7 +228,7 @@ private[projection] object R2dbcProjectionImpl {
           } else {
             Future.sequence(acceptedEnvelopes.map(env => loadEnvelope(env, sourceProvider))).flatMap {
               loadedEnvelopes =>
-                val offsets = loadedEnvelopes.iterator.map(sourceProvider.extractOffset).toVector
+                val offsets = loadedEnvelopes.iterator.map(extractOffsetPidSeqNr(sourceProvider, _)).toVector
                 val filteredEnvelopes = loadedEnvelopes.filterNot(isFilteredEvent)
                 if (filteredEnvelopes.isEmpty) {
                   offsetStore.saveOffsets(offsets)
@@ -512,8 +532,12 @@ private[projection] class R2dbcProjectionImpl[Offset, Envelope](
       offsetStore.readOffset()
 
     // Called from InternalProjectionState.saveOffsetAndReport
-    override def saveOffset(projectionId: ProjectionId, offset: Offset): Future[Done] =
-      offsetStore.saveOffset(offset)
+    override def saveOffset(projectionId: ProjectionId, offset: Offset): Future[Done] = {
+      // need the envelope to be able to call offsetStore.saveOffset
+      // FIXME maybe we can cleanup this mess when moving R2dbcProjection to the Pekko Projections repository?
+      throw new IllegalStateException(
+        "Unexpected call to saveOffset. It should have called saveOffsetAndReport. Please report bug at https://github.com/apache/pekko-persistence-r2dbc/issues")
+    }
 
     override protected def saveOffsetAndReport(
         projectionId: ProjectionId,
@@ -523,7 +547,18 @@ private[projection] class R2dbcProjectionImpl[Offset, Envelope](
       val envelope = projectionContext.envelope
 
       if (offsetStore.isInflight(envelope) || isExactlyOnceWithSkip) {
-        super.saveOffsetAndReport(projectionId, projectionContext, batchSize)
+        val offset = extractOffsetPidSeqNr(projectionContext.offset, envelope)
+        offsetStore
+          .saveOffset(offset)
+          .map { done =>
+            try {
+              statusObserver.offsetProgress(projectionId, envelope)
+            } catch {
+              case NonFatal(_) => // ignore
+            }
+            getTelemetry().onOffsetStored(batchSize)
+            done
+          }
       } else {
         FutureDone
       }
@@ -547,7 +582,7 @@ private[projection] class R2dbcProjectionImpl[Offset, Envelope](
       if (acceptedContexts.isEmpty) {
         FutureDone
       } else {
-        val offsets = acceptedContexts.map(_.offset)
+        val offsets = acceptedContexts.map(ctx => extractOffsetPidSeqNr(ctx.offset, ctx.envelope))
         offsetStore
           .saveOffsets(offsets)
           .map { done =>
