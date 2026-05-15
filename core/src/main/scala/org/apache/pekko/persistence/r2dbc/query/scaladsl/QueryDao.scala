@@ -31,6 +31,7 @@ import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
 import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
+import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
@@ -242,7 +243,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
       limit: Int): Future[Seq[Bucket]] = {
 
     val toTimestamp = {
-      val now = Instant.now() // not important to use database time
+      val now = InstantFactory.now() // not important to use database time
       if (fromTimestamp == Instant.EPOCH)
         now
       else {

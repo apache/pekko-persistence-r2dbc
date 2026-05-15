@@ -286,6 +286,24 @@ object ConnectionFactorySettings {
  * INTERNAL API
  */
 @InternalStableApi
+final class CleanupSettings(val config: Config) {
+  val logProgressEvery: Int = config.getInt("log-progress-every")
+  val eventsJournalDeleteBatchSize: Int = config.getInt("events-journal-delete-batch-size")
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
+object CleanupSettings {
+  def apply(config: Config): CleanupSettings =
+    new CleanupSettings(config)
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalStableApi
 trait UseConnnectionFactory {
   def config: Config
 

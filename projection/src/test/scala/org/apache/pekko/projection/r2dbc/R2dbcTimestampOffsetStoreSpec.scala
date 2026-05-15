@@ -71,7 +71,7 @@ class R2dbcTimestampOffsetStoreSpec
 
   override def typedSystem: ActorSystem[_] = system
 
-  private val clock = new TestClock
+  private val clock = TestClock.nowMicros()
   def tick(): Unit = clock.tick(JDuration.ofMillis(1))
 
   private val log = LoggerFactory.getLogger(getClass)
@@ -373,10 +373,10 @@ class R2dbcTimestampOffsetStoreSpec
 
     "accept known sequence numbers and reject unknown" in {
       val projectionId = genRandomProjectionId()
-      val eventTimestampQueryClock = new TestClock
+      val eventTimestampQueryClock = TestClock.nowMicros()
       val offsetStore = createOffsetStore(projectionId, eventTimestampQueryClock = eventTimestampQueryClock)
 
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
       val offset1 = TimestampOffset(startTime, Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
       offsetStore.saveOffset(offset1).futureValue
 
@@ -486,7 +486,7 @@ class R2dbcTimestampOffsetStoreSpec
       val projectionId = genRandomProjectionId()
       val offsetStore = createOffsetStore(projectionId)
 
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
 
       val envelope1 = createEnvelope("p1", 1L, startTime.plusMillis(1), "e1-1")
       val envelope2 = createEnvelope("p1", 2L, startTime.plusMillis(2), "e1-2")
@@ -523,7 +523,7 @@ class R2dbcTimestampOffsetStoreSpec
 
     "filter accepted" in {
       val projectionId = genRandomProjectionId()
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
       val offsetStore = createOffsetStore(projectionId)
 
       val offset1 = TimestampOffset(startTime, Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
@@ -548,7 +548,7 @@ class R2dbcTimestampOffsetStoreSpec
       val projectionId = genRandomProjectionId()
       val offsetStore = createOffsetStore(projectionId)
 
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
       val offset1 = TimestampOffset(startTime, Map("p1" -> 3L, "p2" -> 1L, "p3" -> 5L))
       offsetStore.saveOffset(offset1).futureValue
 
@@ -614,7 +614,7 @@ class R2dbcTimestampOffsetStoreSpec
       import evictSettings._
       val offsetStore = createOffsetStore(projectionId, evictSettings)
 
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
       log.debug("Start time [{}]", startTime)
 
       offsetStore.saveOffset(TimestampOffset(startTime, Map("p1" -> 1L))).futureValue
@@ -657,7 +657,7 @@ class R2dbcTimestampOffsetStoreSpec
       import deleteSettings._
       val offsetStore = createOffsetStore(projectionId, deleteSettings)
 
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
       log.debug("Start time [{}]", startTime)
 
       offsetStore.saveOffset(TimestampOffset(startTime, Map("p1" -> 1L))).futureValue
@@ -688,7 +688,7 @@ class R2dbcTimestampOffsetStoreSpec
       import deleteSettings._
       val offsetStore = createOffsetStore(projectionId, deleteSettings)
 
-      val startTime = Instant.now()
+      val startTime = TestClock.nowMicros().instant()
       log.debug("Start time [{}]", startTime)
 
       offsetStore.saveOffset(TimestampOffset(startTime, Map("p1" -> 1L))).futureValue

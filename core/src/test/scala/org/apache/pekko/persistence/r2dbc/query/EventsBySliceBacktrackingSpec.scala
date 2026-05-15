@@ -31,6 +31,7 @@ import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
@@ -99,7 +100,7 @@ class EventsBySliceBacktrackingSpec
       val sinkProbe = TestSink[EventEnvelope[String]]()(system.classicSystem)
 
       // don't let behind-current-time be a reason for not finding events
-      val startTime = Instant.now().minusSeconds(10 * 60)
+      val startTime = InstantFactory.now().minusSeconds(10 * 60)
 
       writeEvent(slice1, pid1, 1L, startTime, "e1-1")
       writeEvent(slice1, pid1, 2L, startTime.plusMillis(1), "e1-2")
@@ -186,7 +187,7 @@ class EventsBySliceBacktrackingSpec
       val sinkProbe = TestSink[EventEnvelope[String]]()(system.classicSystem)
 
       // don't let behind-current-time be a reason for not finding events
-      val startTime = Instant.now().minusSeconds(10 * 60)
+      val startTime = InstantFactory.now().minusSeconds(10 * 60)
 
       writeEvent(slice1, pid1, 1L, startTime, "e1-1")
       writeEvent(slice1, pid1, 2L, startTime.plusMillis(2), "e1-2")
