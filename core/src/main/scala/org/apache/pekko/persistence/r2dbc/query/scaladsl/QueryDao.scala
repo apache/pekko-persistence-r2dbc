@@ -47,6 +47,11 @@ import org.slf4j.LoggerFactory
 object QueryDao {
   val log: Logger = LoggerFactory.getLogger(classOf[QueryDao])
 
+  private def setFromDb[T](array: Array[T]): Set[T] = array match {
+    case null    => Set.empty[T]
+    case entries => entries.toSet
+  }
+
   def fromConfig(
       settings: QuerySettings,
       config: Config
@@ -71,6 +76,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
     with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata
   import QueryDao.log
+  import QueryDao.setFromDb
 
   implicit protected val dialect: Dialect = settings.dialect
   protected lazy val statementTimestampSql: String = "statement_timestamp()"
@@ -80,38 +86,36 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
   private val currentDbTimestampSql =
     "SELECT transaction_timestamp() AS db_timestamp"
 
+  protected def selectColumns(backtracking: Boolean): String =
+    if (backtracking)
+      "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, tags "
+    else
+      "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, tags, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload "
+
+  protected def toDbTimestampParamCondition(toDbTimestampParam: Boolean): String =
+    if (toDbTimestampParam) "AND db_timestamp <= ?" else ""
+
+  protected def behindCurrentTimeIntervalCondition(behindCurrentTime: FiniteDuration): String =
+    if (behindCurrentTime > Duration.Zero)
+      s"AND db_timestamp < transaction_timestamp() - interval '${behindCurrentTime.toMillis} milliseconds'"
+    else ""
+
   protected def eventsBySlicesRangeSql(
       toDbTimestampParam: Boolean,
       behindCurrentTime: FiniteDuration,
       backtracking: Boolean,
       minSlice: Int,
-      maxSlice: Int): String = {
-
-    def toDbTimestampParamCondition =
-      if (toDbTimestampParam) "AND db_timestamp <= ?" else ""
-
-    def behindCurrentTimeIntervalCondition =
-      if (behindCurrentTime > Duration.Zero)
-        s"AND db_timestamp < transaction_timestamp() - interval '${behindCurrentTime.toMillis} milliseconds'"
-      else ""
-
-    val selectColumns = {
-      if (backtracking)
-        "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp "
-      else
-        "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload "
-    }
-
+      maxSlice: Int): String =
     sql"""
-      $selectColumns
+      ${selectColumns(backtracking)}
       FROM $journalTable
       WHERE entity_type = ?
       AND ${sliceCondition(minSlice, maxSlice)}
-      AND db_timestamp >= ? $toDbTimestampParamCondition $behindCurrentTimeIntervalCondition
+      AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(
+        behindCurrentTime)}
       AND deleted = false
       ORDER BY db_timestamp, seq_nr
       LIMIT ?"""
-  }
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
     settings.dialect match {
@@ -138,7 +142,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
     WHERE persistence_id = ? AND seq_nr = ? AND deleted = false"""
 
   private val selectOneEventSql = sql"""
-    SELECT slice, entity_type, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload
+    SELECT slice, entity_type, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload, tags
     FROM $journalTable
     WHERE persistence_id = ? AND seq_nr = ? AND deleted = false"""
 
@@ -210,7 +214,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
             serId = 0,
             serManifest = "",
             writerUuid = "", // not need in this query
-            tags = Set.empty, // tags not fetched in queries (yet)
+            tags = Set.empty, // tags not fetched in backtracking
             metadata = None)
         else
           SerializedJournalRow(
@@ -224,7 +228,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
             serId = row.get[Integer]("event_ser_id", classOf[Integer]),
             serManifest = row.get("event_ser_manifest", classOf[String]),
             writerUuid = "", // not need in this query
-            tags = Set.empty, // tags not fetched in queries (yet)
+            tags = setFromDb(row.get("tags", classOf[Array[String]])),
             metadata = readMetadata(row)))
 
     if (log.isDebugEnabled)
@@ -310,7 +314,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
           serManifest = row.get("event_ser_manifest", classOf[String]),
           writerUuid = "", // not need in this query
-          tags = Set.empty, // tags not fetched in queries (yet)
+          tags = setFromDb(row.get("tags", classOf[Array[String]])),
           metadata = readMetadata(row)))
 
   def persistenceIds(entityType: String, afterId: Option[String], limit: Long): Source[String, NotUsed] = {

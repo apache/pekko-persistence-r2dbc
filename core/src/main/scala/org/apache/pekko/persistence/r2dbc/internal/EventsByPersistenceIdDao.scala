@@ -36,6 +36,11 @@ private[r2dbc] object EventsByPersistenceIdDao {
   private val log = LoggerFactory.getLogger(classOf[EventsByPersistenceIdDao])
 
   private final case class ByPersistenceIdState(queryCount: Int, rowCount: Int, latestSeqNr: Long)
+
+  private def setFromDb[T](array: Array[T]): Set[T] = array match {
+    case null    => Set.empty[T]
+    case entries => entries.toSet
+  }
 }
 
 /**
@@ -57,7 +62,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
   protected def settings: BufferSize
 
   private lazy val selectEventsSql = sql"""
-    SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload
+    SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload, tags
     from $journalTable
     WHERE persistence_id = ? AND seq_nr >= ? AND seq_nr <= ?
     AND deleted = false
@@ -67,7 +72,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
   /**
    * INTERNAL API: Used by both journal replay and currentEventsByPersistenceId
    */
-  @InternalApi private[r2dbc] def internalEventsByPersistenceId(
+  @InternalApi private[r2dbc] def internalCurrentEventsByPersistenceId(
       persistenceId: String,
       fromSequenceNr: Long,
       toSequenceNr: Long): Source[SerializedJournalRow, NotUsed] = {
@@ -140,7 +145,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
           serManifest = row.get("event_ser_manifest", classOf[String]),
           writerUuid = row.get("writer", classOf[String]),
-          tags = Set.empty, // tags not fetched in queries (yet)
+          tags = setFromDb(row.get("tags", classOf[Array[String]])),
           metadata = readMetadata(row)))
 
     if (log.isDebugEnabled)
