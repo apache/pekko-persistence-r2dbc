@@ -90,6 +90,53 @@ jobs:
       - name: test
         run: sbt ++${{ matrix.SCALA_VERSION }} test
 
+  test-postgres-jsonb:
+    name: Run test with Postgres (JSONB)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        SCALA_VERSION: [ 2.13, 3.3 ]
+        JAVA_VERSION: [ 17 ]
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout GitHub merge
+        if: github.event.pull_request
+        run: |-
+          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
+          git checkout scratch
+
+      - name: Setup Java ${{ matrix.JAVA_VERSION }}
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.JAVA_VERSION }}
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@90c37294538be80a558fd665531fcdc2b467b475 # 6.4.8.1.0
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Start DB
+        run: |-
+          docker compose -f docker/docker-compose-postgres.yml up -d
+          # TODO: could we poll the port instead of sleep?
+          sleep 10
+          docker exec -i docker_postgres-db_1 psql -U postgres -t < ddl-scripts/create_tables_postgres_jsonb.sql
+
+      - name: test
+        run: |-
+          sbt -Dpekko.persistence.r2dbc.journal.payload-column-type=JSONB -Dpekko.persistence.r2dbc.snapshot.payload-column-type=JSONB -Dpekko.persistence.r2dbc.state.payload-column-type=JSONB "core/testOnly *persistence.r2dbc.PayloadSpec"
+
   test-yugabyte:
     name: Run tests with Yugabyte
     runs-on: ubuntu-latest
