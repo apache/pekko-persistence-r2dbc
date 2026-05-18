@@ -34,6 +34,8 @@ import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import org.scalatest.Outcome
+import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
 
 object DurableStateStoreAdditionalColumnSpec {
@@ -85,31 +87,36 @@ class DurableStateStoreAdditionalColumnSpec
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
-    assume(DurableStateStoreAdditionalColumnSpec.dialect != "mysql",
-      "SQL syntax for adding columns with 'if not exists' is not supported in MySQL, skipping additional column tests")
-
-    Await.result(
-      r2dbcExecutor.executeDdl("beforeAll create durable_state_test")(
-        _.createStatement(
-          s"create table if not exists $customTable as select * from durable_state where persistence_id = ''")),
-      20.seconds)
-    Await.result(
-      r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable add if not exists col1 varchar(256)")),
-      20.seconds)
-    Await.result(
-      r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable add if not exists col2 int")),
-      20.seconds)
-    Await.result(
-      r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable add if not exists col3 int")),
-      20.seconds)
-    Await.result(
-      r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $customTable")),
-      10.seconds)
+    if (DurableStateStoreAdditionalColumnSpec.dialect != "mysql") {
+      Await.result(
+        r2dbcExecutor.executeDdl("beforeAll create durable_state_test")(
+          _.createStatement(
+            s"create table if not exists $customTable as select * from durable_state where persistence_id = ''")),
+        20.seconds)
+      Await.result(
+        r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
+          _.createStatement(s"alter table $customTable add if not exists col1 varchar(256)")),
+        20.seconds)
+      Await.result(
+        r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
+          _.createStatement(s"alter table $customTable add if not exists col2 int")),
+        20.seconds)
+      Await.result(
+        r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
+          _.createStatement(s"alter table $customTable add if not exists col3 int")),
+        20.seconds)
+      Await.result(
+        r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $customTable")),
+        10.seconds)
+    }
   }
+
+  override def withFixture(test: NoArgTest): Outcome =
+    if (DurableStateStoreAdditionalColumnSpec.dialect == "mysql") {
+      Pending // MySQL doesn't support CREATE TABLE AS SELECT or ALTER TABLE ADD IF NOT EXISTS
+    } else {
+      super.withFixture(test)
+    }
 
   private val store = DurableStateStoreRegistry(testKit.system)
     .durableStateStoreFor[R2dbcDurableStateStore[String]](R2dbcDurableStateStore.Identifier)
