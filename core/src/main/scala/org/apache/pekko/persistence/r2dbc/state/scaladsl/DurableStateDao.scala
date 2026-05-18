@@ -139,9 +139,12 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     }
   }
 
-  private val selectStateSql: String = sql"""
+  private def selectStateSql(entityType: String): String = {
+    val table = settings.getDurableStateTableWithSchema(entityType)
+    sql"""
     SELECT revision, state_ser_id, state_ser_manifest, state_payload, db_timestamp
-    FROM $stateTable WHERE persistence_id = ?"""
+    FROM $table WHERE persistence_id = ?"""
+  }
 
   protected def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
     sql"""
@@ -300,10 +303,11 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   }
 
   def readState(persistenceId: String): Future[Option[SerializedStateRow]] = {
+    val entityType = PersistenceId.extractEntityType(persistenceId)
     r2dbcExecutor.selectOne(s"select [$persistenceId]")(
       connection =>
         connection
-          .createStatement(selectStateSql)
+          .createStatement(selectStateSql(entityType))
           .bind(0, persistenceId),
       row =>
         SerializedStateRow(
