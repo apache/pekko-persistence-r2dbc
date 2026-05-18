@@ -17,7 +17,7 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.{ LogCapturing, ScalaTestWithActorTestKit }
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.{ TestConfig, TestData, TestDbLifecycle }
-import pekko.persistence.r2dbc.state.scaladsl.{ DurableStateExceptionSupport, R2dbcDurableStateStore }
+import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
