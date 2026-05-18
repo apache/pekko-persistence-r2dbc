@@ -85,7 +85,7 @@ class DurableStateStoreAdditionalColumnSpec
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    
+
     assume(DurableStateStoreAdditionalColumnSpec.dialect != "mysql",
       "SQL syntax for adding columns with 'if not exists' is not supported in MySQL, skipping additional column tests")
 
