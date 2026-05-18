@@ -51,6 +51,8 @@ object DurableStateStoreAdditionalColumnSpec {
     """)
     .withFallback(TestConfig.config)
 
+  val dialect = config.getString("pekko.persistence.r2dbc.dialect")
+
   class Column1 extends AdditionalColumn[String, String] {
     override def columnName: String = "col1"
 
@@ -88,17 +90,29 @@ class DurableStateStoreAdditionalColumnSpec
         _.createStatement(
           s"create table if not exists $customTable as select * from durable_state where persistence_id = ''")),
       20.seconds)
+    val addColumn1 = DurableStateStoreAdditionalColumnSpec.dialect match {
+      case "mysql" => "add if not exists col1 varchar(256)"
+      case _       => "add column if not exists col1 varchar(256)"
+    }
+    val addColumn2 = DurableStateStoreAdditionalColumnSpec.dialect match {
+      case "mysql" => "add if not exists col2 int"
+      case _       => "add column if not exists col2 int"
+    }
+    val addColumn3 = DurableStateStoreAdditionalColumnSpec.dialect match {
+      case "mysql" => "add if not exists col3 int"
+      case _       => "add column if not exists col3 int"
+    }
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable add if not exists col1 varchar(256)")),
+        _.createStatement(s"alter table $customTable $addColumn1")),
       20.seconds)
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable add if not exists col2 int")),
+        _.createStatement(s"alter table $customTable $addColumn2")),
       20.seconds)
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable add if not exists col3 int")),
+        _.createStatement(s"alter table $customTable $addColumn3")),
       20.seconds)
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $customTable")),
