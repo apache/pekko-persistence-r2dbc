@@ -248,7 +248,7 @@ class DurableStateStoreSpec
       val failure =
         store.deleteObject(persistenceId.id, revision = 2L).failed.futureValue
       failure.getMessage should include(
-        s"Failed to delete object with persistenceId [${persistenceId.id}] and revision [2]")
+        s"Delete failed: durable state for persistence id [${persistenceId.id}] and revision [2]")
     }
 
   }
