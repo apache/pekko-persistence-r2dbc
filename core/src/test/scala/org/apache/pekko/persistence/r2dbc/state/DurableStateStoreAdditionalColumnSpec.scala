@@ -85,34 +85,26 @@ class DurableStateStoreAdditionalColumnSpec
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    
+    assume(DurableStateStoreAdditionalColumnSpec.dialect != "mysql",
+      "SQL syntax for adding columns with 'if not exists' is not supported in MySQL, skipping additional column tests")
+
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll create durable_state_test")(
         _.createStatement(
           s"create table if not exists $customTable as select * from durable_state where persistence_id = ''")),
       20.seconds)
-    val addColumn1 = DurableStateStoreAdditionalColumnSpec.dialect match {
-      case "mysql" => "add if not exists col1 varchar(256)"
-      case _       => "add column if not exists col1 varchar(256)"
-    }
-    val addColumn2 = DurableStateStoreAdditionalColumnSpec.dialect match {
-      case "mysql" => "add if not exists col2 int"
-      case _       => "add column if not exists col2 int"
-    }
-    val addColumn3 = DurableStateStoreAdditionalColumnSpec.dialect match {
-      case "mysql" => "add if not exists col3 int"
-      case _       => "add column if not exists col3 int"
-    }
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable $addColumn1")),
+        _.createStatement(s"alter table $customTable add if not exists col1 varchar(256)")),
       20.seconds)
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable $addColumn2")),
+        _.createStatement(s"alter table $customTable add if not exists col2 int")),
       20.seconds)
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll alter durable_state_test")(
-        _.createStatement(s"alter table $customTable $addColumn3")),
+        _.createStatement(s"alter table $customTable add if not exists col3 int")),
       20.seconds)
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $customTable")),
