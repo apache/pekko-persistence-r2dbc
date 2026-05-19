@@ -39,7 +39,8 @@ object AdditionalColumn {
       classOf[Double] -> classOf[java.lang.Double],
       classOf[Byte] -> classOf[java.lang.Byte],
       classOf[Short] -> classOf[java.lang.Short],
-      classOf[Char] -> classOf[java.lang.Character])
+      classOf[Char] -> classOf[java.lang.Character],
+      classOf[Boolean] -> classOf[java.lang.Boolean])
 }
 
 /**
