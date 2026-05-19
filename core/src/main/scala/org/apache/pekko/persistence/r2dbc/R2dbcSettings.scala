@@ -15,7 +15,9 @@ package org.apache.pekko.persistence.r2dbc
 
 import java.util.Locale
 
+import scala.collection.immutable
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.jdk.DurationConverters._
 
 import org.apache.pekko
@@ -115,6 +117,44 @@ final class StateSettings(val config: Config) extends ConnectionSettings with Us
 
   val durableStatePayloadCodec: PayloadCodec =
     if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
+
+  private val durableStateTableByEntityType: Map[String, String] = {
+    val cfg = config.getConfig("custom-table")
+    cfg.root.unwrapped.asScala.toMap.map { case (k, v) => k -> v.toString }
+  }
+
+  /**
+   * INTERNAL API
+   */
+  @InternalApi private[pekko] val durableStateTableByEntityTypeWithSchema: Map[String, String] =
+    durableStateTableByEntityType.map { case (entityType, table) =>
+      entityType -> (schema.map(_ + ".").getOrElse("") + table)
+    }
+
+  def getDurableStateTable(entityType: String): String =
+    durableStateTableByEntityType.getOrElse(entityType, durableStateTable)
+
+  def getDurableStateTableWithSchema(entityType: String): String =
+    durableStateTableByEntityTypeWithSchema.getOrElse(entityType, durableStateTableWithSchema)
+
+  /**
+   * INTERNAL API
+   */
+  @InternalApi private[pekko] val durableStateAdditionalColumnClasses: Map[String, immutable.IndexedSeq[String]] = {
+    val cfg = config.getConfig("additional-columns")
+    cfg.root.unwrapped.asScala.toMap.map {
+      case (k, v: java.util.List[_]) => k -> v.iterator.asScala.map(_.toString).toVector
+      case (k, v)                    => k -> Vector(v.toString)
+    }
+  }
+
+  /**
+   * INTERNAL API
+   */
+  @InternalApi private[pekko] val durableStateChangeHandlerClasses: Map[String, String] = {
+    val cfg = config.getConfig("change-handler")
+    cfg.root.unwrapped.asScala.toMap.map { case (k, v) => k -> v.toString }
+  }
 }
 
 /**
