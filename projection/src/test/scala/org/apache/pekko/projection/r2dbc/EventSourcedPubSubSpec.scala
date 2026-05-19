@@ -175,11 +175,13 @@ class EventSourcedPubSubSpec
         spawn(Persister(persistenceId), s"p$n")
       }
 
-      // write some before starting the projections
+      // write some before starting the projections, with ack to ensure they are all in the DB
+      val ackProbe = createTestProbe[Done]()
       (1 to 10).foreach { n =>
         val p = n % numberOfEntities
-        entities(p) ! Persister.Persist(mkEvent(n))
+        entities(p) ! Persister.PersistWithAck(mkEvent(n), ackProbe.ref)
       }
+      (1 to 10).foreach { _ => ackProbe.receiveMessage(10.seconds) }
 
       val projectionName = UUID.randomUUID().toString
       val processedProbe = createTestProbe[Processed]()
