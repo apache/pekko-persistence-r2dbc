@@ -31,7 +31,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
   /**
    * Adapter from javadsl.AdditionalColumn to scaladsl.AdditionalColumn
    */
-  final class AdditionColumnAdapter(delegate: javadslState.AdditionalColumn[Any, Any])
+  final class AdditionalColumnAdapter(delegate: javadslState.AdditionalColumn[Any, Any])
       extends AdditionalColumn[Any, Any] {
 
     override private[pekko] val fieldClass: Class[_] =
@@ -84,7 +84,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
     }
 
     def adapt(javadslColumn: javadslState.AdditionalColumn[Any, Any]): AdditionalColumn[Any, Any] =
-      new AdditionColumnAdapter(javadslColumn)
+      new AdditionalColumnAdapter(javadslColumn)
 
     tryCreateScaladslInstance()
       .orElse(tryCreateJavadslInstance().map(adapt))
