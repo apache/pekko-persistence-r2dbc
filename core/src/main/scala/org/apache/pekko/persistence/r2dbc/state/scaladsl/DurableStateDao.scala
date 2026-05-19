@@ -483,7 +483,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
       s"Change handler $changeType failed for [${change.persistenceId}] revision [$revision], due to ${cause.getMessage}"
     }
 
-    try handler.process(session, change).recoverWith { case cause =>
+    try handler.process(session, change).recoverWith { case NonFatal(cause) =>
         Future.failed[Done](new ChangeHandlerException(excMessage(cause), cause))
       }
     catch {
