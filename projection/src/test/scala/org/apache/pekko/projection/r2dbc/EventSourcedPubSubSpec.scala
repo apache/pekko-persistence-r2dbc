@@ -53,7 +53,7 @@ object EventSourcedPubSubSpec {
           buffer-size = 10
 
           backtracking {
-            behind-current-time = 5 seconds
+            behind-current-time = 100 millis
             window = 20 seconds
           }
       }

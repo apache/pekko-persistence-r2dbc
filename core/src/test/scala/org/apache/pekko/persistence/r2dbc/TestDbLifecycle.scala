@@ -39,6 +39,8 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
 
   lazy val stateSettings: StateSettings = new StateSettings(config.getConfig(testConfigPath + ".state"))
 
+  lazy val querySettings: QuerySettings = QuerySettings(config.getConfig(testConfigPath + ".query"))
+
   // making sure that test harness does not initialize connection factory for the plugin that is being tested
   lazy val connectionFactoryProvider: ConnectionFactory =
     ConnectionFactoryProvider(typedSystem)
