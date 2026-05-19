@@ -37,6 +37,7 @@ object TestActors {
     final case class PersistAll(payloads: List[Any]) extends Command
     final case class Ping(replyTo: ActorRef[Done]) extends Command
     final case class GetState(replyTo: ActorRef[String]) extends Command
+    final case class GetSeqNr(replyTo: ActorRef[Long]) extends Command
     final case class Stop(replyTo: ActorRef[Done]) extends Command
 
     def apply(pid: String): Behavior[Command] =
@@ -102,6 +103,9 @@ object TestActors {
             case GetState(replyTo) =>
               replyTo ! state
               Effect.none
+            case GetSeqNr(replyTo) =>
+              replyTo ! EventSourcedBehavior.lastSequenceNumber(context)
+              Effect.none
             case Stop(replyTo) =>
               replyTo ! Done
               Effect.stop()
@@ -120,6 +124,7 @@ object TestActors {
     final case class DeleteWithAck(replyTo: ActorRef[Done]) extends Command
     final case class Ping(replyTo: ActorRef[Done]) extends Command
     final case class GetState(replyTo: ActorRef[Any]) extends Command
+    final case class GetRevision(replyTo: ActorRef[Long]) extends Command
     final case class Stop(replyTo: ActorRef[Done]) extends Command
 
     def apply(pid: String): Behavior[Command] =
@@ -152,6 +157,9 @@ object TestActors {
                 Effect.delete[Any]().thenRun(_ => command.replyTo ! Done)
               case GetState(replyTo) =>
                 replyTo ! state
+                Effect.none
+              case GetRevision(replyTo) =>
+                replyTo ! DurableStateBehavior.lastSequenceNumber(context)
                 Effect.none
               case Ping(replyTo) =>
                 replyTo ! Done

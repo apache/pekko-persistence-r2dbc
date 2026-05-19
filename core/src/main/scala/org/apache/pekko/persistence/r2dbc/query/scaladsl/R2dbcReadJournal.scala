@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.query.scaladsl
 
 import java.time.Instant
+import java.time.{ Duration => JDuration }
 
 import scala.collection.immutable
 import scala.collection.mutable
@@ -188,6 +189,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
           }
       dbSource
         .mergePrioritized(pubSubSource, leftPriority = 1, rightPriority = 10)
+        .via(skipPubSubTooFarAhead(settings.backtrackingEnabled, JDuration.ofMillis(settings.backtrackingWindow.toMillis)))
         .via(deduplicate(settings.deduplicateCapacity))
     } else
       dbSource
@@ -231,6 +233,50 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
           }
         })
     }
+  }
+
+  /**
+   * INTERNAL API
+   */
+  @InternalApi private[pekko] def skipPubSubTooFarAhead[Event](
+      enabled: Boolean,
+      maxAheadOfBacktracking: JDuration): Flow[EventEnvelope[Event], EventEnvelope[Event], NotUsed] = {
+    if (!enabled)
+      Flow[EventEnvelope[Event]]
+    else
+      Flow[EventEnvelope[Event]]
+        .statefulMapConcat(() => {
+          // track backtracking offset
+          var latestBacktracking = Instant.EPOCH
+          env => {
+            env.offset match {
+              case t: TimestampOffset =>
+                if (EnvelopeOrigin.fromBacktracking(env)) {
+                  latestBacktracking = t.timestamp
+                  env :: Nil
+                } else if (EnvelopeOrigin.fromPubSub(env) && latestBacktracking == Instant.EPOCH) {
+                  log.trace(
+                    "Dropping pubsub event for persistenceId [{}] seqNr [{}] because no event from backtracking yet.",
+                    env.persistenceId,
+                    env.sequenceNr: java.lang.Long)
+                  Nil
+                } else if (EnvelopeOrigin.fromPubSub(env) && JDuration
+                    .between(latestBacktracking, t.timestamp)
+                    .compareTo(maxAheadOfBacktracking) > 0) {
+                  // drop from pubsub when too far ahead from backtracking
+                  log.debug(
+                    "Dropping pubsub event for persistenceId [{}] seqNr [{}] because too far ahead of backtracking.",
+                    env.persistenceId,
+                    env.sequenceNr: java.lang.Long)
+                  Nil
+                } else {
+                  env :: Nil
+                }
+              case _ =>
+                env :: Nil
+            }
+          }
+        })
   }
 
   override def currentEventsByPersistenceId(
