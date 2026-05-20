@@ -49,32 +49,40 @@ private[r2dbc] object MySQLJournalDao {
    * Returns an empty set for `null` or an empty JSON array.
    */
   def tagsFromJson(json: String): Set[String] = {
-    if (json == null || json.trim == "[]") return Set.empty
-    val result = scala.collection.mutable.Set.empty[String]
-    val n = json.length
-    var i = 1 // skip opening '['
-    while (i < n - 1) { // stop before closing ']'
-      if (json.charAt(i) == '"') {
-        val sb = new StringBuilder
-        i += 1
-        while (i < n - 1 && json.charAt(i) != '"') {
-          if (json.charAt(i) == '\\' && i + 1 < n - 1) {
+    if (json == null) {
+      Set.empty
+    } else {
+      val trimmed = json.trim
+      if (trimmed == "[]") {
+        Set.empty
+      } else {
+        val result = scala.collection.mutable.Set.empty[String]
+        val n = trimmed.length
+        var i = 1 // skip opening '['
+        while (i < n - 1) { // stop before closing ']'
+          if (trimmed.charAt(i) == '"') {
+            val sb = new StringBuilder
             i += 1
-            json.charAt(i) match {
-              case '"'  => sb.append('"')
-              case '\\' => sb.append('\\')
-              case c    => sb.append('\\').append(c)
+            while (i < n - 1 && trimmed.charAt(i) != '"') {
+              if (trimmed.charAt(i) == '\\' && i + 1 < n - 1) {
+                i += 1
+                trimmed.charAt(i) match {
+                  case '"'  => sb.append('"')
+                  case '\\' => sb.append('\\')
+                  case c    => sb.append('\\').append(c)
+                }
+              } else {
+                sb.append(trimmed.charAt(i))
+              }
+              i += 1
             }
-          } else {
-            sb.append(json.charAt(i))
+            result += sb.toString()
           }
           i += 1
         }
-        result += sb.toString()
+        result.toSet
       }
-      i += 1
     }
-    result.toSet
   }
 
   def settingRequirements(settings: UseAppTimestamp with DbTimestampMonotonicIncreasing): Unit = {
