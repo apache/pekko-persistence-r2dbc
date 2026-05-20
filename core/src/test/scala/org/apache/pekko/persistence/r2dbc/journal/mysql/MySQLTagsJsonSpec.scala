@@ -38,7 +38,7 @@ class MySQLTagsJsonSpec extends AnyWordSpec with Matchers {
       val json = MySQLJournalDao.tagsToJson(Set("a", "b", "c"))
       json should startWith("[")
       json should endWith("]")
-      json should not include " "
+      (json should not).include(" ")
     }
 
     "escape double-quotes in tag values" in {
