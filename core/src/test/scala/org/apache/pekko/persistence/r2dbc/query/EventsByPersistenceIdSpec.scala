@@ -31,6 +31,7 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.persistence.typed.internal.ReplicatedEventMetadata
+import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
@@ -188,6 +189,33 @@ class EventsByPersistenceIdSpec
 
         assertFinished(sub)
       }
+    }
+  }
+
+  "Typed versions of query" should {
+    "include tags" in {
+      val probe = testKit.createTestProbe[Done]()
+      val entityType = nextEntityType()
+      val entityId = "entity-1"
+      val pid = PersistenceId(entityType, entityId)
+
+      val persister = testKit.spawn(TestActors.Persister(pid, tags = Set("tag")))
+      persister ! Persister.PersistWithAck("e-1", probe.ref)
+      probe.expectMessage(Done)
+
+      val events = query
+        .currentEventsByPersistenceIdTyped[String](pid.id, 0L, Long.MaxValue)
+        .runWith(Sink.seq)
+        .futureValue
+
+      events should have size 1
+      events.head.tags should ===(Set("tag"))
+
+      val event = query
+        .eventsByPersistenceIdTyped[String](pid.id, 0L, Long.MaxValue)
+        .runWith(Sink.head)
+        .futureValue
+      event.tags should ===(Set("tag"))
     }
   }
 
