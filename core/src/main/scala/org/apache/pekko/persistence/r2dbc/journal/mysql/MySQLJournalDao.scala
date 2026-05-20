@@ -46,43 +46,54 @@ private[r2dbc] object MySQLJournalDao {
 
   /**
    * Deserialise a JSON array string from a MySQL JSON column back to a set of tags.
-   * Returns an empty set for `null` or an empty JSON array.
+   * Returns an empty set for `null` or an empty JSON array (with optional surrounding whitespace).
+   * Throws [[IllegalStateException]] if the input is not a valid JSON array of strings.
    */
   def tagsFromJson(json: String): Set[String] = {
-    if (json == null) {
-      Set.empty
-    } else {
-      val trimmed = json.trim
-      if (trimmed == "[]") {
-        Set.empty
-      } else {
-        val result = scala.collection.mutable.Set.empty[String]
-        val n = trimmed.length
-        var i = 1 // skip opening '['
-        while (i < n - 1) { // stop before closing ']'
-          if (trimmed.charAt(i) == '"') {
-            val sb = new StringBuilder
-            i += 1
-            while (i < n - 1 && trimmed.charAt(i) != '"') {
-              if (trimmed.charAt(i) == '\\' && i + 1 < n - 1) {
-                i += 1
-                trimmed.charAt(i) match {
-                  case '"'  => sb.append('"')
-                  case '\\' => sb.append('\\')
-                  case c    => sb.append('\\').append(c)
-                }
-              } else {
-                sb.append(trimmed.charAt(i))
+    if (json == null) return Set.empty
+    val trimmed = json.trim
+    if (!trimmed.startsWith("[") || !trimmed.endsWith("]"))
+      throw new IllegalStateException(s"tags JSON is not a JSON array: $json")
+    val inner = trimmed.substring(1, trimmed.length - 1).trim
+    if (inner.isEmpty) return Set.empty
+    val result = scala.collection.mutable.Set.empty[String]
+    val n = trimmed.length
+    var i = 1 // skip opening '['
+    while (i < n - 1) { // stop before closing ']'
+      val c = trimmed.charAt(i)
+      if (c == '"') {
+        val sb = new StringBuilder
+        i += 1
+        var closed = false
+        while (i < n - 1 && !closed) {
+          trimmed.charAt(i) match {
+            case '"' =>
+              closed = true
+            case '\\' if i + 1 < n - 1 =>
+              i += 1
+              trimmed.charAt(i) match {
+                case '"'  => sb.append('"')
+                case '\\' => sb.append('\\')
+                case 'n'  => sb.append('\n')
+                case 'r'  => sb.append('\r')
+                case 't'  => sb.append('\t')
+                case c2   => sb.append('\\').append(c2)
               }
               i += 1
-            }
-            result += sb.toString()
+            case other =>
+              sb.append(other)
+              i += 1
           }
-          i += 1
         }
-        result.toSet
+        if (!closed)
+          throw new IllegalStateException(s"tags JSON contains an unterminated string: $json")
+        result += sb.toString()
+      } else if (c != ',' && c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+        throw new IllegalStateException(s"tags JSON contains non-string element: $json")
       }
+      i += 1
     }
+    result.toSet
   }
 
   def settingRequirements(settings: UseAppTimestamp with DbTimestampMonotonicIncreasing): Unit = {
