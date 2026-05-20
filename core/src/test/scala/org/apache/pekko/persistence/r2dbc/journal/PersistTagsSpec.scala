@@ -24,6 +24,7 @@ import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.typed.PersistenceId
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -41,17 +42,7 @@ class PersistTagsSpec
 
   private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.journal.dialect")
 
-  private lazy val testEnabled: Boolean = {
-    // tags are not implemented for MySQL
-    dialect != "mysql"
-  }
-
   "Persist tags" should {
-    if (!testEnabled) {
-      info(s"PersistTagsSpec not enabled for $dialect")
-      pending
-    }
-
     "be the same for events stored in same transaction" in {
       val numberOfEntities = 9
       val entityType = nextEntityType()
@@ -77,10 +68,15 @@ class PersistTagsSpec
           .select[Row]("test")(
             connection => connection.createStatement(s"select * from ${settings.journalTableWithSchema}"),
             row => {
-              val tags = row.get("tags", classOf[Array[String]]) match {
-                case null      => Set.empty[String]
-                case tagsArray => tagsArray.toSet
-              }
+              val tags =
+                if (dialect == "mysql") {
+                  MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
+                } else {
+                  row.get("tags", classOf[Array[String]]) match {
+                    case null      => Set.empty[String]
+                    case tagsArray => tagsArray.toSet
+                  }
+                }
               Row(
                 pid = row.get("persistence_id", classOf[String]),
                 seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),

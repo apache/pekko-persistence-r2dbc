@@ -116,6 +116,10 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
   protected val journalTable: String = settings.journalTableWithSchema
   protected implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec
 
+  protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
+    if (tags.isEmpty) stmt.bindNull(index, classOf[Array[String]])
+    else stmt.bind(index, tags.toArray)
+
   protected val (insertEventWithParameterTimestampSql: String, insertEventWithTransactionTimestampSql: String) = {
     val baseSql =
       s"INSERT INTO $journalTable " +
@@ -194,10 +198,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         .bind(7, write.serManifest)
         .bindPayload(8, write.payload.get)
 
-      if (write.tags.isEmpty)
-        stmt.bindNull(9, classOf[Array[String]])
-      else
-        stmt.bind(9, write.tags.toArray)
+      bindTagsForWrite(stmt, write.tags, 9)
 
       // optional metadata
       write.metadata match {

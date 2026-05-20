@@ -29,12 +29,54 @@ import pekko.persistence.r2dbc.UseAppTimestamp
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 
 /**
  * INTERNAL API
  */
 @InternalApi
 private[r2dbc] object MySQLJournalDao {
+
+  /** Serialise a set of tags to a JSON array string for MySQL JSON column storage. */
+  def tagsToJson(tags: Set[String]): String =
+    tags.iterator
+      .map(t => "\"" + t.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+      .mkString("[", ",", "]")
+
+  /**
+   * Deserialise a JSON array string from a MySQL JSON column back to a set of tags.
+   * Returns an empty set for `null` or an empty JSON array.
+   */
+  def tagsFromJson(json: String): Set[String] = {
+    if (json == null || json.trim == "[]") return Set.empty
+    val result = scala.collection.mutable.Set.empty[String]
+    val n = json.length
+    var i = 1 // skip opening '['
+    while (i < n - 1) { // stop before closing ']'
+      if (json.charAt(i) == '"') {
+        val sb = new StringBuilder
+        i += 1
+        while (i < n - 1 && json.charAt(i) != '"') {
+          if (json.charAt(i) == '\\' && i + 1 < n - 1) {
+            i += 1
+            json.charAt(i) match {
+              case '"'  => sb.append('"')
+              case '\\' => sb.append('\\')
+              case c    => sb.append('\\').append(c)
+            }
+          } else {
+            sb.append(json.charAt(i))
+          }
+          i += 1
+        }
+        result += sb.toString()
+      }
+      i += 1
+    }
+    result.toSet
+  }
+
   def settingRequirements(settings: UseAppTimestamp with DbTimestampMonotonicIncreasing): Unit = {
     // Application timestamps are used because MySQL does not have transaction_timestamp like Postgres. In future releases
     // they could be tried to be emulated, but the benefits are questionable - no matter where the timestamps are generated,
@@ -64,6 +106,13 @@ private[r2dbc] class MySQLJournalDao(
 
   override lazy val timestampSql: String = "NOW(6)"
   override lazy val statementTimestampSql: String = "NOW(6)"
+
+  override protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
+    if (tags.isEmpty) stmt.bindNull(index, classOf[String])
+    else stmt.bind(index, MySQLJournalDao.tagsToJson(tags))
+
+  override protected def tagsFromRow(row: Row): Set[String] =
+    MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
 
   override val insertEventWithParameterTimestampSql: String =
     sql"INSERT INTO $journalTable " +

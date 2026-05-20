@@ -194,8 +194,6 @@ class EventsByPersistenceIdSpec
 
   "Typed versions of query" should {
     "include tags" in {
-      // tags are not implemented for MySQL
-      assume(journalSettings.dialect != pekko.persistence.r2dbc.Dialect.MySQL)
       val probe = testKit.createTestProbe[Done]()
       val entityType = nextEntityType()
       val entityId = "entity-1"

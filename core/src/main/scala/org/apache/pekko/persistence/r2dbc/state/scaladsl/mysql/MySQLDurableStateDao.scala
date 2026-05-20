@@ -33,6 +33,7 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Statement
 
 /**
  * INTERNAL API
@@ -45,6 +46,10 @@ private[r2dbc] class MySQLDurableStateDao(
   MySQLJournalDao.settingRequirements(settings)
 
   override lazy val transactionTimestampSql: String = "NOW(6)"
+
+  override protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
+    if (tags.isEmpty) stmt.bindNull(index, classOf[String])
+    else stmt.bind(index, MySQLJournalDao.tagsToJson(tags))
 
   override def selectBucketsSql(minSlice: Int, maxSlice: Int): String = {
     sql"""

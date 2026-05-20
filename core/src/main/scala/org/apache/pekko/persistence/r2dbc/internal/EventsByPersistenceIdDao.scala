@@ -26,6 +26,7 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.journal.JournalDao.readMetadata
 import pekko.stream.scaladsl.Source
+import io.r2dbc.spi.Row
 import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext
 
@@ -64,6 +65,9 @@ private[r2dbc] trait EventsByPersistenceIdDao {
   protected def settings: BufferSize
 
   implicit protected def journalPayloadCodec: PayloadCodec
+
+  protected def tagsFromRow(row: Row): Set[String] =
+    setFromDb(row.get("tags", classOf[Array[String]]))
 
   private lazy val selectEventsSql = sql"""
     SELECT slice, entity_type, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, event_ser_id, event_ser_manifest, event_payload, writer, adapter_manifest, meta_ser_id, meta_ser_manifest, meta_payload, tags
@@ -149,7 +153,7 @@ private[r2dbc] trait EventsByPersistenceIdDao {
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
           serManifest = row.get("event_ser_manifest", classOf[String]),
           writerUuid = row.get("writer", classOf[String]),
-          tags = setFromDb(row.get("tags", classOf[Array[String]])),
+          tags = tagsFromRow(row),
           metadata = readMetadata(row)))
 
     if (log.isDebugEnabled)
