@@ -30,8 +30,10 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.query.scaladsl.QueryDao
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
 
 /**
  * INTERNAL API
@@ -43,6 +45,9 @@ private[r2dbc] class MySQLQueryDao(
 )(implicit ec: ExecutionContext, system: ActorSystem[_]) extends QueryDao(querySettings, connectionFactory) {
 
   override lazy val statementTimestampSql: String = "NOW(6)"
+
+  override protected def tagsFromRow(row: Row): Set[String] =
+    MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
 
   override protected def selectColumns(backtracking: Boolean): String =
     if (backtracking)

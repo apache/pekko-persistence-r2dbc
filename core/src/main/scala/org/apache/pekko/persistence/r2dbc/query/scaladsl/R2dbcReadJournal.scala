@@ -182,10 +182,14 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
             // OverflowStrategy.dropNew is long deprecated and removed in Pekko 2.0.0.
             overflowStrategy = OverflowStrategy.dropHead)
           .mapMaterializedValue { ref =>
-            (minSlice to maxSlice).foreach { slice =>
+            pubSub.eventTopics[Event](entityType, minSlice, maxSlice).foreach { topic =>
               import pekko.actor.typed.scaladsl.adapter._
-              pubSub.eventTopic(entityType, slice) ! Topic.Subscribe(ref.toTyped[EventEnvelope[Event]])
+              topic ! Topic.Subscribe(ref.toTyped[EventEnvelope[Event]])
             }
+          }
+          .filter { env =>
+            val slice = sliceForPersistenceId(env.persistenceId)
+            minSlice <= slice && slice <= maxSlice
           }
       dbSource
         .mergePrioritized(pubSubSource, leftPriority = 1, rightPriority = 10)

@@ -125,6 +125,10 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   protected val stateTable = settings.durableStateTableWithSchema
   protected implicit val statePayloadCodec: PayloadCodec = settings.durableStatePayloadCodec
 
+  protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
+    if (tags.isEmpty) stmt.bindNull(index, classOf[Array[String]])
+    else stmt.bind(index, tags.toArray)
+
   private lazy val additionalColumns: Map[String, immutable.IndexedSeq[AdditionalColumn[Any, Any]]] = {
     settings.durableStateAdditionalColumnClasses.map { case (entityType, columnClasses) =>
       val instances = columnClasses.map(fqcn => AdditionalColumnFactory.create(system, fqcn))
@@ -334,13 +338,6 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   def upsertState(state: SerializedStateRow, value: Any): Future[Done] = {
     require(state.revision > 0)
 
-    def bindTags(stmt: Statement, i: Int): Statement = {
-      if (state.tags.isEmpty)
-        stmt.bindNull(i, classOf[Array[String]])
-      else
-        stmt.bind(i, state.tags.toArray)
-    }
-
     var bindIdx = 0
     def getAndIncIndex(): Int = {
       val i = bindIdx
@@ -388,7 +385,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
             .bind(getAndIncIndex(), state.serId)
             .bind(getAndIncIndex(), state.serManifest)
             .bindPayloadOption(getAndIncIndex(), state.payload)
-          bindTags(stmt, getAndIncIndex())
+          bindTagsForWrite(stmt, state.tags, getAndIncIndex())
           bindAdditionalColumns(stmt, additionalBindings)
         }
 
@@ -420,7 +417,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
             .bind(getAndIncIndex(), state.serId)
             .bind(getAndIncIndex(), state.serManifest)
             .bindPayloadOption(getAndIncIndex(), state.payload)
-          bindTags(stmt, getAndIncIndex())
+          bindTagsForWrite(stmt, state.tags, getAndIncIndex())
           bindAdditionalColumns(stmt, additionalBindings)
 
           if (settings.dbTimestampMonotonicIncreasing) {
@@ -503,7 +500,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
           val slice = persistenceExt.sliceForPersistenceId(persistenceId)
 
           def insertDeleteMarkerStatement(connection: Connection): Statement = {
-            connection
+            val stmt = connection
               .createStatement(
                 insertStateSql(entityType, Vector.empty)
               ) // FIXME should the additional columns be cleared (null)? Then they must allow NULL
@@ -514,7 +511,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
               .bind(4, 0)
               .bind(5, "")
               .bindPayloadOption(6, None)
-              .bindNull(7, classOf[Array[String]])
+            bindTagsForWrite(stmt, Set.empty, 7)
           }
 
           def recoverDataIntegrityViolation[A](f: Future[A]): Future[A] =

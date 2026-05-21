@@ -43,6 +43,7 @@ import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -231,7 +232,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
             serId = row.get[Integer]("event_ser_id", classOf[Integer]),
             serManifest = row.get("event_ser_manifest", classOf[String]),
             writerUuid = "", // not need in this query
-            tags = setFromDb(row.get("tags", classOf[Array[String]])),
+            tags = tagsFromRow(row),
             metadata = readMetadata(row)))
 
     if (log.isDebugEnabled)
@@ -317,7 +318,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
           serManifest = row.get("event_ser_manifest", classOf[String]),
           writerUuid = "", // not need in this query
-          tags = setFromDb(row.get("tags", classOf[Array[String]])),
+          tags = tagsFromRow(row),
           metadata = readMetadata(row)))
 
   def persistenceIds(entityType: String, afterId: Option[String], limit: Long): Source[String, NotUsed] = {

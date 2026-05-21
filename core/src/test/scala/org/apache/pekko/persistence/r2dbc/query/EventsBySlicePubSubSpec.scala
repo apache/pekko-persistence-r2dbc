@@ -18,6 +18,7 @@ import java.time.{ Duration => JDuration }
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.collection.immutable
 
 import org.apache.pekko
 import pekko.Done
@@ -26,6 +27,7 @@ import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.internal.pubsub.TopicImpl
+import pekko.persistence.Persistence
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.TimestampOffset
@@ -303,6 +305,43 @@ class EventsBySlicePubSubSpec
         Await.result(done2, 20.seconds)
       }
 
+    }
+
+    "group slices into topics" in new Setup {
+
+      val numberOfTopics =
+        typedSystem.settings.config.getInt("pekko.persistence.r2dbc.journal.publish-events-number-of-topics")
+      val querySliceRanges = Persistence(typedSystem).sliceRanges(numberOfTopics * 2)
+      val queries: immutable.IndexedSeq[TestSubscriber.Probe[EventEnvelope[String]]] = {
+        querySliceRanges.map { range =>
+          query
+            .eventsBySlices[String](setupEntityType, range.min, range.max, NoOffset)
+            .runWith(sinkProbe)
+            .request(100)
+        }
+      }
+
+      val topicStatsProbe = createTestProbe[TopicImpl.TopicStats]()
+      eventually {
+        (0 until 1024).foreach { i =>
+          withClue(s"slice $i: ") {
+            PubSub(typedSystem).eventTopic[String](setupEntityType, i) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
+            topicStatsProbe.receiveMessage().localSubscriberCount shouldBe 2
+          }
+        }
+      }
+
+      for (i <- 1 to 10) {
+        persister ! PersistWithAck(s"e-$i", probe.ref)
+        probe.expectMessage(Done)
+      }
+
+      for (i <- 1 to 10) {
+        val queryIndex = querySliceRanges.indexOf(querySliceRanges.find(_.contains(slice)).get)
+        queries(queryIndex).expectNext().event shouldBe s"e-$i"
+      }
+
+      queries.foreach(_.cancel())
     }
 
   }
