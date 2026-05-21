@@ -17,7 +17,7 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.{ LogCapturing, ScalaTestWithActorTestKit }
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.{ TestConfig, TestData, TestDbLifecycle }
-import pekko.persistence.r2dbc.state.scaladsl.{ DurableStateExceptionSupport, R2dbcDurableStateStore }
+import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
@@ -120,23 +120,23 @@ class DurableStateStoreSpec
       val value = "Genuinely Collaborative"
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
-      store.deleteObject(persistenceId, 1L).futureValue
+      store.deleteObject(persistenceId, 2L).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
-    "fail deleteObject call when revision is unknown" in {
+    "fail deleteObject call when revision is wrong" in {
       val entityType = nextEntityType()
       val persistenceId = PersistenceId(entityType, "to-be-added-and-removed").id
       val value = "Genuinely Collaborative"
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
       if (pekko.Version.current.startsWith("1.0")) {
-        store.deleteObject(persistenceId, 2L).futureValue
+        store.deleteObject(persistenceId, 1L).futureValue
       } else {
         val ex = intercept[Exception] {
-          Await.result(store.deleteObject(persistenceId, 2L), 20.seconds)
+          Await.result(store.deleteObject(persistenceId, 1L), 20.seconds)
         }
-        ex.getClass.getName shouldEqual DurableStateExceptionSupport.DeleteRevisionExceptionClass
+        ex.getClass shouldEqual classOf[IllegalStateException]
       }
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
     }
