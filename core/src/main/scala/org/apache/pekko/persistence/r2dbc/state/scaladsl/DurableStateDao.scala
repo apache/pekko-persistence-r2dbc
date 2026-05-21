@@ -307,7 +307,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
   /**
    * @param persistenceId The persistence id for the object
-   * @param revision The revision to delete
+   * @param revision The next revision (current stored revision + 1) - deletes the row where stored revision equals revision - 1
    * @return The number of rows deleted
    * @since 1.1.0
    */
@@ -317,7 +317,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
         connection
           .createStatement(deleteStateWithRevisionSql)
           .bind(0, persistenceId)
-          .bind(1, revision)
+          .bind(1, revision - 1)
       }
 
     if (log.isDebugEnabled())

@@ -120,17 +120,21 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
    * locking check. Next call to [[getObject]] will then return revision 0 and no value.
    */
   override def deleteObject(persistenceId: String, revision: Long): Future[Done] = {
-    stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
-      if (count != 1) {
-        val msg = if (count == 0) {
-          s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
-        } else {
-          s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
+    if (revision == 0) {
+      stateDao.deleteState(persistenceId)
+    } else {
+      stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
+        if (count != 1) {
+          val msg = if (count == 0) {
+            s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
+          } else {
+            s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
+          }
+          throw new IllegalStateException(msg)
         }
-        throw new IllegalStateException(msg)
-      }
-      Done
-    }(ExecutionContexts.parasitic)
+        Done
+      }(ExecutionContexts.parasitic)
+    }
   }
 
   override def sliceForPersistenceId(persistenceId: String): Int =
