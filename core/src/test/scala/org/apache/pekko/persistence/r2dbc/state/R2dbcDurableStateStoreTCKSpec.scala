@@ -32,4 +32,10 @@ class R2dbcDurableStateStoreTCKSpec
   override def typedSystem: ActorSystem[_] = system.toTyped
 
   override protected def supportsDeleteWithRevisionCheck: CapabilityFlag = CapabilityFlag.on()
+
+  override protected def supportsUpsertWithRevisionCheck: CapabilityFlag = CapabilityFlag.on()
+
+  override protected def supportsSerialization: CapabilityFlag = CapabilityFlag.on()
+
+  override protected def supportsSoftDelete: CapabilityFlag = CapabilityFlag.on()
 }
