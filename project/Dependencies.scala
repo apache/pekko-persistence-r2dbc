@@ -20,6 +20,7 @@ object Dependencies {
   val PekkoVersionInDocs = PekkoCoreDependency.default.link
   val PekkoPersistenceJdbcVersion = PekkoPersistenceJdbcDependency.version
   val PekkoPersistenceR2dbcVersionInDocs = "current"
+  val PekkoProjectionVersionInDocs = "current"
 
   object Compile {
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
