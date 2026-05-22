@@ -19,17 +19,14 @@ object Dependencies {
   val PekkoVersion = PekkoCoreDependency.version
   val PekkoVersionInDocs = PekkoCoreDependency.default.link
   val PekkoPersistenceJdbcVersion = PekkoPersistenceJdbcDependency.version
-  val PekkoPersistenceR2dbcVersionInDocs = "1.0"
-  val PekkoProjectionVersion = PekkoProjectionDependency.version
-  val PekkoProjectionVersionInDocs = PekkoProjectionDependency.default.link
+  val PekkoPersistenceR2dbcVersionInDocs = "current"
+  val PekkoProjectionVersionInDocs = "current"
 
   object Compile {
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
     val pekkoStream = "org.apache.pekko" %% "pekko-stream" % PekkoVersion
     val pekkoPersistence = "org.apache.pekko" %% "pekko-persistence-typed" % PekkoVersion
     val pekkoPersistenceQuery = "org.apache.pekko" %% "pekko-persistence-query" % PekkoVersion
-
-    val pekkoProjectionCore = "org.apache.pekko" %% "pekko-projection-core" % PekkoProjectionVersion
 
     val r2dbcSpi = "io.r2dbc" % "r2dbc-spi" % "1.0.0.RELEASE"
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.2.RELEASE"
@@ -53,12 +50,6 @@ object Dependencies {
     val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
     val pekkoStreamTyped = "org.apache.pekko" %% "pekko-stream-typed" % PekkoVersion % Test
     val pekkoTestkit = "org.apache.pekko" %% "pekko-testkit" % PekkoVersion % Test
-
-    val pekkoProjectionEventSourced =
-      "org.apache.pekko" %% "pekko-projection-eventsourced" % PekkoProjectionVersion % Test
-    val pekkoProjectionDurableState =
-      "org.apache.pekko" %% "pekko-projection-durable-state" % PekkoProjectionVersion % Test
-    val pekkoProjectionTestKit = "org.apache.pekko" %% "pekko-projection-testkit" % PekkoProjectionVersion % Test
 
     val postgresql = "org.postgresql" % "postgresql" % "42.7.11" % Test
 
@@ -85,22 +76,6 @@ object Dependencies {
     TestDeps.logback,
     TestDeps.scalaTest)
 
-  val projection = Seq(
-    pekkoPersistenceQuery,
-    r2dbcSpi,
-    r2dbcPool,
-    r2dbcPostgres % "provided,test",
-    r2dbcMysql % "provided,test",
-    pekkoProjectionCore,
-    TestDeps.pekkoProjectionEventSourced,
-    TestDeps.pekkoProjectionDurableState,
-    TestDeps.pekkoProjectionTestKit,
-    TestDeps.pekkoActorTestkitTyped,
-    TestDeps.pekkoJackson,
-    TestDeps.pekkoStreamTestkit,
-    TestDeps.logback,
-    TestDeps.scalaTest)
-
   val migration = Seq(
     "org.apache.pekko" %% "pekko-persistence-jdbc" % PekkoPersistenceJdbcVersion % Test,
     TestDeps.postgresql,
@@ -109,8 +84,6 @@ object Dependencies {
 
   val docs = Seq(
     TestDeps.pekkoPersistenceTyped,
-    TestDeps.pekkoProjectionEventSourced,
-    TestDeps.pekkoProjectionDurableState,
     TestDeps.pekkoShardingTyped)
 
   val pekkoTestDependencyOverrides = Seq(
