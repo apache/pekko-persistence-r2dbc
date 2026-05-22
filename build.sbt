@@ -46,7 +46,7 @@ lazy val root = (project in file("."))
   .settings(dontPublish)
   .settings(
     name := "pekko-persistence-r2dbc-root")
-  .aggregate(core, projection, migration, docs)
+  .aggregate(core, migration, docs)
 
 def suffixFileFilter(suffix: String): FileFilter = new SimpleFileFilter(f => f.getAbsolutePath.endsWith(suffix))
 
@@ -55,14 +55,6 @@ lazy val core = (project in file("core"))
   .settings(
     name := "pekko-persistence-r2dbc",
     libraryDependencies ++= Dependencies.core)
-
-lazy val projection = (project in file("projection"))
-  .dependsOn(core % "compile->compile;test->test")
-  .enablePlugins(ReproducibleBuildsPlugin)
-  .settings(
-    name := "pekko-projection-r2dbc",
-    libraryDependencies ++= Dependencies.projection,
-    dependencyOverrides ++= Dependencies.pekkoTestDependencyOverrides)
 
 lazy val migration = (project in file("migration"))
   .enablePlugins(ReproducibleBuildsPlugin)
@@ -87,7 +79,7 @@ lazy val docs = project
   .in(file("docs"))
   .enablePlugins(PekkoParadoxPlugin, ParadoxSitePlugin, ScalaUnidocPlugin)
   .disablePlugins(MimaPlugin)
-  .dependsOn(core, projection, migration)
+  .dependsOn(core, migration)
   .settings(dontPublish)
   .settings(
     name := "Apache Pekko Persistence R2DBC",
@@ -110,8 +102,6 @@ lazy val docs = project
       "extref.java-docs.base_url" -> "https://docs.oracle.com/en/java/javase/11/%s",
       "scaladoc.scala.base_url" -> "https://www.scala-lang.org/api/current/",
       "scaladoc.org.apache.pekko.persistence.r2dbc.base_url" ->
-      s"https://pekko.apache.org/api/pekko-persistence-r2dbc/${Dependencies.PekkoPersistenceR2dbcVersionInDocs}",
-      "scaladoc.org.apache.pekko.projection.r2dbc.base_url" ->
       s"https://pekko.apache.org/api/pekko-persistence-r2dbc/${Dependencies.PekkoPersistenceR2dbcVersionInDocs}",
       "scaladoc.org.apache.pekko.projection.base_url" ->
       s"https://pekko.apache.org/api/pekko-projection/${Dependencies.PekkoProjectionVersionInDocs}",
