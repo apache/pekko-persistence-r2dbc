@@ -84,7 +84,8 @@ object Dependencies {
 
   val docs = Seq(
     TestDeps.pekkoPersistenceTyped,
-    TestDeps.pekkoShardingTyped)
+    TestDeps.pekkoShardingTyped,
+    r2dbcPostgres % "provided,test")
 
   val pekkoTestDependencyOverrides = Seq(
     TestDeps.pekkoActor,
