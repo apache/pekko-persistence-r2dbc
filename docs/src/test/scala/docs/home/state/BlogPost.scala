@@ -13,14 +13,15 @@
 
 package docs.home.state
 
-import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.Behavior
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.pattern.StatusReply
-import org.apache.pekko.persistence.typed.PersistenceId
-import org.apache.pekko.persistence.typed.state.scaladsl.DurableStateBehavior
-import org.apache.pekko.persistence.typed.state.scaladsl.Effect
+import org.apache.pekko
+import pekko.Done
+import pekko.actor.typed.ActorRef
+import pekko.actor.typed.Behavior
+import pekko.actor.typed.scaladsl.Behaviors
+import pekko.pattern.StatusReply
+import pekko.persistence.typed.PersistenceId
+import pekko.persistence.typed.state.scaladsl.DurableStateBehavior
+import pekko.persistence.typed.state.scaladsl.Effect
 
 object BlogPost {
   val EntityTypeName = "BlogPost"

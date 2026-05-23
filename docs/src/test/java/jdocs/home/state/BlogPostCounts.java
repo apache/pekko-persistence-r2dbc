@@ -51,10 +51,10 @@ public class BlogPostCounts implements ChangeHandler<BlogPost.State> {
 
   @Override
   public CompletionStage<Done> process(R2dbcSession session, DurableStateChange<BlogPost.State> change) {
-    if (change instanceof UpdatedDurableState) {
-      return processUpdate(session, (UpdatedDurableState<BlogPost.State>) change);
-    } else if (change instanceof DeletedDurableState) {
-      return processDelete(session, (DeletedDurableState<BlogPost.State>) change);
+    if (change instanceof UpdatedDurableState updatedDurableState) {
+      return processUpdate(session, updatedDurableState);
+    } else if (change instanceof DeletedDurableState deletedDurableState) {
+      return processDelete(session, deletedDurableState);
     } else {
       throw new IllegalArgumentException("Unexpected change " + change.getClass().getName());
     }

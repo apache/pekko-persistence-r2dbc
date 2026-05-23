@@ -14,7 +14,8 @@
 package docs.home.state
 
 // #additional-column
-import org.apache.pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
+import org.apache.pekko
+import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 
 // #additional-column
 

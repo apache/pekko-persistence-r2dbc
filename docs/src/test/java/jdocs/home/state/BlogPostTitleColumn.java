@@ -32,8 +32,7 @@ public class BlogPostTitleColumn extends AdditionalColumn<BlogPost.State, String
     BlogPost.State state = upsert.value();
     if (state.equals(BlogPost.BlankState.INSTANCE)) {
       return AdditionalColumn.bindNull();
-    } else if (state instanceof BlogPost.DraftState) {
-      BlogPost.DraftState draft = (BlogPost.DraftState) state;
+    } else if (state instanceof BlogPost.DraftState draft) {
       return AdditionalColumn.bindValue(draft.content.title);
     } else {
       return AdditionalColumn.skip();

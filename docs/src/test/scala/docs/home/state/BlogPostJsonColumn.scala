@@ -13,7 +13,8 @@
 
 package docs.home.state
 
-import org.apache.pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
+import org.apache.pekko
+import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 // #additional-column-json
 import io.r2dbc.postgresql.codec.Json
 

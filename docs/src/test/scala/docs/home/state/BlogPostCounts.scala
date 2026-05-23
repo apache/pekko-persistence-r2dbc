@@ -17,14 +17,15 @@ package docs.home.state
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.persistence.Persistence
-import org.apache.pekko.persistence.query.DeletedDurableState
-import org.apache.pekko.persistence.query.DurableStateChange
-import org.apache.pekko.persistence.query.UpdatedDurableState
-import org.apache.pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
-import org.apache.pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
+import org.apache.pekko
+import pekko.Done
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.Persistence
+import pekko.persistence.query.DeletedDurableState
+import pekko.persistence.query.DurableStateChange
+import pekko.persistence.query.UpdatedDurableState
+import pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
+import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 
 // #change-handler
 

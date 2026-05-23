@@ -16,9 +16,10 @@ package docs.home.state
 // #query
 import scala.concurrent.Future
 
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
-import org.apache.pekko.serialization.SerializationExtension
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
+import pekko.serialization.SerializationExtension
 
 class BlogPostQuery(system: ActorSystem[_]) {
 
