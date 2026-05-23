@@ -7,6 +7,10 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
+/*
+ * Copyright (C) 2022 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.query
 
 import org.apache.pekko
@@ -50,7 +54,7 @@ object QueryDocCompileOnly {
 
   {
     // #currentEventsBySlices
-    import org.apache.pekko.persistence.query.typed.EventEnvelope
+    import pekko.persistence.query.typed.EventEnvelope
 
     // Slit the slices into 4 ranges
     val numberOfSliceRanges: Int = 4
@@ -71,7 +75,7 @@ object QueryDocCompileOnly {
 
   {
     // #currentChangesBySlices
-    import org.apache.pekko.persistence.query.UpdatedDurableState
+    import pekko.persistence.query.UpdatedDurableState
 
     // Slit the slices into 4 ranges
     val numberOfSliceRanges: Int = 4
