@@ -37,3 +37,14 @@ If a `keepNSnapshots > 1` is specified for an `EventSourcedBehavior` that settin
 
 The reason for this is that there is no real benefit to keep multiple snapshots around on a relational 
 database with a high consistency.
+
+See also @ref[EventSourcedCleanup tool](cleanup.md#event-sourced-cleanup-tool).
+
+## Snapshot serialization
+
+The state is serialized with @extref:[Pekko Serialization](pekko:serialization.html) and the binary snapshot representation
+is stored in the `snapshot` column together with information about what serializer that was used in the
+`ser_id` and `ser_manifest` columns.
+
+For PostgreSQL the payload is stored as `BYTEA` type. Alternatively, you can use `JSONB` column type as described in
+@ref:[PostgreSQL JSON](postgres_json.md).
