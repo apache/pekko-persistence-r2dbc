@@ -36,7 +36,7 @@ public class BlogPostJsonColumn extends AdditionalColumn<BlogPost.State, Json> {
       String jsonString = "{\"title\": \"" + s.content.title + "\", \"published\": false}";
       Json json = Json.of(jsonString);
       return AdditionalColumn.bindValue(json);
-    } else if (state instanceof BlogPost.PublishedState) {
+    } else if (state instanceof BlogPost.PublishedState s) {
       // a json library would be used here
       String jsonString = "{\"title\": \"" + s.content.title + "\", \"published\": true}";
       Json json = Json.of(jsonString);
