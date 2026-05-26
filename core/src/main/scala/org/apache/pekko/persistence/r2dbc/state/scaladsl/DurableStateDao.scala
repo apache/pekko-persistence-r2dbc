@@ -150,20 +150,8 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   private val deleteStateSql: String =
     sql"DELETE from $stateTable WHERE persistence_id = ?"
 
-  // Soft-delete: nulls out the payload while advancing the revision so subsequent upserts can use the row.
-  private val softDeleteStateWithRevisionSql: String = {
-    val timestamp =
-      if (settings.dbTimestampMonotonicIncreasing)
-        s"$transactionTimestampSql"
-      else
-        s"GREATEST($transactionTimestampSql, " +
-        s"(SELECT db_timestamp + '1 microsecond'::interval FROM $stateTable WHERE persistence_id = ? AND revision = ?))"
-
-    sql"""
-      UPDATE $stateTable
-      SET revision = ?, state_ser_id = 0, state_ser_manifest = '', state_payload = NULL, tags = NULL, db_timestamp = $timestamp
-      WHERE persistence_id = ? AND revision = ?"""
-  }
+  private val deleteStateWithRevisionSql: String =
+    sql"DELETE from $stateTable WHERE persistence_id = ? AND revision = ?"
 
   private val currentDbTimestampSql =
     sql"SELECT transaction_timestamp() AS db_timestamp"
@@ -237,30 +225,46 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
         stmt.bind(i, state.tags.toArray)
     }
 
-    val result = {
-      if (state.revision == 1) {
-        r2dbcExecutor
-          .updateOne(s"insert [${state.persistenceId}]") { connection =>
-            val stmt = connection
-              .createStatement(insertStateSql)
-              .bind(0, slice)
-              .bind(1, entityType)
-              .bind(2, state.persistenceId)
-              .bind(3, state.revision)
-              .bind(4, state.serId)
-              .bind(5, state.serManifest)
-              .bind(6, state.payload)
-            bindTags(stmt, 7)
+    def doInsert(): Future[Done] = {
+      r2dbcExecutor
+        .updateOne(s"insert [${state.persistenceId}]") { connection =>
+          val stmt = connection
+            .createStatement(insertStateSql)
+            .bind(0, slice)
+            .bind(1, entityType)
+            .bind(2, state.persistenceId)
+            .bind(3, state.revision)
+            .bind(4, state.serId)
+            .bind(5, state.serManifest)
+            .bind(6, state.payload)
+          bindTags(stmt, 7)
+        }
+        .recoverWith { case _: R2dbcDataIntegrityViolationException =>
+          Future.failed(
+            new IllegalStateException(
+              s"Insert failed: durable state for persistence id [${state.persistenceId}] already exists"))
+        }
+        .map { updatedRows =>
+          if (updatedRows != 1)
+            throw new IllegalStateException(
+              s"Insert failed: durable state for persistence id [${state.persistenceId}] could not be inserted at revision [${state.revision}]")
+          else {
+            log.debug(
+              "Inserted durable state for persistenceId [{}] at revision [{}]",
+              state.persistenceId,
+              state.revision)
+            Done
           }
-          .recoverWith { case _: R2dbcDataIntegrityViolationException =>
-            Future.failed(
-              new IllegalStateException(
-                s"Insert failed: durable state for persistence id [${state.persistenceId}] already exists"))
-          }
-      } else {
-        val previousRevision = state.revision - 1
+        }
+    }
 
-        r2dbcExecutor.updateOne(s"update [${state.persistenceId}]") { connection =>
+    if (state.revision == 1) {
+      doInsert()
+    } else {
+      val previousRevision = state.revision - 1
+
+      r2dbcExecutor
+        .updateOne(s"update [${state.persistenceId}]") { connection =>
           val stmt = connection
             .createStatement(updateStateSql)
             .bind(0, state.revision)
@@ -289,17 +293,27 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
               stmt
           }
         }
-      }
-    }
-
-    result.map { updatedRows =>
-      if (updatedRows != 1)
-        throw new IllegalStateException(
-          s"Update failed: durable state for persistence id [${state.persistenceId}] could not be updated to revision [${state.revision}]")
-      else {
-        log.debug("Updated durable state for persistenceId [{}] to revision [{}]", state.persistenceId, state.revision)
-        Done
-      }
+        .flatMap { updatedRows =>
+          if (updatedRows == 1) {
+            log.debug(
+              "Updated durable state for persistenceId [{}] to revision [{}]",
+              state.persistenceId,
+              state.revision)
+            Future.successful(Done)
+          } else {
+            // The UPDATE matched no row. Check whether the state was deleted (no row exists)
+            // or whether this is a revision mismatch (a row exists with a different revision).
+            readState(state.persistenceId).flatMap {
+              case None =>
+                // State was previously hard-deleted; insert a fresh row at the requested revision.
+                doInsert()
+              case Some(_) =>
+                Future.failed(
+                  new IllegalStateException(
+                    s"Update failed: durable state for persistence id [${state.persistenceId}] could not be updated to revision [${state.revision}]"))
+            }
+          }
+        }
     }
   }
 
@@ -319,27 +333,17 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
   /**
    * @param persistenceId The persistence id for the object
-   * @param revision The next revision (current stored revision + 1) - soft-deletes the row by nulling the payload and setting revision to this value
-   * @return The number of rows updated
+   * @param revision The next revision (current stored revision + 1) - deletes the row where stored revision equals revision - 1
+   * @return The number of rows deleted
    * @since 1.1.0
    */
   def deleteStateForRevision(persistenceId: String, revision: Long): Future[Long] = {
     val result =
       r2dbcExecutor.updateOne(s"delete [$persistenceId, $revision]") { connection =>
-        val stmt = connection
-          .createStatement(softDeleteStateWithRevisionSql)
-          .bind(0, revision) // SET revision = new revision
-        if (settings.dbTimestampMonotonicIncreasing) {
-          stmt
-            .bind(1, persistenceId) // WHERE persistence_id = ?
-            .bind(2, revision - 1) // AND revision = old revision
-        } else {
-          stmt
-            .bind(1, persistenceId) // timestamp subquery: WHERE persistence_id = ?
-            .bind(2, revision - 1) // timestamp subquery: AND revision = old revision
-            .bind(3, persistenceId) // WHERE persistence_id = ?
-            .bind(4, revision - 1) // AND revision = old revision
-        }
+        connection
+          .createStatement(deleteStateWithRevisionSql)
+          .bind(0, persistenceId)
+          .bind(1, revision - 1)
       }
 
     if (log.isDebugEnabled())

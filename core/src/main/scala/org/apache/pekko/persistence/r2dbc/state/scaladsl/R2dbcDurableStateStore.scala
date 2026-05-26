@@ -78,8 +78,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   override def getObject(persistenceId: String): Future[GetObjectResult[A]] = {
     implicit val ec: ExecutionContext = system.dispatcher
     stateDao.readState(persistenceId).map {
-      case None                                                 => GetObjectResult(None, 0L)
-      case Some(serializedRow) if serializedRow.payload == null => GetObjectResult(None, 0L)
+      case None => GetObjectResult(None, 0L)
       case Some(serializedRow) =>
         val payload = serialization
           .deserialize(serializedRow.payload, serializedRow.serId, serializedRow.serManifest)
@@ -113,8 +112,8 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
 
   /**
    * Delete the value, which will fail with `IllegalStateException` if the existing stored `revision` + 1 isn't equal to
-   * the given `revision`. The row is soft-deleted (payload nulled, revision advanced) and the next call to
-   * [[getObject]] will return `GetObjectResult(None, 0L)`. A subsequent [[upsertObject]] at revision + 1 will succeed.
+   * the given `revision`. The row is removed from the database and the next call to [[getObject]] will return
+   * `GetObjectResult(None, 0L)`. A subsequent [[upsertObject]] at `revision + 1` will succeed by inserting a new row.
    *
    * If the given revision is `0` it will fully delete the value and revision from the database without any optimistic
    * locking check. Next call to [[getObject]] will then return revision 0 and no value.
