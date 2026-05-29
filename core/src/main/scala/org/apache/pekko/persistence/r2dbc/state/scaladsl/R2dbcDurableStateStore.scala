@@ -110,22 +110,30 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   override def deleteObject(persistenceId: String): Future[Done] =
     stateDao.deleteState(persistenceId)
 
+  /**
+   * Delete the value, which will fail with `IllegalStateException` if the existing stored `revision` + 1 isn't equal to
+   * the given `revision`. The row is removed from the database and the next call to [[getObject]] will return
+   * `GetObjectResult(None, 0L)`. A subsequent [[upsertObject]] at `revision + 1` will succeed by inserting a new row.
+   *
+   * If the given revision is `0` it will fully delete the value and revision from the database without any optimistic
+   * locking check. Next call to [[getObject]] will then return revision 0 and no value.
+   */
   override def deleteObject(persistenceId: String, revision: Long): Future[Done] = {
-    stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
-      if (count != 1) {
-        // if you run this code with Pekko 1.0.x, no exception will be thrown here
-        // this matches the behavior of pekko-connectors-jdbc 1.0.x
-        // if you run this code with Pekko 1.1.x, a DeleteRevisionException will be thrown here
-        val msg = if (count == 0) {
-          s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
-        } else {
-          s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
+    if (revision == 0) {
+      stateDao.deleteState(persistenceId)
+    } else {
+      stateDao.deleteStateForRevision(persistenceId, revision).map { count =>
+        if (count != 1) {
+          val msg = if (count == 0) {
+            s"Failed to delete object with persistenceId [$persistenceId] and revision [$revision]"
+          } else {
+            s"Delete object succeeded for persistenceId [$persistenceId] and revision [$revision] but more than one row was affected ($count rows)"
+          }
+          throw new IllegalStateException(msg)
         }
-        DurableStateExceptionSupport.createDeleteRevisionExceptionIfSupported(msg)
-          .foreach(throw _)
-      }
-      Done
-    }(ExecutionContexts.parasitic)
+        Done
+      }(ExecutionContexts.parasitic)
+    }
   }
 
   override def sliceForPersistenceId(persistenceId: String): Int =
