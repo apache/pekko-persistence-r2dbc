@@ -58,6 +58,8 @@ object EventsByPersistenceIdGapSpec {
   val config = ConfigFactory
     .parseString("pekko.persistence.r2dbc.buffer-size = 1")
     .withFallback(TestConfig.config)
+
+  val dialect: String = config.getString("pekko.persistence.r2dbc.dialect")
 }
 
 class EventsByPersistenceIdGapSpec
@@ -97,10 +99,17 @@ class EventsByPersistenceIdGapSpec
    */
   private def hardDeleteSeqNrs(pid: String, seqNrs: Long*): Unit = {
     val table = journalSettings.journalTableWithSchema
-    // PostgreSQL R2DBC uses numbered parameters: $1, $2, ...
-    // $1 is bound to pid; $2 onwards are bound to the seq_nr values.
-    val inList = seqNrs.zipWithIndex.map { case (_, i) => s"$$${i + 2}" }.mkString(", ")
-    val sql = s"DELETE FROM $table WHERE persistence_id = $$1 AND seq_nr IN ($inList)"
+    val sql = if (EventsByPersistenceIdGapSpec.dialect == "mysql") {
+      // MySQL R2DBC uses ? as parameter markers, so we can use the same SQL for
+      // any number of seqNrs.
+      val inList = seqNrs.map(_ => "?").mkString(", ")
+      s"DELETE FROM $table WHERE persistence_id = ? AND seq_nr IN ($inList)"
+    } else {
+      // PostgreSQL R2DBC uses numbered parameters: $1, $2, $3, … so we need to
+      // generate the SQL with the correct number of parameters.
+      val inList = seqNrs.zipWithIndex.map { case (_, i) => s"$$${i + 2}" }.mkString(", ")
+      s"DELETE FROM $table WHERE persistence_id = $$1 AND seq_nr IN ($inList)"
+    }
     r2dbcExecutor
       .updateOne("hard-delete seqNrs") { connection =>
         val stmt = connection.createStatement(sql).bind(0, pid)
