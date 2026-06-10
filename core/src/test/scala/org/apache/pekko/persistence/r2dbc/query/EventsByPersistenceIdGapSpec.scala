@@ -38,7 +38,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 /**
  * Tests covering sequence-number gap handling in eventsByPersistenceId and
- * currentEventsByPersistenceId queries for PostgreSQL.
+ * currentEventsByPersistenceId queries.
  *
  * Gaps arise when journal rows are hard-deleted (physical removal) or
  * soft-deleted (the `deleted` flag is set to `true`, e.g. via the delete-marker
@@ -93,9 +93,6 @@ class EventsByPersistenceIdGapSpec
    * Hard-delete specific rows from the journal table by directly issuing a
    * DELETE statement.  This simulates the scenario from pekko-persistence-jdbc
    * issue #516 where messages are removed without leaving a delete marker.
-   *
-   * Uses PostgreSQL numbered parameter syntax ($1, $2, …) as required by the
-   * r2dbc-postgresql driver.
    */
   private def hardDeleteSeqNrs(pid: String, seqNrs: Long*): Unit = {
     val table = journalSettings.journalTableWithSchema
