@@ -39,7 +39,7 @@ class PersistTimestampSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
   private val settings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
   private val serialization = SerializationExtension(system)
   private implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec

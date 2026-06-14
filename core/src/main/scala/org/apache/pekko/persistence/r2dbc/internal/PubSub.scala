@@ -41,17 +41,17 @@ import org.slf4j.LoggerFactory
 @InternalApi private[pekko] object PubSub extends ExtensionId[PubSub] {
   private val log = LoggerFactory.getLogger(classOf[PubSub])
 
-  def createExtension(system: ActorSystem[_]): PubSub = new PubSub(system)
+  def createExtension(system: ActorSystem[?]): PubSub = new PubSub(system)
 
   // Java API
-  def get(system: ActorSystem[_]): PubSub = apply(system)
+  def get(system: ActorSystem[?]): PubSub = apply(system)
 
 }
 
 /**
  * INTERNAL API
  */
-@InternalApi private[pekko] class PubSub(system: ActorSystem[_]) extends Extension {
+@InternalApi private[pekko] class PubSub(system: ActorSystem[?]) extends Extension {
   import PubSub.log
 
   private val topics = new ConcurrentHashMap[String, ActorRef[Any]]

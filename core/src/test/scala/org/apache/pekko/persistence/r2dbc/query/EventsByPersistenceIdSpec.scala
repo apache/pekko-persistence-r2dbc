@@ -51,7 +51,7 @@ class EventsByPersistenceIdSpec
     with LogCapturing {
   import EventsByPersistenceIdSpec._
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
 
@@ -64,7 +64,7 @@ class EventsByPersistenceIdSpec
           query.currentEventsByPersistenceId(pid, from, to)
       }
 
-    def assertFinished(probe: TestSubscriber.Probe[_], liveShouldFinish: Boolean = false): Unit =
+    def assertFinished(probe: TestSubscriber.Probe[?], liveShouldFinish: Boolean = false): Unit =
       queryType match {
         case Live if !liveShouldFinish =>
           probe.expectNoMessage()

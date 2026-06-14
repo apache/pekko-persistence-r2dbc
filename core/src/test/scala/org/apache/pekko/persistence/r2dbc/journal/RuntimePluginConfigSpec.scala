@@ -119,7 +119,7 @@ object RuntimePluginConfigSpec {
   }
 
   trait DurableState {
-    def typedSystem: ActorSystem[_]
+    def typedSystem: ActorSystem[?]
     def configKey: String
     def database: String
 
@@ -169,12 +169,12 @@ class RuntimePluginConfigSpec
   }
 
   private lazy val state1 = new DurableState {
-    override def typedSystem: ActorSystem[_] = system
+    override def typedSystem: ActorSystem[?] = system
     override def configKey: String = "plugin1"
     override def database: String = "database1"
   }
   private lazy val state2 = new DurableState {
-    override def typedSystem: ActorSystem[_] = system
+    override def typedSystem: ActorSystem[?] = system
     override def configKey: String = "plugin2"
     override def database: String = "database2"
   }

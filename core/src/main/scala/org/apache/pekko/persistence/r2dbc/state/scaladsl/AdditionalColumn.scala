@@ -31,7 +31,7 @@ object AdditionalColumn {
 
   case object Skip extends Binding[Nothing]
 
-  private val scalaPrimitivesMapping: Map[Class[_], Class[_]] =
+  private val scalaPrimitivesMapping: Map[Class[?], Class[?]] =
     Map(
       classOf[Int] -> classOf[java.lang.Integer],
       classOf[Long] -> classOf[java.lang.Long],
@@ -56,7 +56,7 @@ abstract class AdditionalColumn[A, B: ClassTag] {
   /**
    * INTERNAL API: used when binding null
    */
-  @InternalApi private[pekko] val fieldClass: Class[_] = {
+  @InternalApi private[pekko] val fieldClass: Class[?] = {
     val cls = implicitly[ClassTag[B]].runtimeClass
     scalaPrimitivesMapping.getOrElse(cls, cls)
   }

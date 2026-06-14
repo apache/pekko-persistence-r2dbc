@@ -83,7 +83,7 @@ class EventsBySliceSpec
     with LogCapturing {
   import EventsBySliceSpec._
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
 

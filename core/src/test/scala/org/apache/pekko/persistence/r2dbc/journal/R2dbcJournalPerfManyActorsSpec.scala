@@ -36,7 +36,7 @@ class R2dbcJournalPerfManyActorsSpec extends JournalPerfSpec(R2dbcJournalPerfSpe
 
   override protected def supportsRejectingNonSerializableObjects: CapabilityFlag = CapabilityFlag.off()
 
-  override def typedSystem: ActorSystem[_] = system.toTyped
+  override def typedSystem: ActorSystem[?] = system.toTyped
 
   def actorCount = 20 // increase when testing for real
 

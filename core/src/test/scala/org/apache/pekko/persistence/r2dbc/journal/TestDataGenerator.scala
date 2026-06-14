@@ -71,7 +71,7 @@ object TestDataGenerator {
         Behaviors.same
       }
 
-    def startEventsByQuery(system: ActorSystem[_]): Unit = {
+    def startEventsByQuery(system: ActorSystem[?]): Unit = {
       import system.executionContext
       implicit val sys = system
 

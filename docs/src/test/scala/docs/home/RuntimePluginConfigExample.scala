@@ -31,7 +31,7 @@ object RuntimePluginConfigExample {
   type Command
   type Event
   type State
-  val context: ActorContext[_] = ???
+  val context: ActorContext[?] = ???
 
   // #runtime-plugin-config
   class EventSourcedBehaviorForDatabase(database: String) {

@@ -61,7 +61,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   private val log = LoggerFactory.getLogger(getClass)
   private val settings = StateSettings(config)
 
-  private implicit val typedSystem: ActorSystem[_] = system.toTyped
+  private implicit val typedSystem: ActorSystem[?] = system.toTyped
   implicit val ec: ExecutionContext = system.dispatcher
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)

@@ -34,7 +34,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
   final class AdditionalColumnAdapter(delegate: javadslState.AdditionalColumn[Any, Any])
       extends AdditionalColumn[Any, Any] {
 
-    override private[pekko] val fieldClass: Class[_] =
+    override private[pekko] val fieldClass: Class[?] =
       delegate.fieldClass
 
     override def columnName: String =
@@ -48,7 +48,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
         upsert.revision,
         upsert.value)
       delegate.bind(javadslUpsert) match {
-        case bindValue: javadslState.AdditionalColumn.BindValue[_] => AdditionalColumn.BindValue(bindValue.value)
+        case bindValue: javadslState.AdditionalColumn.BindValue[?] => AdditionalColumn.BindValue(bindValue.value)
         case javadslState.AdditionalColumn.BindNull                => AdditionalColumn.BindNull
         case javadslState.AdditionalColumn.Skip                    => AdditionalColumn.Skip
       }
@@ -56,7 +56,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
 
   }
 
-  def create(system: ActorSystem[_], fqcn: String): AdditionalColumn[Any, Any] = {
+  def create(system: ActorSystem[?], fqcn: String): AdditionalColumn[Any, Any] = {
     val dynamicAccess = system.classicSystem.asInstanceOf[ExtendedActorSystem].dynamicAccess
 
     def tryCreateScaladslInstance(): Try[AdditionalColumn[Any, Any]] = {
@@ -64,7 +64,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
         .createInstanceFor[AdditionalColumn[Any, Any]](fqcn, Nil)
         .orElse(
           dynamicAccess
-            .createInstanceFor[AdditionalColumn[Any, Any]](fqcn, List(classOf[ActorSystem[_]] -> system))
+            .createInstanceFor[AdditionalColumn[Any, Any]](fqcn, List(classOf[ActorSystem[?]] -> system))
             .orElse(dynamicAccess.createInstanceFor[AdditionalColumn[Any, Any]](
               fqcn,
               List(classOf[ClassicActorSystem] -> system.classicSystem))))
@@ -77,7 +77,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
           dynamicAccess
             .createInstanceFor[javadslState.AdditionalColumn[Any, Any]](
               fqcn,
-              List(classOf[ActorSystem[_]] -> system))
+              List(classOf[ActorSystem[?]] -> system))
             .orElse(dynamicAccess.createInstanceFor[javadslState.AdditionalColumn[Any, Any]](
               fqcn,
               List(classOf[ClassicActorSystem] -> system.classicSystem))))
@@ -91,7 +91,7 @@ import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
       .getOrElse(
         throw new IllegalArgumentException(
           s"Additional column [$fqcn] must implement " +
-          s"[${classOf[AdditionalColumn[_, _]].getName}] or [${classOf[javadslState.AdditionalColumn[_, _]].getName}]. It " +
+          s"[${classOf[AdditionalColumn[?, ?]].getName}] or [${classOf[javadslState.AdditionalColumn[?, ?]].getName}]. It " +
           s"may have an ActorSystem constructor parameter."))
   }
 

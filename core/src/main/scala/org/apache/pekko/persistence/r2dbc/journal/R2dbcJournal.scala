@@ -48,7 +48,7 @@ import pekko.stream.scaladsl.Sink
  */
 @InternalApi
 private[r2dbc] object R2dbcJournal {
-  case class WriteFinished(persistenceId: String, done: Future[_])
+  case class WriteFinished(persistenceId: String, done: Future[?])
 
   def deserializeRow(serialization: Serialization, row: SerializedJournalRow): PersistentRepr = {
     if (row.payload.isEmpty)
@@ -80,7 +80,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
   import R2dbcJournal.WriteFinished
   import R2dbcJournal.deserializeRow
 
-  implicit val system: ActorSystem[_] = context.system.toTyped
+  implicit val system: ActorSystem[?] = context.system.toTyped
   implicit val ec: ExecutionContext = context.dispatcher
 
   private val log = Logging(context.system, classOf[R2dbcJournal])
@@ -98,7 +98,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   // if there are pending writes when an actor restarts we must wait for
   // them to complete before we can read the highest sequence number or we will miss it
-  private val writesInProgress = new java.util.HashMap[String, Future[_]]()
+  private val writesInProgress = new java.util.HashMap[String, Future[?]]()
 
   override def receivePluginInternal: Receive = { case WriteFinished(pid, f) =>
     writesInProgress.remove(pid, f)

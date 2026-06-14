@@ -83,15 +83,15 @@ import org.slf4j.LoggerFactory
   }
 
   private final case class EvaluatedAdditionalColumnBindings(
-      additionalColumn: AdditionalColumn[_, _],
-      binding: AdditionalColumn.Binding[_])
+      additionalColumn: AdditionalColumn[?, ?],
+      binding: AdditionalColumn.Binding[?])
 
   private val FutureDone: Future[Done] = Future.successful(Done)
 
   def fromConfig(
       settings: StateSettings,
       config: Config
-  )(implicit system: ActorSystem[_], ec: ExecutionContext): DurableStateDao = {
+  )(implicit system: ActorSystem[?], ec: ExecutionContext): DurableStateDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
     settings.dialect match {
@@ -112,7 +112,7 @@ import org.slf4j.LoggerFactory
 private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory)(
     implicit
     ec: ExecutionContext,
-    system: ActorSystem[_])
+    system: ActorSystem[?])
     extends BySliceQuery.Dao[DurableStateDao.SerializedStateRow] {
   import DurableStateDao._
 
@@ -187,7 +187,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     else {
       val strB = new lang.StringBuilder()
       additionalBindings.foreach {
-        case EvaluatedAdditionalColumnBindings(c, _: AdditionalColumn.BindValue[_]) =>
+        case EvaluatedAdditionalColumnBindings(c, _: AdditionalColumn.BindValue[?]) =>
           strB.append(", ").append(c.columnName)
         case EvaluatedAdditionalColumnBindings(c, AdditionalColumn.BindNull) =>
           strB.append(", ").append(c.columnName)
@@ -203,7 +203,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     else {
       val strB = new lang.StringBuilder()
       additionalBindings.foreach {
-        case EvaluatedAdditionalColumnBindings(_, _: AdditionalColumn.BindValue[_]) |
+        case EvaluatedAdditionalColumnBindings(_, _: AdditionalColumn.BindValue[?]) |
             EvaluatedAdditionalColumnBindings(_, AdditionalColumn.BindNull) =>
           strB.append(", ?")
         case EvaluatedAdditionalColumnBindings(_, AdditionalColumn.Skip) =>
@@ -245,7 +245,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     else {
       val strB = new lang.StringBuilder()
       additionalBindings.foreach {
-        case EvaluatedAdditionalColumnBindings(col, _: AdditionalColumn.BindValue[_]) =>
+        case EvaluatedAdditionalColumnBindings(col, _: AdditionalColumn.BindValue[?]) =>
           strB.append(", ").append(col.columnName).append(" = ?")
         case EvaluatedAdditionalColumnBindings(col, AdditionalColumn.BindNull) =>
           strB.append(", ").append(col.columnName).append(" = ?")
@@ -474,8 +474,8 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
     def excMessage(cause: Throwable): String = {
       val (changeType, revision) = change match {
-        case upd: UpdatedDurableState[_] => "update" -> upd.revision
-        case del: DeletedDurableState[_] => "delete" -> del.revision
+        case upd: UpdatedDurableState[?] => "update" -> upd.revision
+        case del: DeletedDurableState[?] => "delete" -> del.revision
       }
       s"Change handler $changeType failed for [${change.persistenceId}] revision [$revision], due to ${cause.getMessage}"
     }

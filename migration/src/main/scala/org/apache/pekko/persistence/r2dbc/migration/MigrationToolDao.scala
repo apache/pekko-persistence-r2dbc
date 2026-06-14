@@ -37,7 +37,7 @@ import io.r2dbc.spi.ConnectionFactory
  */
 @InternalApi private[r2dbc] class MigrationToolDao(
     connectionFactory: ConnectionFactory,
-    logDbCallsExceeding: FiniteDuration)(implicit ec: ExecutionContext, system: ActorSystem[_]) {
+    logDbCallsExceeding: FiniteDuration)(implicit ec: ExecutionContext, system: ActorSystem[?]) {
   import MigrationToolDao.CurrentProgress
 
   private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, logDbCallsExceeding)(ec, system)

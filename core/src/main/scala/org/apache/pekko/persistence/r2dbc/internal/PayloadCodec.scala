@@ -24,7 +24,7 @@ import io.r2dbc.spi.Statement
  * INTERNAL API
  */
 @InternalApi private[pekko] sealed trait PayloadCodec {
-  def payloadClass: Class[_]
+  def payloadClass: Class[?]
   def encode(bytes: Array[Byte]): Any
   def decode(payload: Any): Array[Byte]
   def nonePayload: Array[Byte]

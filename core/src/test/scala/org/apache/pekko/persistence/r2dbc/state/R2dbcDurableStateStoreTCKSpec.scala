@@ -29,7 +29,7 @@ class R2dbcDurableStateStoreTCKSpec
     extends DurableStateStoreSpec(TestConfig.config)
     with TestDbLifecycle {
 
-  override def typedSystem: ActorSystem[_] = system.toTyped
+  override def typedSystem: ActorSystem[?] = system.toTyped
 
   override protected def supportsDeleteWithRevisionCheck: CapabilityFlag = CapabilityFlag.on()
 

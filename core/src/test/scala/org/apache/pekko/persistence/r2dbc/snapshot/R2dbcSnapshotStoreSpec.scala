@@ -30,7 +30,7 @@ import org.scalatest.Outcome
 import org.scalatest.Pending
 
 class R2dbcSnapshotStoreSpec extends SnapshotStoreSpec(TestConfig.config) with TestDbLifecycle {
-  def typedSystem: ActorSystem[_] = system.toTyped
+  def typedSystem: ActorSystem[?] = system.toTyped
 
   val ignoreTests = Set(
     // All these expects multiple snapshots for same pid, either as the core test

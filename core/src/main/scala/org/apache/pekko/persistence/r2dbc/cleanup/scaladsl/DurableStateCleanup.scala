@@ -57,7 +57,7 @@ final class DurableStateCleanup(systemProvider: ClassicActorSystemProvider, conf
   /**
    * INTERNAL API
    */
-  @InternalApi private[pekko] implicit val system: ActorSystem[_] = {
+  @InternalApi private[pekko] implicit val system: ActorSystem[?] = {
     import pekko.actor.typed.scaladsl.adapter._
     systemProvider.classicSystem.toTyped
   }

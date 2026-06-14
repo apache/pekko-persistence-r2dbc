@@ -41,7 +41,7 @@ class ConnectionFactoryOptionsCustomizerSpec extends ScalaTestWithActorTestKit(c
 object ConnectionFactoryOptionsCustomizerSpec {
   object CustomizerCalled
 
-  class Customizer(system: ActorSystem[_]) extends ConnectionFactoryOptionsCustomizer {
+  class Customizer(system: ActorSystem[?]) extends ConnectionFactoryOptionsCustomizer {
     override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder = {
       system.eventStream.tell(EventStream.Publish(CustomizerCalled))
       builder

@@ -58,7 +58,7 @@ object DurableStateStoreChangeHandlerSpec {
     if (dialect == "mysql") "insert into changes_test (pid, rev, value) values (?, ?, ?)"
     else sql"insert into changes_test (pid, rev, value) values (?, ?, ?)"
 
-  class Handler(system: ActorSystem[_]) extends ChangeHandler[String] {
+  class Handler(system: ActorSystem[?]) extends ChangeHandler[String] {
     private implicit val ec: ExecutionContext = system.executionContext
 
     override def process(session: R2dbcSession, change: DurableStateChange[String]): Future[Done] = {
@@ -100,7 +100,7 @@ class DurableStateStoreChangeHandlerSpec
 
   private val anotherTable = "changes_test"
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   override def beforeAll(): Unit = {
     super.beforeAll()

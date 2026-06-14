@@ -119,7 +119,7 @@ private[r2dbc] object MySQLJournalDao {
 private[r2dbc] class MySQLJournalDao(
     journalSettings: JournalSettings,
     connectionFactory: ConnectionFactory)(
-    implicit ec: ExecutionContext, system: ActorSystem[_]
+    implicit ec: ExecutionContext, system: ActorSystem[?]
 ) extends JournalDao(journalSettings, connectionFactory) {
   MySQLJournalDao.settingRequirements(journalSettings)
 

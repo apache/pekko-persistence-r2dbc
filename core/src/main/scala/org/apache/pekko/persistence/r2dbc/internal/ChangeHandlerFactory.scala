@@ -43,7 +43,7 @@ import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
     }
   }
 
-  def create(system: ActorSystem[_], fqcn: String): ChangeHandler[Any] = {
+  def create(system: ActorSystem[?], fqcn: String): ChangeHandler[Any] = {
     val dynamicAccess = system.classicSystem.asInstanceOf[ExtendedActorSystem].dynamicAccess
 
     def tryCreateScaladslInstance(): Try[ChangeHandler[Any]] = {
@@ -51,7 +51,7 @@ import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
         .createInstanceFor[ChangeHandler[Any]](fqcn, Nil)
         .orElse(
           dynamicAccess
-            .createInstanceFor[ChangeHandler[Any]](fqcn, List(classOf[ActorSystem[_]] -> system))
+            .createInstanceFor[ChangeHandler[Any]](fqcn, List(classOf[ActorSystem[?]] -> system))
             .orElse(
               dynamicAccess
                 .createInstanceFor[ChangeHandler[Any]](
@@ -64,7 +64,7 @@ import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
         .createInstanceFor[javadslState.ChangeHandler[Any]](fqcn, Nil)
         .orElse(
           dynamicAccess
-            .createInstanceFor[javadslState.ChangeHandler[Any]](fqcn, List(classOf[ActorSystem[_]] -> system))
+            .createInstanceFor[javadslState.ChangeHandler[Any]](fqcn, List(classOf[ActorSystem[?]] -> system))
             .orElse(
               dynamicAccess
                 .createInstanceFor[javadslState.ChangeHandler[Any]](
@@ -80,7 +80,7 @@ import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
       .getOrElse(
         throw new IllegalArgumentException(
           s"Change handler [$fqcn] must implement " +
-          s"[${classOf[ChangeHandler[_]].getName}] or [${classOf[javadslState.ChangeHandler[_]].getName}]. It " +
+          s"[${classOf[ChangeHandler[?]].getName}] or [${classOf[javadslState.ChangeHandler[?]].getName}]. It " +
           s"may have an ActorSystem constructor parameter."))
 
   }

@@ -83,7 +83,7 @@ class DurableStateStoreAdditionalColumnSpec
 
   private val customTable = stateSettings.getDurableStateTableWithSchema("CustomEntity")
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   override def beforeAll(): Unit = {
     super.beforeAll()

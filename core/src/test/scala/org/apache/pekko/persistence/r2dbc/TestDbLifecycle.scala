@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory
 
 trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
 
-  def typedSystem: ActorSystem[_]
+  def typedSystem: ActorSystem[?]
 
   def testConfigPath: String = "pekko.persistence.r2dbc"
 

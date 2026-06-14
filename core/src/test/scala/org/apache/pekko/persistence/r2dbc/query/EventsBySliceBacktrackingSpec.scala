@@ -58,7 +58,7 @@ class EventsBySliceBacktrackingSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
   private val settings = QuerySettings(system.settings.config.getConfig("pekko.persistence.r2dbc.query"))
   private implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec
 

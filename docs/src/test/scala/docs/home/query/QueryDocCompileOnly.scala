@@ -20,7 +20,7 @@ import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Sink
 
 object QueryDocCompileOnly {
-  implicit val system: ActorSystem[_] = ???
+  implicit val system: ActorSystem[?] = ???
   trait MyEvent
   trait MyState
 

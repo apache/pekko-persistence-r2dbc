@@ -69,7 +69,7 @@ class PayloadSpec
     with LogCapturing {
   import PayloadSpec._
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   private def testJournalPersister(persistenceId: String, msg: Any): Unit = {
     val probe = createTestProbe[Any]()

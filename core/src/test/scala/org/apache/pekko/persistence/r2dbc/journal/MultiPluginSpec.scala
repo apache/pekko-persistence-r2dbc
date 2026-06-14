@@ -102,7 +102,7 @@ class MultiPluginSpec
 
   import MultiPluginSpec.MyEntity
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   "Addition plugin config" should {
 
