@@ -86,7 +86,7 @@ final private[r2dbc] class ContinuousQuery[S, T](
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new TimerGraphStageLogicWithLogging(shape) with OutHandler {
       var nextRow: OptionVal[T] = OptionVal.none[T]
-      var sinkIn: SubSinkInlet[T] = _
+      var sinkIn: SubSinkInlet[T] = null
       var state = initialState
       var nrElements = Long.MaxValue
       var subStreamFinished = false
