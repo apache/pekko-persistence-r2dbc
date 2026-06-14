@@ -34,7 +34,7 @@ import pekko.persistence.r2dbc.snapshot.SnapshotDao
 @InternalApi
 private[r2dbc] class MySQLSnapshotDao(
     settings: SnapshotSettings, connectionFactory: ConnectionFactory
-)(implicit ec: ExecutionContext, system: ActorSystem[_]) extends SnapshotDao(settings, connectionFactory) {
+)(implicit ec: ExecutionContext, system: ActorSystem[?]) extends SnapshotDao(settings, connectionFactory) {
 
   override val upsertSql = sql"""
     INSERT INTO $snapshotTable

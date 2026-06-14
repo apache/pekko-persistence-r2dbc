@@ -42,7 +42,7 @@ import io.r2dbc.spi.Statement
 private[r2dbc] class MySQLDurableStateDao(
     settings: StateSettings,
     connectionFactory: ConnectionFactory
-)(implicit ec: ExecutionContext, system: ActorSystem[_]) extends DurableStateDao(settings, connectionFactory) {
+)(implicit ec: ExecutionContext, system: ActorSystem[?]) extends DurableStateDao(settings, connectionFactory) {
   MySQLJournalDao.settingRequirements(settings)
 
   override lazy val transactionTimestampSql: String = "NOW(6)"

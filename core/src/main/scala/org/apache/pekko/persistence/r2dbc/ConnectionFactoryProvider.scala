@@ -43,10 +43,10 @@ import io.r2dbc.spi.ConnectionFactoryOptions
 import io.r2dbc.spi.Option
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
-  def createExtension(system: ActorSystem[_]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)
+  def createExtension(system: ActorSystem[?]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)
 
   // Java API
-  def get(system: ActorSystem[_]): ConnectionFactoryProvider = apply(system)
+  def get(system: ActorSystem[?]): ConnectionFactoryProvider = apply(system)
 
   /**
    * Enables customization of [[ConnectionFactoryOptions]] right before the connection factory is created.
@@ -76,7 +76,7 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   }
 }
 
-class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
+class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
 
   private val sessions = new ConcurrentHashMap[String, ConnectionPool]
 
@@ -111,7 +111,7 @@ class ConnectionFactoryProvider(system: ActorSystem[_]) extends Extension {
     settings.connectionFactoryOptionsCustomizer match {
       case None       => NoopCustomizer
       case Some(fqcn) =>
-        val args = List(classOf[ActorSystem[_]] -> system)
+        val args = List(classOf[ActorSystem[?]] -> system)
         system.dynamicAccess.createInstanceFor[ConnectionFactoryOptionsCustomizer](fqcn, args) match {
           case Success(customizer) => customizer
           case Failure(cause)      =>

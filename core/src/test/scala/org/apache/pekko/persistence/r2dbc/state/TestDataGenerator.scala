@@ -73,7 +73,7 @@ object TestDataGenerator {
         Behaviors.same
       }
 
-    def startChangesByQuery(system: ActorSystem[_]): Unit = {
+    def startChangesByQuery(system: ActorSystem[?]): Unit = {
       import system.executionContext
       implicit val sys = system
 

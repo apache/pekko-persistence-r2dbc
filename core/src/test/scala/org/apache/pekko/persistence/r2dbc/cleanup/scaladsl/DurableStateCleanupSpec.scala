@@ -43,7 +43,7 @@ class DurableStateCleanupSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   "DurableStateCleanup" must {
     "delete state for one persistenceId" in {

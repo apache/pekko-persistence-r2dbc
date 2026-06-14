@@ -35,7 +35,7 @@ class PersistTagsSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
   private val settings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
 
   case class Row(pid: String, seqNr: Long, tags: Set[String])

@@ -35,5 +35,5 @@ class R2dbcJournalPerfSpec extends JournalPerfSpec(R2dbcJournalPerfSpec.config) 
 
   override protected def supportsRejectingNonSerializableObjects: CapabilityFlag = CapabilityFlag.off()
 
-  override def typedSystem: ActorSystem[_] = system.toTyped
+  override def typedSystem: ActorSystem[?] = system.toTyped
 }

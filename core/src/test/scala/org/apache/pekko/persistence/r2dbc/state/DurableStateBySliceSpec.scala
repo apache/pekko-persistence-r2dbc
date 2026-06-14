@@ -71,7 +71,7 @@ class DurableStateBySliceSpec
     with LogCapturing {
   import DurableStateBySliceSpec._
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   private val query = DurableStateStoreRegistry(testKit.system)
     .durableStateStoreFor[R2dbcDurableStateStore[String]](R2dbcDurableStateStore.Identifier)
@@ -108,7 +108,7 @@ class DurableStateBySliceSpec
           queryImpl.currentChangesBySlices(entityType, minSlice, maxSlice, offset)
       }
 
-    def assertFinished(probe: TestProbe[_], streamDone: Future[Done]): Unit =
+    def assertFinished(probe: TestProbe[?], streamDone: Future[Done]): Unit =
       queryType match {
         case Live =>
           probe.expectNoMessage()

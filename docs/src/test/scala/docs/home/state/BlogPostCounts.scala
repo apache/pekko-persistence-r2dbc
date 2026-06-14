@@ -47,7 +47,7 @@ pekko.persistence.r2dbc.state {
  * CREATE TABLE post_count (slice INT NOT NULL, cnt BIGINT NOT NULL, PRIMARY KEY(slice));
  * }}}
  */
-class BlogPostCounts(system: ActorSystem[_]) extends ChangeHandler[BlogPost.State] {
+class BlogPostCounts(system: ActorSystem[?]) extends ChangeHandler[BlogPost.State] {
 
   private val incrementSql =
     "INSERT INTO post_count (slice, cnt) VALUES ($1, 1) " +

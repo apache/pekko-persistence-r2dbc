@@ -26,7 +26,7 @@ import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 
 object CleanupDocExample {
 
-  implicit val system: ActorSystem[_] = ???
+  implicit val system: ActorSystem[?] = ???
 
   // #cleanup
   val queries = PersistenceQuery(system).readJournalFor[CurrentPersistenceIdsQuery](R2dbcReadJournal.Identifier)

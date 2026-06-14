@@ -101,10 +101,10 @@ object MigrationTool {
  *
  * Note: tags are not migrated.
  */
-class MigrationTool(system: ActorSystem[_]) {
+class MigrationTool(system: ActorSystem[?]) {
   import MigrationTool.Result
   import system.executionContext
-  private implicit val sys: ActorSystem[_] = system
+  private implicit val sys: ActorSystem[?] = system
 
   private val log = LoggerFactory.getLogger(getClass)
 

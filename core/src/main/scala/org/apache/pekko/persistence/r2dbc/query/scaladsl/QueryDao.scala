@@ -58,7 +58,7 @@ object QueryDao {
   def fromConfig(
       settings: QuerySettings,
       config: Config
-  )(implicit system: ActorSystem[_], ec: ExecutionContext): QueryDao = {
+  )(implicit system: ActorSystem[?], ec: ExecutionContext): QueryDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
     settings.dialect match {
@@ -75,7 +75,7 @@ object QueryDao {
  */
 @InternalApi
 private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory)(
-    implicit val ec: ExecutionContext, system: ActorSystem[_]) extends BySliceQuery.Dao[SerializedJournalRow]
+    implicit val ec: ExecutionContext, system: ActorSystem[?]) extends BySliceQuery.Dao[SerializedJournalRow]
     with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata
   import QueryDao.log

@@ -83,14 +83,14 @@ import reactor.core.publisher.Mono
   def selectOneInTx[A](statement: Statement, mapRow: Row => A)(
       implicit
       ec: ExecutionContext,
-      system: ActorSystem[_]): Future[Option[A]] = {
+      system: ActorSystem[?]): Future[Option[A]] = {
     selectInTx(statement, mapRow).map(_.headOption)
   }
 
   def selectInTx[A](statement: Statement, mapRow: Row => A)(
       implicit
       ec: ExecutionContext,
-      system: ActorSystem[_]): Future[immutable.IndexedSeq[A]] = {
+      system: ActorSystem[?]): Future[immutable.IndexedSeq[A]] = {
     statement.execute().asFuture().flatMap { result =>
       val consumer: BiConsumer[mutable.Builder[A, immutable.IndexedSeq[A]], A] = (builder, elem) => builder += elem
       Flux
@@ -111,7 +111,7 @@ import reactor.core.publisher.Mono
 class R2dbcExecutor(val connectionFactory: ConnectionFactory, log: Logger, logDbCallsExceeding: FiniteDuration)(
     implicit
     ec: ExecutionContext,
-    system: ActorSystem[_]) {
+    system: ActorSystem[?]) {
   import R2dbcExecutor._
 
   private val logDbCallsExceedingMicros = logDbCallsExceeding.toMicros

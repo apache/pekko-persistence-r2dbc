@@ -69,7 +69,7 @@ class EventsByPersistenceIdGapSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   private val query =
     PersistenceQuery(system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)

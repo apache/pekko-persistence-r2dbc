@@ -81,7 +81,7 @@ private[r2dbc] object JournalDao {
   def fromConfig(
       settings: JournalSettings,
       config: Config
-  )(implicit system: ActorSystem[_], ec: ExecutionContext): JournalDao = {
+  )(implicit system: ActorSystem[?], ec: ExecutionContext): JournalDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
     settings.dialect match {
@@ -100,7 +100,7 @@ private[r2dbc] object JournalDao {
  */
 @InternalApi
 private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory: ConnectionFactory)(
-    implicit val ec: ExecutionContext, system: ActorSystem[_]) extends EventsByPersistenceIdDao
+    implicit val ec: ExecutionContext, system: ActorSystem[?]) extends EventsByPersistenceIdDao
     with HighestSequenceNrDao {
   import JournalDao.SerializedJournalRow
   import JournalDao.log

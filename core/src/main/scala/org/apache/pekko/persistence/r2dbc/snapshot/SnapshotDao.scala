@@ -56,7 +56,7 @@ private[r2dbc] object SnapshotDao {
   def fromConfig(
       settings: SnapshotSettings,
       config: Config
-  )(implicit system: ActorSystem[_], ec: ExecutionContext): SnapshotDao = {
+  )(implicit system: ActorSystem[?], ec: ExecutionContext): SnapshotDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
     settings.dialect match {
@@ -77,7 +77,7 @@ private[r2dbc] object SnapshotDao {
 private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory)(
     implicit
     ec: ExecutionContext,
-    system: ActorSystem[_]) {
+    system: ActorSystem[?]) {
   import SnapshotDao._
 
   implicit protected val dialect: Dialect = settings.dialect

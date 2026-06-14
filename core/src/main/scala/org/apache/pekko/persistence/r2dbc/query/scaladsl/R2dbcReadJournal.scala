@@ -81,7 +81,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
   private val log = LoggerFactory.getLogger(getClass)
   private val settings = QuerySettings(config)
 
-  private implicit val typedSystem: ActorSystem[_] = system.toTyped
+  private implicit val typedSystem: ActorSystem[?] = system.toTyped
   import typedSystem.executionContext
   private val serialization = SerializationExtension(system)
   private val persistenceExt = Persistence(system)

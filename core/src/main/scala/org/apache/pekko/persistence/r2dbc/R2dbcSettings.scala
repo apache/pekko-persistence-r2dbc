@@ -143,7 +143,7 @@ final class StateSettings(val config: Config) extends ConnectionSettings with Us
   @InternalApi private[pekko] val durableStateAdditionalColumnClasses: Map[String, immutable.IndexedSeq[String]] = {
     val cfg = config.getConfig("additional-columns")
     cfg.root.unwrapped.asScala.toMap.map {
-      case (k, v: java.util.List[_]) => k -> v.iterator.asScala.map(_.toString).toVector
+      case (k, v: java.util.List[?]) => k -> v.iterator.asScala.map(_.toString).toVector
       case (k, v)                    => k -> Vector(v.toString)
     }
   }

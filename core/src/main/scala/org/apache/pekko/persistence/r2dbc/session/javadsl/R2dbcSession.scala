@@ -38,12 +38,12 @@ object R2dbcSession {
    * Runs the passed function using a R2dbcSession with a new transaction. The connection is closed and the transaction
    * is committed at the end or rolled back in case of failures.
    */
-  def withSession[A](system: ActorSystem[_], fun: JFunction[R2dbcSession, CompletionStage[A]]): CompletionStage[A] = {
+  def withSession[A](system: ActorSystem[?], fun: JFunction[R2dbcSession, CompletionStage[A]]): CompletionStage[A] = {
     withSession(system, "pekko.persistence.r2dbc.connection-factory", fun)
   }
 
   def withSession[A](
-      system: ActorSystem[_],
+      system: ActorSystem[?],
       connectionFactoryConfigPath: String,
       fun: JFunction[R2dbcSession, CompletionStage[A]]): CompletionStage[A] = {
     scaladslSession.R2dbcSession.withSession(system, connectionFactoryConfigPath) { scaladslSession =>
@@ -55,7 +55,7 @@ object R2dbcSession {
 }
 
 @ApiMayChange
-final class R2dbcSession(val connection: Connection)(implicit ec: ExecutionContext, system: ActorSystem[_]) {
+final class R2dbcSession(val connection: Connection)(implicit ec: ExecutionContext, system: ActorSystem[?]) {
 
   def createStatement(sql: String): Statement =
     connection.createStatement(sql)

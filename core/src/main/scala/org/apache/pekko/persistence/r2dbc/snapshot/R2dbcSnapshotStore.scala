@@ -57,7 +57,7 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
 
   private implicit val ec: ExecutionContext = context.dispatcher
   private val serialization: Serialization = SerializationExtension(context.system)
-  private implicit val system: ActorSystem[_] = context.system.toTyped
+  private implicit val system: ActorSystem[?] = context.system.toTyped
 
   private val dao = {
     val settings = SnapshotSettings(cfg)

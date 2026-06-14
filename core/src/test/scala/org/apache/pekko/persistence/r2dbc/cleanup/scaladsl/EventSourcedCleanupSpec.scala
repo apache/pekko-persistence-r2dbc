@@ -48,7 +48,7 @@ class EventSourcedCleanupSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   "EventSourcedCleanup" must {
     "delete events for one persistenceId" in {

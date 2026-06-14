@@ -74,7 +74,7 @@ class MigrationToolSpec
     with TestData
     with LogCapturing {
 
-  override def typedSystem: ActorSystem[_] = system
+  override def typedSystem: ActorSystem[?] = system
 
   private val migrationConfig = system.settings.config.getConfig("pekko.persistence.r2dbc.migration")
   private val sourceJournalPluginId = "jdbc-journal"

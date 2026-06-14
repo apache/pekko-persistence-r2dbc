@@ -21,7 +21,7 @@ import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
 import pekko.serialization.SerializationExtension
 
-class BlogPostQuery(system: ActorSystem[_]) {
+class BlogPostQuery(system: ActorSystem[?]) {
 
   private val findByTitleSql =
     "SELECT state_ser_id, state_ser_manifest, state_payload " +
