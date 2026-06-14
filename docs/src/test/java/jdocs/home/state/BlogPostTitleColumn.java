@@ -7,10 +7,7 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
-/**
- * Copyright (C) 2022 Lightbend Inc. <https://www.lightbend.com>
- */
-
+/** Copyright (C) 2022 Lightbend Inc. <https://www.lightbend.com> */
 package jdocs.home.state;
 
 // #additional-column

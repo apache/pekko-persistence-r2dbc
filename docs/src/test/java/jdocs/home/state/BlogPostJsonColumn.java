@@ -7,15 +7,12 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
-/**
- * Copyright (C) 2022 Lightbend Inc. <https://www.lightbend.com>
- */
-
+/** Copyright (C) 2022 Lightbend Inc. <https://www.lightbend.com> */
 package jdocs.home.state;
 
+import io.r2dbc.postgresql.codec.Json;
 import org.apache.pekko.persistence.r2dbc.state.javadsl.AdditionalColumn;
 // #additional-column-json
-import io.r2dbc.postgresql.codec.Json;
 
 public class BlogPostJsonColumn extends AdditionalColumn<BlogPost.State, Json> {
   @Override
