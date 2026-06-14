@@ -16,6 +16,10 @@ sourceDistIncubating := false
 ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
 ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
 ThisBuild / evictionErrorLevel := Level.Info
+ThisBuild / javafmtFormatterCompatibleJavaVersion := 17
+
+addCommandAlias("checkCodeStyle", "scalafmtCheckAll; scalafmtSbtCheck; javafmtCheckAll; +headerCheckAll")
+addCommandAlias("applyCodeStyle", "+headerCreateAll; scalafmtAll; scalafmtSbt; javafmtAll")
 
 GlobalScope / parallelExecution := false
 Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
