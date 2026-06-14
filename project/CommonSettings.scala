@@ -27,7 +27,7 @@ object CommonSettings extends AutoPlugin {
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),
     scalacOptions ++= {
-      if (scalaBinaryVersion.value == "3") Seq("-Yfuture-lazy-vals")
+      if (scalaBinaryVersion.value == "3") Seq("-Yfuture-lazy-vals", "-release:17")
       else Seq.empty
     },
     Test / logBuffered := false,
