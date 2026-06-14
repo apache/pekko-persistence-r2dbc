@@ -26,6 +26,10 @@ object CommonSettings extends AutoPlugin {
     crossVersion := CrossVersion.binary,
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),
+    scalacOptions ++= {
+      if (scalaBinaryVersion.value == "3") Seq("-Yfuture-lazy-vals", "-release:17")
+      else Seq.empty
+    },
     Test / logBuffered := false,
     Test / parallelExecution := false,
     // show full stack traces and test case durations
