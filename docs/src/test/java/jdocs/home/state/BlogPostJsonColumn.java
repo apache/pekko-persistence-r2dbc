@@ -12,6 +12,7 @@ package jdocs.home.state;
 
 import io.r2dbc.postgresql.codec.Json;
 import org.apache.pekko.persistence.r2dbc.state.javadsl.AdditionalColumn;
+
 // #additional-column-json
 
 public class BlogPostJsonColumn extends AdditionalColumn<BlogPost.State, Json> {
