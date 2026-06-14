@@ -11,12 +11,13 @@
 package jdocs.home.state;
 
 // #query
-import io.r2dbc.spi.Statement;
-import java.util.List;
-import java.util.concurrent.CompletionStage;
 import org.apache.pekko.actor.typed.ActorSystem;
 import org.apache.pekko.persistence.r2dbc.session.javadsl.R2dbcSession;
 import org.apache.pekko.serialization.SerializationExtension;
+import io.r2dbc.spi.Statement;
+
+import java.util.List;
+import java.util.concurrent.CompletionStage;
 
 public class BlogPostQuery {
   private final ActorSystem<?> system;

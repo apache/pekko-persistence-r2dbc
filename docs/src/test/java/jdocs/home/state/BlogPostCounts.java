@@ -11,9 +11,6 @@
 package jdocs.home.state;
 
 // #change-handler
-import io.r2dbc.spi.Statement;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import org.apache.pekko.Done;
 import org.apache.pekko.actor.typed.ActorSystem;
 import org.apache.pekko.persistence.Persistence;
@@ -22,6 +19,10 @@ import org.apache.pekko.persistence.query.DurableStateChange;
 import org.apache.pekko.persistence.query.UpdatedDurableState;
 import org.apache.pekko.persistence.r2dbc.session.javadsl.R2dbcSession;
 import org.apache.pekko.persistence.r2dbc.state.javadsl.ChangeHandler;
+import io.r2dbc.spi.Statement;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Keep track of number of published blog posts. Count per slice.

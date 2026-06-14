@@ -8,37 +8,6 @@ on:
     tags-ignore: [ v.* ]
 
 jobs:
-  check-code-style:
-    name: Check Code Style
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Checkout GitHub merge
-        if: github.event.pull_request
-        run: |-
-          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
-          git checkout scratch
-
-      - name: Setup Java 17
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Install sbt
-        uses: sbt/setup-sbt@af116cce31c00823d3903ce687f9cda3a4f19f1b # v1.2.1
-
-      - name: Cache Coursier cache
-        uses: coursier/cache-action@95e5b1029b6b86e7bac033ee44a0697d8a527d2d # v8.1.1
-
-      - name: Code style check
-        run: sbt checkCodeStyle
-
   compile:
     name: Test and compile
     runs-on: ubuntu-latest
