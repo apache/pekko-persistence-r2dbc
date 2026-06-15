@@ -19,15 +19,6 @@ services:
       - "7000:7000"
     environment:
       SERVICE_7000_NAME: yb-master
-    healthcheck:
-      test: [
-        "CMD-SHELL",
-        "curl -f http://localhost:7000/api/v1/is_leader || exit 1"
-      ]
-      interval: 5s
-      timeout: 10s
-      retries: 20  # 100 seconds max
-      start_period: 20s
 
   yb-tserver:
     image: yugabytedb/yugabyte:2025.2.0.1-b1
@@ -51,14 +42,5 @@ services:
       SERVICE_9042_NAME: ycql
       SERVICE_6379_NAME: yedis
       SERVICE_9000_NAME: yb-tserver
-    healthcheck:
-      test: [
-        "CMD-SHELL",
-        "ysqlsh -h localhost -p 5433 -U yugabyte -d yugabyte -c 'SELECT 1;' 2>/dev/null || exit 1"
-      ]
-      interval: 5s
-      timeout: 10s
-      retries: 20  # 100 seconds max
-      start_period: 30s
     depends_on:
       - yb-master
