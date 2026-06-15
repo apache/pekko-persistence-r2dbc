@@ -247,6 +247,15 @@ jobs:
       - name: Start DB
         run: |-
           docker compose -f docker/docker-compose-mysql.yml up -d --wait
+          # loop to wait for the DB to be ready
+          for i in {1..8}; do
+            if docker exec -i docker-mysql-db-1 mysql \
+                -h 127.0.0.1 --user=root --password=root --database=mysql -e 'SELECT 1;' 2>/dev/null; then
+              break
+            fi
+            echo "Retry $i: DDL script failed, waiting before retry..."
+            sleep $((i * 2))
+          done
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root -e 'CREATE SCHEMA database1;'
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=database1 < ddl-scripts/create_tables_mysql.sql
