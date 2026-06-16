@@ -18,6 +18,8 @@ ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
 ThisBuild / evictionErrorLevel := Level.Info
 ThisBuild / javafmtFormatterCompatibleJavaVersion := 17
 ThisBuild / javafmtSortImports := false
+ThisBuild / javafmt / excludeFilter := new SimpleFileFilter(f =>
+  f.getAbsolutePath.contains("/jdocs/"))
 
 addCommandAlias("checkCodeStyle", "scalafmtCheckAll; scalafmtSbtCheck; javafmtCheckAll; +headerCheckAll")
 addCommandAlias("applyCodeStyle", "+headerCreateAll; scalafmtAll; scalafmtSbt; javafmtAll")

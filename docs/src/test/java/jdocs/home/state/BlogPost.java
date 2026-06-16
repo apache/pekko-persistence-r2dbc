@@ -23,7 +23,9 @@ import org.apache.pekko.persistence.typed.state.javadsl.CommandHandlerBuilder;
 import org.apache.pekko.persistence.typed.state.javadsl.DurableStateBehavior;
 import org.apache.pekko.persistence.typed.state.javadsl.Effect;
 
-public class BlogPost extends DurableStateBehavior<BlogPost.Command, BlogPost.State> {
+public class BlogPost
+    extends DurableStateBehavior<
+        BlogPost.Command, BlogPost.State> {
   // commands and state as in above snippets
 
   interface State {}
@@ -73,7 +75,6 @@ public class BlogPost extends DurableStateBehavior<BlogPost.Command, BlogPost.St
   }
 
   public interface Command {}
-
   public static class AddPost implements Command {
     final PostContent content;
     final ActorRef<AddPostDone> replyTo;
@@ -91,7 +92,6 @@ public class BlogPost extends DurableStateBehavior<BlogPost.Command, BlogPost.St
       this.postId = postId;
     }
   }
-
   public static class GetPost implements Command {
     final ActorRef<PostContent> replyTo;
 

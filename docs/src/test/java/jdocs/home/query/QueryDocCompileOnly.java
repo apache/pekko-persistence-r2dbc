@@ -61,7 +61,6 @@ public class QueryDocCompileOnly {
       DurableStateStoreRegistry.get(system)
           .getDurableStateStoreFor(
               R2dbcDurableStateStore.class, R2dbcDurableStateStore.Identifier());
-
   // #durableStateStoreFor
 
   void exampleEventsByPid() {
