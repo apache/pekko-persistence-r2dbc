@@ -27,8 +27,13 @@ object CommonSettings extends AutoPlugin {
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),
     scalacOptions ++= {
+      val commonWconf = Seq(
+        // r2dbc-spi annotation parsing warning - external dependency, cannot be fixed
+        "-Wconf:msg=could not find MAYBE in enum:s",
+        // existential type feature warning in ConnectionFactoryProvider - wildcard type required
+        "-language:existentials")
       if (scalaBinaryVersion.value == "3")
-        Seq(
+        commonWconf ++ Seq(
           "-Yfuture-lazy-vals",
           "-release:17",
           "-Wconf:msg=Implicit parameters should be provided with a `using` clause:s",
@@ -38,7 +43,7 @@ object CommonSettings extends AutoPlugin {
           "-Wconf:msg=Unreachable case except for null:s",
           "-Wconf:msg=is no longer supported for vararg splices:s",
           "-Wconf:msg=bad option.*-Yfuture-lazy-vals:s")
-      else Seq.empty
+      else commonWconf
     },
     Test / logBuffered := false,
     Test / parallelExecution := false,
