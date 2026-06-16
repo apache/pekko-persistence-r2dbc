@@ -91,6 +91,7 @@ lazy val docs = project
   .settings(
     name := "Apache Pekko Persistence R2DBC",
     libraryDependencies ++= Dependencies.docs,
+    Global / excludeLintKeys += previewPath,
     previewPath := (Paradox / siteSubdirName).value,
     Paradox / siteSubdirName := s"docs/pekko-persistence-r2dbc/${projectInfoVersion.value}",
     pekkoParadoxGithub := Some("https://github.com/apache/pekko-persistence-r2dbc"),

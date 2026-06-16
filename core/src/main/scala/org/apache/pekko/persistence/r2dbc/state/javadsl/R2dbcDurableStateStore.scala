@@ -52,7 +52,7 @@ class R2dbcDurableStateStore[A](scalaStore: ScalaR2dbcDurableStateStore[A])(impl
     scalaStore.upsertObject(persistenceId, revision, value, tag).asJava
 
   override def deleteObject(persistenceId: String): CompletionStage[Done] =
-    scalaStore.deleteObject(persistenceId).asJava
+    scalaStore.deleteObject(persistenceId, revision = 0).asJava
 
   override def deleteObject(persistenceId: String, revision: Long): CompletionStage[Done] =
     scalaStore.deleteObject(persistenceId, revision).asJava
