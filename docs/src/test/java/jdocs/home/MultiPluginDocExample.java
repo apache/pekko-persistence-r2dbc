@@ -20,9 +20,8 @@ import org.apache.pekko.persistence.typed.javadsl.EventSourcedBehavior;
 
 public class MultiPluginDocExample {
 
-  static
   // #withPlugins
-  public class MyEntity extends EventSourcedBehavior<MyEntity.Command, MyEntity.Event, MyEntity.State> {
+  public static class MyEntity extends EventSourcedBehavior<MyEntity.Command, MyEntity.Event, MyEntity.State> {
     // #withPlugins
     public MyEntity(PersistenceId persistenceId) {
       super(persistenceId);
