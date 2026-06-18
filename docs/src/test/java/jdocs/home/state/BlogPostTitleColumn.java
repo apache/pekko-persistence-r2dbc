@@ -33,7 +33,7 @@ public class BlogPostTitleColumn extends AdditionalColumn<BlogPost.State, String
     if (state.equals(BlogPost.BlankState.INSTANCE)) {
       return AdditionalColumn.bindNull();
     } else if (state instanceof BlogPost.DraftState draft) {
-      return AdditionalColumn.bindValue(draft.content.title);
+      return AdditionalColumn.bindValue(draft.content.title());
     } else {
       return AdditionalColumn.skip();
     }

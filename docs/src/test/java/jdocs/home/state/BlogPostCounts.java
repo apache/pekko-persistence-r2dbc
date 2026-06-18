@@ -39,8 +39,9 @@ public class BlogPostCounts implements ChangeHandler<BlogPost.State> {
   private final ActorSystem<?> system;
 
   private final String incrementSql =
-      "INSERT INTO post_count (slice, cnt) VALUES ($1, 1) " +
-          "ON CONFLICT (slice) DO UPDATE SET cnt = excluded.cnt + 1";
+      """
+      INSERT INTO post_count (slice, cnt) VALUES ($1, 1) \
+      ON CONFLICT (slice) DO UPDATE SET cnt = excluded.cnt + 1""";
 
   private final String decrementSql =
       "UPDATE post_count SET cnt = cnt - 1 WHERE slice = $1";

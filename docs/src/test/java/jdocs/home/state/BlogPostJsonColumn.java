@@ -33,12 +33,12 @@ public class BlogPostJsonColumn extends AdditionalColumn<BlogPost.State, Json> {
     BlogPost.State state = upsert.value();
     if (state instanceof BlogPost.DraftState s) {
       // a json library would be used here
-      String jsonString = "{\"title\": \"" + s.content.title + "\", \"published\": false}";
+      String jsonString = "{\"title\": \"" + s.content.title() + "\", \"published\": false}";
       Json json = Json.of(jsonString);
       return AdditionalColumn.bindValue(json);
     } else if (state instanceof BlogPost.PublishedState s) {
       // a json library would be used here
-      String jsonString = "{\"title\": \"" + s.content.title + "\", \"published\": true}";
+      String jsonString = "{\"title\": \"" + s.content.title() + "\", \"published\": true}";
       Json json = Json.of(jsonString);
       return AdditionalColumn.bindValue(json);
     } else {
