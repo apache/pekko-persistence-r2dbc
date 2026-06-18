@@ -39,8 +39,7 @@ public class JavadslChangeHandler implements ChangeHandler<String> {
 
   @Override
   public CompletionStage<Done> process(R2dbcSession session, DurableStateChange<String> change) {
-    if (change instanceof UpdatedDurableState) {
-      UpdatedDurableState<String> upd = (UpdatedDurableState<String>) change;
+    if (change instanceof UpdatedDurableState<String> upd) {
       return session
           .updateOne(
               session
