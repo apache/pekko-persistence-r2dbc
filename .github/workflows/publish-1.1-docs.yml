@@ -25,7 +25,7 @@ jobs:
           java-version: 8
 
       - name: Install sbt
-        uses: sbt/setup-sbt@6c68d2fe8dfbc0a0534d70101baa2e0420e1a506 # v1.1.9
+        uses: sbt/setup-sbt@3afe9cf056c5d139bfc46579af1192d77a2f0821 # v1.4.0
 
       - name: Install Graphviz
         run: |-
