@@ -209,7 +209,7 @@ trait ConnectionSettings {
     }
 
   protected def useJsonPayload(configKey: String): Boolean =
-    config.getString(configKey).toUpperCase match {
+    config.getString(configKey).toUpperCase(Locale.ROOT) match {
       case "BYTEA"          => false
       case "JSONB" | "JSON" => true
       case t                =>
