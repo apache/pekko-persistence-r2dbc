@@ -26,6 +26,7 @@ object CommonSettings extends AutoPlugin {
     crossVersion := CrossVersion.binary,
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),
+    scalacOptions ++= Seq("-deprecation", "-feature", "-Xfatal-warnings"),
     scalacOptions ++= {
       val commonWconf = Seq(
         // r2dbc-spi annotation parsing warning - external dependency, cannot be fixed
@@ -34,18 +35,21 @@ object CommonSettings extends AutoPlugin {
         "-language:existentials")
       if (scalaBinaryVersion.value == "3")
         commonWconf ++ Seq(
+          "-Werror",
           "-release:17",
           "-Wconf:msg=Implicit parameters should be provided with a `using` clause:s",
           "-Wconf:msg=is deprecated for wildcard arguments of types:s",
           "-Wconf:msg=The trailing ` _` for eta-expansion is unnecessary:s",
           "-Wconf:msg=with as a type operator has been deprecated:s",
           "-Wconf:msg=Unreachable case except for null:s",
-          "-Wconf:msg=is no longer supported for vararg splices:s") ++
+          "-Wconf:msg=is no longer supported for vararg splices:s",
+          "-Wconf:msg=bad option.*-Xfatal-warnings:s") ++
         (if (CrossVersion.partialVersion(scalaVersion.value).exists(_._2 < 9))
            Seq("-Yfuture-lazy-vals", "-Wconf:msg=bad option.*-Yfuture-lazy-vals:s")
          else Seq.empty)
       else commonWconf
     },
+    Compile / doc / scalacOptions --= Seq("-Xfatal-warnings"),
     Test / logBuffered := false,
     Test / parallelExecution := false,
     // show full stack traces and test case durations
