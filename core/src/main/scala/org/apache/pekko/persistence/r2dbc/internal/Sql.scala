@@ -62,7 +62,7 @@ object Sql {
 
   /**
    * Java API: Replaces `?` with numbered `\$1`, `\$2` for bind parameters. Use `??` to include a literal `?`. Trims
-   * whitespace, including line breaks. The arguments are used like in [[java.lang.String.format]].
+   * whitespace, including line breaks. The arguments are used like in `java.lang.String.format`.
    */
   @varargs
   def format(sql: String, args: AnyRef*): String =
