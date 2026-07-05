@@ -120,8 +120,8 @@ class DurableStateStoreSpec
       val value = "Genuinely Collaborative"
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
-      store.deleteObject(persistenceId).futureValue
-      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
+      store.deleteObject(persistenceId, 2L).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
     }
 
     "hard delete when revision=0" in {

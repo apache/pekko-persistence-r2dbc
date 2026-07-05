@@ -220,7 +220,7 @@ class EventSourcedCleanupSpec
       })
 
       (1 to 10).foreach { n =>
-        p ! Persister.PersistWithAck(s"${if (n == 3) n + "-snap" else n}", ackProbe.ref)
+        p ! Persister.PersistWithAck(s"${if (n == 3) s"$n-snap" else n}", ackProbe.ref)
         ackProbe.expectMessage(Done)
       }
 
@@ -252,7 +252,7 @@ class EventSourcedCleanupSpec
       })
 
       (1 to 10).foreach { n =>
-        p ! Persister.PersistWithAck(s"${if (n == 3) n + "-snap" else n}", ackProbe.ref)
+        p ! Persister.PersistWithAck(s"${if (n == 3) s"$n-snap" else n}", ackProbe.ref)
         ackProbe.expectMessage(Done)
       }
 
@@ -290,7 +290,7 @@ class EventSourcedCleanupSpec
 
       (1 to 10).foreach { n =>
         persisters.foreach { p =>
-          p ! Persister.PersistWithAck(s"${if (n == 3) n + "-snap" else n}", ackProbe.ref)
+          p ! Persister.PersistWithAck(s"${if (n == 3) s"$n-snap" else n}", ackProbe.ref)
           ackProbe.expectMessage(Done)
         }
       }
@@ -324,7 +324,7 @@ class EventSourcedCleanupSpec
 
       (1 to 10).foreach { n =>
         persisters.foreach { p =>
-          p ! Persister.PersistWithAck(s"${if (n == 3) n + "-snap" else n}", ackProbe.ref)
+          p ! Persister.PersistWithAck(s"${if (n == 3) s"$n-snap" else n}", ackProbe.ref)
           ackProbe.expectMessage(Done)
         }
       }
