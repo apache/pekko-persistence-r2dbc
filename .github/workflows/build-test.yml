@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
         JAVA_VERSION: [ 17, 21 ]
     steps:
       - name: Checkout
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -156,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -213,7 +213,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3 ]
+        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
         JAVA_VERSION: [ 17, 21 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
