@@ -49,7 +49,7 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   def get(system: ActorSystem[?]): ConnectionFactoryProvider = apply(system)
 
   /**
-   * Enables customization of [[ConnectionFactoryOptions]] right before the connection factory is created.
+   * Enables customization of `ConnectionFactoryOptions` right before the connection factory is created.
    * This is particularly useful for setting options that support dynamically computed values rather than
    * just plain constants. Classes implementing this trait must have a constructor with a single parameter
    * of type [[ActorSystem]].
@@ -59,7 +59,7 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   trait ConnectionFactoryOptionsCustomizer {
 
     /**
-     * Customizes the [[ConnectionFactoryOptions.Builder]] instance based on the provided configuration.
+     * Customizes the `ConnectionFactoryOptions.Builder` instance based on the provided configuration.
      *
      * @param builder the options builder that has been pre-configured by the connection factory provider
      * @param config  the connection factory configuration

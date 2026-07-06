@@ -141,7 +141,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
    * The consumer can keep track of its current position in the event stream by storing the `offset` and restart the
    * query from a given `offset` after a crash/restart.
    *
-   * The supported offset is [[TimestampOffset]] and [[Offset.noOffset]].
+   * The supported offset is [[org.apache.pekko.persistence.query.TimestampOffset TimestampOffset]] and [[Offset.noOffset]].
    *
    * The timestamp is based on the database `transaction_timestamp()` when the event was stored.
    * `transaction_timestamp()` is the time when the transaction started, not when it was committed. This means that a
@@ -451,7 +451,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
    *
    * Note: to reuse existing index, the actual query filters entity types based on persistence_id column and sql LIKE
    * operator. Hence the persistenceId must start with an entity type followed by default separator ("|") from
-   * [[pekko.persistence.typed.PersistenceId]].
+   * [[org.apache.pekko.persistence.typed.PersistenceId PersistenceId]].
    *
    * @param entityType
    *   The entity type name.

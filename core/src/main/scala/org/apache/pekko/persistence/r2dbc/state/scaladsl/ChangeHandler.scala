@@ -29,7 +29,7 @@ trait ChangeHandler[A] {
    * delete.
    *
    * The `process` method is invoked for each `DurableStateChange`. Each time a new `Connection` is passed with a new
-   * open transaction. You can use `createStatement`, `update` and other methods provided by the [[R2dbcSession]]. The
+   * open transaction. You can use `createStatement`, `update` and other methods provided by the [[org.apache.pekko.persistence.r2dbc.session.scaladsl.R2dbcSession R2dbcSession]]. The
    * results of several statements can be combined with `Future` composition. The transaction will be automatically
    * committed or rolled back when the returned `Future` is completed. Note that an exception here will abort the
    * transaction and fail the upsert or delete.

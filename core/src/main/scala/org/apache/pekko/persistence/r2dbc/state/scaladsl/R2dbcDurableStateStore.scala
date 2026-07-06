@@ -178,7 +178,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
    *
    * Note: to reuse existing index, the actual query filters entity types based on persistence_id column and sql LIKE
    * operator. Hence the persistenceId must start with an entity type followed by default separator ("|") from
-   * [[pekko.persistence.typed.PersistenceId]].
+   * [[org.apache.pekko.persistence.typed.PersistenceId PersistenceId]].
    *
    * @param entityType
    *   The entity type name.
