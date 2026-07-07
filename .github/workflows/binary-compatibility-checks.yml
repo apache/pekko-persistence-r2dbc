@@ -40,7 +40,9 @@ jobs:
 
       - name: Report MiMa Binary Issues
         run: |-
-          sbt +mimaReportBinaryIssues
+          scala_2_13="$(bash .github/scripts/resolve-scala-version.sh "2.13")"
+          scala_3="$(bash .github/scripts/resolve-scala-version.sh "3.3")"
+          sbt "++${scala_2_13}! mimaReportBinaryIssues" "++${scala_3}! mimaReportBinaryIssues"
 
       - name: Check correct MiMa filter directories
         run: |

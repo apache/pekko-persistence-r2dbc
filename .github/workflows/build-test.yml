@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
+        SCALA_VERSION: [ 2.13, 3.3, next ]
         JAVA_VERSION: [ 17, 21 ]
     steps:
       - name: Checkout
@@ -38,14 +38,16 @@ jobs:
         run: cp .jvmopts-ci .jvmopts
 
       - name: Compile and test for JDK ${{ matrix.JAVA_VERSION }}, Scala ${{ matrix.SCALA_VERSION }}
-        run: sbt ++${{ matrix.SCALA_VERSION }} test:compile
+        run: |-
+          scala_version="$(bash .github/scripts/resolve-scala-version.sh "${{ matrix.SCALA_VERSION }}")"
+          sbt "++${scala_version}!" test:compile
 
   test-postgres:
     name: Run test with Postgres
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
+        SCALA_VERSION: [ 2.13, 3.3, next ]
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -95,14 +97,16 @@ jobs:
           docker exec -i docker-postgres-db-1 psql -U postgres -t -d database2 < ddl-scripts/create_tables_postgres.sql
 
       - name: test
-        run: sbt ++${{ matrix.SCALA_VERSION }} test
+        run: |-
+          scala_version="$(bash .github/scripts/resolve-scala-version.sh "${{ matrix.SCALA_VERSION }}")"
+          sbt "++${scala_version}!" test
 
   test-postgres-jsonb:
     name: Run test with Postgres (JSONB)
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
+        SCALA_VERSION: [ 2.13, 3.3, next ]
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -156,7 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
+        SCALA_VERSION: [ 2.13, 3.3, next ]
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -206,14 +210,16 @@ jobs:
           docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t -d database2 < ddl-scripts/create_tables_yugabyte.sql
 
       - name: test
-        run: sbt -Dpekko.persistence.r2dbc.dialect=yugabyte ++${{ matrix.SCALA_VERSION }} test
+        run: |-
+          scala_version="$(bash .github/scripts/resolve-scala-version.sh "${{ matrix.SCALA_VERSION }}")"
+          sbt -Dpekko.persistence.r2dbc.dialect=yugabyte "++${scala_version}!" test
 
   test-mysql:
     name: Run tests with MySQL
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.8 ]
+        SCALA_VERSION: [ 2.13, 3.3, next ]
         JAVA_VERSION: [ 17, 21 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -263,7 +269,9 @@ jobs:
           docker exec -i docker-mysql-db-1 mysql -h 127.0.0.1 --user=root --password=root --database=database2 < ddl-scripts/create_tables_mysql.sql
 
       - name: test
-        run: sbt -Dpekko.persistence.r2dbc.dialect=mysql ++${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
+        run: |-
+          scala_version="$(bash .github/scripts/resolve-scala-version.sh "${{ matrix.SCALA_VERSION }}")"
+          sbt -Dpekko.persistence.r2dbc.dialect=mysql "++${scala_version}!" ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
 
   test-docs:
     name: Docs
