@@ -105,7 +105,8 @@ private[r2dbc] object JournalDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory: ConnectionFactory, closeCallsExceeding: Option[FiniteDuration] = None)(
+private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit val ec: ExecutionContext, system: ActorSystem[?]) extends EventsByPersistenceIdDao
     with HighestSequenceNrDao {
   import JournalDao.SerializedJournalRow

@@ -80,7 +80,8 @@ private[r2dbc] object SnapshotDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory, closeCallsExceeding: Option[FiniteDuration] = None)(
+private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[?]) {

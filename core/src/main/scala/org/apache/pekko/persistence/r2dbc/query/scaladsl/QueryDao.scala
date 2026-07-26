@@ -79,7 +79,8 @@ object QueryDao {
  * INTERNAL API
  */
 @InternalApi
-private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory, closeCallsExceeding: Option[FiniteDuration] = None)(
+private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit val ec: ExecutionContext, system: ActorSystem[?]) extends BySliceQuery.Dao[SerializedJournalRow]
     with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata

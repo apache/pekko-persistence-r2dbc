@@ -114,7 +114,8 @@ import org.slf4j.LoggerFactory
  * Class for encapsulating db interaction.
  */
 @InternalApi
-private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory, closeCallsExceeding: Option[FiniteDuration] = None)(
+private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[?])
