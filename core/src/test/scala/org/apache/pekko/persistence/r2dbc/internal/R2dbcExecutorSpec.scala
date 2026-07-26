@@ -16,13 +16,14 @@ package org.apache.pekko.persistence.r2dbc.internal
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.LogCapturing
-import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.persistence.r2dbc.ConnectionFactorySettings
-import org.apache.pekko.persistence.r2dbc.TestConfig
-import org.apache.pekko.persistence.r2dbc.TestData
-import org.apache.pekko.persistence.r2dbc.TestDbLifecycle
+import org.apache.pekko
+import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.ConnectionFactorySettings
+import pekko.persistence.r2dbc.TestConfig
+import pekko.persistence.r2dbc.TestData
+import pekko.persistence.r2dbc.TestDbLifecycle
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.spi.Connection
@@ -53,7 +54,8 @@ class R2dbcExecutorSpec
   private val table = "r2dbc_executor_spec"
 
   private val closeCallsExceeding =
-    ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+    ConnectionFactorySettings.closeCallsExceeding(
+      system.settings.config.getConfig("pekko.persistence.r2dbc.connection-factory"))
 
   case class Row(col: String)
 
