@@ -20,7 +20,6 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.control.Exception.Catcher
@@ -125,7 +124,7 @@ class R2dbcExecutor(
   private val logDbCallsExceedingEnabled = logDbCallsExceedingMicros >= 0
 
   // for backwards compatibility, closeCallsExceeding should be defined
-  @deprecated("Use constructor with closeCallsExceeding", "1.2.0")
+  @deprecated("Use constructor with closeCallsExceeding", "2.0.0")
   def this(connectionFactory: ConnectionFactory, log: Logger, logDbCallsExceeding: FiniteDuration)(
       implicit
       ec: ExecutionContext,
