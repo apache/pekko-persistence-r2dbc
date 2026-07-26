@@ -29,6 +29,7 @@ import com.typesafe.config.ConfigFactory
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.R2dbcNonTransientResourceException
 import io.r2dbc.spi.Wrapped
+import org.scalatest.{ Outcome, Pending }
 import org.scalatest.wordspec.AnyWordSpecLike
 
 object R2dbcExecutorSpec {
@@ -41,6 +42,8 @@ object R2dbcExecutorSpec {
     }
     """)
     .withFallback(TestConfig.config)
+
+  val dialect = config.getString("pekko.persistence.r2dbc.dialect")
 }
 
 class R2dbcExecutorSpec
@@ -49,6 +52,13 @@ class R2dbcExecutorSpec
     with TestDbLifecycle
     with TestData
     with LogCapturing {
+
+  override def withFixture(test: NoArgTest): Outcome =
+    if (R2dbcExecutorSpec.dialect == "mysql") {
+      Pending // uses pg_sleep which is Postgres-specific
+    } else {
+      super.withFixture(test)
+    }
 
   override def typedSystem: ActorSystem[?] = system
   private val table = "r2dbc_executor_spec"
