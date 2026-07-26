@@ -41,8 +41,9 @@ import io.r2dbc.spi.Row
 @InternalApi
 private[r2dbc] class MySQLQueryDao(
     querySettings: QuerySettings,
-    connectionFactory: ConnectionFactory
-)(implicit ec: ExecutionContext, system: ActorSystem[?]) extends QueryDao(querySettings, connectionFactory) {
+    connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None
+)(implicit ec: ExecutionContext, system: ActorSystem[?]) extends QueryDao(querySettings, connectionFactory, closeCallsExceeding) {
 
   override lazy val statementTimestampSql: String = "NOW(6)"
 

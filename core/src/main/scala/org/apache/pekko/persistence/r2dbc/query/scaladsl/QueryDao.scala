@@ -62,11 +62,15 @@ object QueryDao {
   )(implicit system: ActorSystem[?], ec: ExecutionContext): QueryDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    val closeCallsExceeding = {
+      val fullConfig = config.withFallback(system.settings.config)
+      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
+    }
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new QueryDao(settings, connectionFactory)
+        new QueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
-        new MySQLQueryDao(settings, connectionFactory)
+        new MySQLQueryDao(settings, connectionFactory, closeCallsExceeding)
     }
   }
 }
@@ -75,7 +79,7 @@ object QueryDao {
  * INTERNAL API
  */
 @InternalApi
-private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory, closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit val ec: ExecutionContext, system: ActorSystem[?]) extends BySliceQuery.Dao[SerializedJournalRow]
     with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata
@@ -163,11 +167,8 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
   private val persistenceIdsForEntityTypeAfterSql =
     sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id LIKE ? AND persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
-  protected val r2dbcExecutor = {
-    val closeCallsExceeding =
-      ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig(settings.useConnectionFactory))
+  protected val r2dbcExecutor =
     new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
-  }
 
   def currentDbTimestamp(): Future[Instant] = {
     r2dbcExecutor

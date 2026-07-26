@@ -95,11 +95,15 @@ import org.slf4j.LoggerFactory
   )(implicit system: ActorSystem[?], ec: ExecutionContext): DurableStateDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    val closeCallsExceeding = {
+      val fullConfig = config.withFallback(system.settings.config)
+      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
+    }
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new DurableStateDao(settings, connectionFactory)
+        new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
-        new MySQLDurableStateDao(settings, connectionFactory)
+        new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
     }
   }
 }
@@ -110,7 +114,7 @@ import org.slf4j.LoggerFactory
  * Class for encapsulating db interaction.
  */
 @InternalApi
-private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory: ConnectionFactory, closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[?])
@@ -121,11 +125,8 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
 
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = {
-    val closeCallsExceeding =
-      ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig(settings.useConnectionFactory))
+  private val r2dbcExecutor =
     new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
-  }
 
   protected val stateTable = settings.durableStateTableWithSchema
   protected implicit val statePayloadCodec: PayloadCodec = settings.durableStatePayloadCodec

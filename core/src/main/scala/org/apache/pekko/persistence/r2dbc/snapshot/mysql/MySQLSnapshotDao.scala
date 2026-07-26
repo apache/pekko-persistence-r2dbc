@@ -20,6 +20,7 @@
 package org.apache.pekko.persistence.r2dbc.snapshot.mysql
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import io.r2dbc.spi.ConnectionFactory
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
@@ -33,8 +34,9 @@ import pekko.persistence.r2dbc.snapshot.SnapshotDao
  */
 @InternalApi
 private[r2dbc] class MySQLSnapshotDao(
-    settings: SnapshotSettings, connectionFactory: ConnectionFactory
-)(implicit ec: ExecutionContext, system: ActorSystem[?]) extends SnapshotDao(settings, connectionFactory) {
+    settings: SnapshotSettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None
+)(implicit ec: ExecutionContext, system: ActorSystem[?]) extends SnapshotDao(settings, connectionFactory, closeCallsExceeding) {
 
   override val upsertSql = sql"""
     INSERT INTO $snapshotTable
