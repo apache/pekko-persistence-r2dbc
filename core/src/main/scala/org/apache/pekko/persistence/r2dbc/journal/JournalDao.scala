@@ -22,6 +22,7 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
@@ -111,7 +112,11 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
 
   private val persistenceExt = Persistence(system)
 
-  protected val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  protected val r2dbcExecutor = {
+    val closeCallsExceeding =
+      ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig(settings.useConnectionFactory))
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
+  }
 
   protected val journalTable: String = settings.journalTableWithSchema
   protected implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec

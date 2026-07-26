@@ -33,6 +33,7 @@ import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.internal.AdditionalColumnFactory
@@ -120,7 +121,11 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
 
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = {
+    val closeCallsExceeding =
+      ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig(settings.useConnectionFactory))
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
+  }
 
   protected val stateTable = settings.durableStateTableWithSchema
   protected implicit val statePayloadCodec: PayloadCodec = settings.durableStatePayloadCodec

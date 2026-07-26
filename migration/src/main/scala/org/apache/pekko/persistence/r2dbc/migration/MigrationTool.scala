@@ -36,6 +36,7 @@ import pekko.persistence.query.scaladsl.CurrentPersistenceIdsQuery
 import pekko.persistence.query.scaladsl.ReadJournal
 import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.journal.JournalDao
@@ -141,7 +142,11 @@ class MigrationTool(system: ActorSystem[?]) {
   private lazy val sourceSnapshotStore = Persistence(system).snapshotStoreFor(sourceSnapshotPluginId)
 
   private[r2dbc] val migrationDao =
-    new MigrationToolDao(targetJournalConnectionFactory, targetJournalSettings.logDbCallsExceeding)
+    new MigrationToolDao(
+      targetJournalConnectionFactory,
+      targetJournalSettings.logDbCallsExceeding,
+      ConnectionFactorySettings.closeCallsExceeding(
+        system.settings.config.getConfig(targetJournalSettings.useConnectionFactory)))
 
   private lazy val createProgressTable: Future[Done] =
     migrationDao.createProgressTable()

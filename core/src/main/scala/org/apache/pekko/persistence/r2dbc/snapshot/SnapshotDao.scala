@@ -21,6 +21,7 @@ import pekko.annotation.InternalApi
 import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -84,7 +85,11 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
 
   protected val snapshotTable: String = settings.snapshotsTableWithSchema
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor = {
+    val closeCallsExceeding =
+      ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig(settings.useConnectionFactory))
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
+  }
   protected implicit val snapshotPayloadCodec: PayloadCodec = settings.snapshotPayloadCodec
 
   private def collectSerializedSnapshot(row: Row): SerializedSnapshotRow =
