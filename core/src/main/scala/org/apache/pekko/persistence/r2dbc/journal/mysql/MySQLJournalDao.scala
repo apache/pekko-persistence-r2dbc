@@ -20,6 +20,7 @@
 package org.apache.pekko.persistence.r2dbc.journal.mysql
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -118,9 +119,10 @@ private[r2dbc] object MySQLJournalDao {
 @InternalApi
 private[r2dbc] class MySQLJournalDao(
     journalSettings: JournalSettings,
-    connectionFactory: ConnectionFactory)(
+    connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit ec: ExecutionContext, system: ActorSystem[?]
-) extends JournalDao(journalSettings, connectionFactory) {
+) extends JournalDao(journalSettings, connectionFactory, closeCallsExceeding) {
   MySQLJournalDao.settingRequirements(journalSettings)
 
   override lazy val timestampSql: String = "NOW(6)"

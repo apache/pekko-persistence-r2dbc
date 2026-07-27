@@ -24,6 +24,7 @@ import pekko.NotUsed
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
@@ -61,11 +62,15 @@ object QueryDao {
   )(implicit system: ActorSystem[?], ec: ExecutionContext): QueryDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    val closeCallsExceeding = {
+      val fullConfig = config.withFallback(system.settings.config)
+      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
+    }
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new QueryDao(settings, connectionFactory)
+        new QueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
-        new MySQLQueryDao(settings, connectionFactory)
+        new MySQLQueryDao(settings, connectionFactory, closeCallsExceeding)
     }
   }
 }
@@ -74,7 +79,8 @@ object QueryDao {
  * INTERNAL API
  */
 @InternalApi
-private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit val ec: ExecutionContext, system: ActorSystem[?]) extends BySliceQuery.Dao[SerializedJournalRow]
     with EventsByPersistenceIdDao with HighestSequenceNrDao {
   import JournalDao.readMetadata
@@ -163,7 +169,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
     sql"SELECT DISTINCT(persistence_id) from $journalTable WHERE persistence_id LIKE ? AND persistence_id > ? ORDER BY persistence_id LIMIT ?"
 
   protected val r2dbcExecutor =
-    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
 
   def currentDbTimestamp(): Future[Instant] = {
     r2dbcExecutor

@@ -147,6 +147,10 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         PostgresqlConnectionFactoryProvider.PREPARED_STATEMENT_CACHE_QUERIES,
         Integer.valueOf(settings.statementCacheSize))
 
+    settings.statementTimeout.foreach { timeout =>
+      builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, JDuration.ofMillis(timeout.toMillis))
+    }
+
     if (settings.sslEnabled) {
       builder.option(ConnectionFactoryOptions.SSL, java.lang.Boolean.TRUE)
 

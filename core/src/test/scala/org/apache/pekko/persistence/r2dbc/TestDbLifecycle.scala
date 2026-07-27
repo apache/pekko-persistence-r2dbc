@@ -18,6 +18,7 @@ import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.Persistence
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
@@ -48,11 +49,15 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
         config.getConfig("pekko.persistence.r2dbc.connection-factory").atPath("test.connection-factory"))
 
   // this assumes that journal, snapshot store and state use same connection settings
-  lazy val r2dbcExecutor: R2dbcExecutor =
+  lazy val r2dbcExecutor: R2dbcExecutor = {
+    val closeCallsExceeding =
+      ConnectionFactorySettings.closeCallsExceeding(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
     new R2dbcExecutor(
       connectionFactoryProvider,
       LoggerFactory.getLogger(getClass),
-      journalSettings.logDbCallsExceeding)(typedSystem.executionContext, typedSystem)
+      journalSettings.logDbCallsExceeding,
+      closeCallsExceeding)(typedSystem.executionContext, typedSystem)
+  }
 
   lazy val persistenceExt: Persistence = Persistence(typedSystem)
 

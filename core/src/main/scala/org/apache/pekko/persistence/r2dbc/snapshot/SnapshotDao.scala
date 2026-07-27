@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.snapshot
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.FiniteDuration
 
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
@@ -21,6 +22,7 @@ import pekko.annotation.InternalApi
 import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -59,11 +61,15 @@ private[r2dbc] object SnapshotDao {
   )(implicit system: ActorSystem[?], ec: ExecutionContext): SnapshotDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    val closeCallsExceeding = {
+      val fullConfig = config.withFallback(system.settings.config)
+      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
+    }
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new SnapshotDao(settings, connectionFactory)
+        new SnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
-        new MySQLSnapshotDao(settings, connectionFactory)
+        new MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding)
     }
   }
 }
@@ -74,7 +80,8 @@ private[r2dbc] object SnapshotDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit
     ec: ExecutionContext,
     system: ActorSystem[?]) {
@@ -84,7 +91,8 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
 
   protected val snapshotTable: String = settings.snapshotsTableWithSchema
   private val persistenceExt = Persistence(system)
-  private val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  private val r2dbcExecutor =
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
   protected implicit val snapshotPayloadCodec: PayloadCodec = settings.snapshotPayloadCodec
 
   private def collectSerializedSnapshot(row: Row): SerializedSnapshotRow =

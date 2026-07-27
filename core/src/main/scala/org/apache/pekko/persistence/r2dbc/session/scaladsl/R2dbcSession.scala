@@ -22,6 +22,7 @@ import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.ApiMayChange
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.Row
@@ -45,7 +46,12 @@ object R2dbcSession {
   def withSession[A](system: ActorSystem[?], connectionFactoryConfigPath: String)(
       fun: R2dbcSession => Future[A]): Future[A] = {
     val connectionFactory = ConnectionFactoryProvider(system).connectionFactoryFor(connectionFactoryConfigPath)
-    val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, logDbCallsDisabled)(system.executionContext, system)
+    val closeCallsExceeding =
+      ConnectionFactorySettings.closeCallsExceeding(system.settings.config.getConfig(connectionFactoryConfigPath))
+    val r2dbcExecutor =
+      new R2dbcExecutor(connectionFactory, log, logDbCallsDisabled, closeCallsExceeding)(
+        system.executionContext,
+        system)
     r2dbcExecutor.withConnection("R2dbcSession") { connection =>
       val session = new R2dbcSession(connection)(system.executionContext, system)
       fun(session)

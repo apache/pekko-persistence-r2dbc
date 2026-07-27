@@ -16,12 +16,14 @@ package org.apache.pekko.persistence.r2dbc.journal
 import java.time.Instant
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.FiniteDuration
 
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
+import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
@@ -84,11 +86,15 @@ private[r2dbc] object JournalDao {
   )(implicit system: ActorSystem[?], ec: ExecutionContext): JournalDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
+    val closeCallsExceeding = {
+      val fullConfig = config.withFallback(system.settings.config)
+      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
+    }
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
-        new JournalDao(settings, connectionFactory)
+        new JournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
-        new MySQLJournalDao(settings, connectionFactory)
+        new MySQLJournalDao(settings, connectionFactory, closeCallsExceeding)
     }
   }
 }
@@ -99,7 +105,8 @@ private[r2dbc] object JournalDao {
  * Class for doing db interaction outside of an actor to avoid mistakes in future callbacks
  */
 @InternalApi
-private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory: ConnectionFactory)(
+private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory: ConnectionFactory,
+    closeCallsExceeding: Option[FiniteDuration] = None)(
     implicit val ec: ExecutionContext, system: ActorSystem[?]) extends EventsByPersistenceIdDao
     with HighestSequenceNrDao {
   import JournalDao.SerializedJournalRow
@@ -111,7 +118,8 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
 
   private val persistenceExt = Persistence(system)
 
-  protected val r2dbcExecutor = new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding)(ec, system)
+  protected val r2dbcExecutor =
+    new R2dbcExecutor(connectionFactory, log, settings.logDbCallsExceeding, closeCallsExceeding)(ec, system)
 
   protected val journalTable: String = settings.journalTableWithSchema
   protected implicit val journalPayloadCodec: PayloadCodec = settings.journalPayloadCodec

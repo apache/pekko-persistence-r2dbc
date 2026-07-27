@@ -331,6 +331,14 @@ final class ConnectionFactorySettings(config: Config) {
 
   val statementCacheSize: Int = config.getInt("statement-cache-size")
 
+  val statementTimeout: Option[FiniteDuration] =
+    config.getString("statement-timeout").toLowerCase(Locale.ROOT) match {
+      case "off" => None
+      case _     => Some(config.getDuration("statement-timeout").toScala)
+    }
+
+  val closeCallsExceeding: Option[FiniteDuration] = ConnectionFactorySettings.closeCallsExceeding(config)
+
   val connectionFactoryOptionsCustomizer: Option[String] =
     Option(config.getString("connection-factory-options-customizer")).filter(_.trim.nonEmpty)
 }
@@ -342,6 +350,12 @@ final class ConnectionFactorySettings(config: Config) {
 object ConnectionFactorySettings {
   def apply(config: Config): ConnectionFactorySettings =
     new ConnectionFactorySettings(config)
+
+  def closeCallsExceeding(config: Config): Option[FiniteDuration] =
+    config.getString("close-calls-exceeding").toLowerCase(Locale.ROOT) match {
+      case "off" => None
+      case _     => Some(config.getDuration("close-calls-exceeding").toScala)
+    }
 }
 
 /**

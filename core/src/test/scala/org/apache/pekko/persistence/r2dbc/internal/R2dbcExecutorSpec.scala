@@ -1,0 +1,131 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * license agreements; and to You under the Apache License, version 2.0:
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * This file is part of the Apache Pekko project, which was derived from Akka.
+ */
+
+/*
+ * Copyright (C) 2022 - 2023 Lightbend Inc. <https://www.lightbend.com>
+ */
+
+package org.apache.pekko.persistence.r2dbc.internal
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
+import org.apache.pekko
+import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.ConnectionFactorySettings
+import pekko.persistence.r2dbc.TestConfig
+import pekko.persistence.r2dbc.TestData
+import pekko.persistence.r2dbc.TestDbLifecycle
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.R2dbcNonTransientResourceException
+import io.r2dbc.spi.Wrapped
+import org.scalatest.{ Outcome, Pending }
+import org.scalatest.wordspec.AnyWordSpecLike
+
+object R2dbcExecutorSpec {
+  val config: Config = ConfigFactory
+    .parseString("""
+    pekko.persistence.r2dbc.connection-factory {
+      initial-size = 1
+      max-size = 1
+      close-calls-exceeding = 3 seconds
+    }
+    """)
+    .withFallback(TestConfig.config)
+
+  val dialect = config.getString("pekko.persistence.r2dbc.dialect")
+}
+
+class R2dbcExecutorSpec
+    extends ScalaTestWithActorTestKit(R2dbcExecutorSpec.config)
+    with AnyWordSpecLike
+    with TestDbLifecycle
+    with TestData
+    with LogCapturing {
+
+  override def withFixture(test: NoArgTest): Outcome =
+    if (R2dbcExecutorSpec.dialect == "mysql") {
+      Pending // uses pg_sleep which is Postgres-specific
+    } else {
+      super.withFixture(test)
+    }
+
+  override def typedSystem: ActorSystem[?] = system
+  private val table = "r2dbc_executor_spec"
+
+  private val closeCallsExceeding =
+    ConnectionFactorySettings.closeCallsExceeding(
+      system.settings.config.getConfig("pekko.persistence.r2dbc.connection-factory"))
+
+  case class Row(col: String)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+
+    Await.result(
+      r2dbcExecutor.executeDdl(s"beforeAll create table $table")(
+        _.createStatement(s"create table if not exists $table (col text)")),
+      20.seconds)
+
+    r2dbcExecutor.updateOne("test")(_.createStatement(s"delete from $table")).futureValue
+  }
+
+  "R2dbcExecutor" should {
+
+    "close connection when no response from update" in {
+      @volatile var c1: Connection = null
+      @volatile var c2: Connection = null
+
+      val result = r2dbcExecutor.update("test") { connection =>
+        c1 = connection.asInstanceOf[Wrapped[Connection]].unwrap()
+        Vector(
+          connection.createStatement(s"insert into $table (col) values ('a')"),
+          connection.createStatement("select pg_sleep(4)"),
+          connection.createStatement(s"insert into $table (col) values ('b')"))
+      }
+
+      Thread.sleep(closeCallsExceeding.get.toMillis)
+
+      // The request will fail with PostgresConnectionClosedException
+      result.failed.futureValue shouldBe a[R2dbcNonTransientResourceException]
+
+      r2dbcExecutor
+        .selectOne("test")(
+          { connection =>
+            c2 = connection.asInstanceOf[Wrapped[Connection]].unwrap()
+            connection.createStatement(s"select col from $table where col = 'a'")
+          },
+          row => Row(row.get("col", classOf[String])))
+        .futureValue shouldBe None
+
+      r2dbcExecutor
+        .selectOne("test")(
+          _.createStatement(s"select col from $table where col = 'b'"),
+          row => Row(row.get("col", classOf[String])))
+        .futureValue shouldBe None
+
+      // it shouldn't reuse the connection
+      c1 should not be theSameInstanceAs(c2)
+    }
+
+    "close connection when no response from update with auto-commit" in {
+      val result = r2dbcExecutor.updateOne("test")(_.createStatement("select pg_sleep(4)"))
+
+      Thread.sleep(closeCallsExceeding.get.toMillis)
+
+      // The request will fail with PostgresConnectionClosedException
+      result.failed.futureValue shouldBe a[R2dbcNonTransientResourceException]
+    }
+
+  }
+}
