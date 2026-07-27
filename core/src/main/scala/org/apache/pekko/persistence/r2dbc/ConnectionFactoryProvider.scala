@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.jdk.CollectionConverters._
+import scala.jdk.DurationConverters._
 import scala.util.Failure
 import scala.util.Success
 
@@ -137,7 +138,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
             .option(ConnectionFactoryOptions.USER, settings.user)
             .option(ConnectionFactoryOptions.PASSWORD, settings.password)
             .option(ConnectionFactoryOptions.DATABASE, settings.database)
-            .option(ConnectionFactoryOptions.CONNECT_TIMEOUT, JDuration.ofMillis(settings.connectTimeout.toMillis))
+            .option(ConnectionFactoryOptions.CONNECT_TIMEOUT, settings.connectTimeout.toJava)
       }
 
     builder
@@ -148,7 +149,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         Integer.valueOf(settings.statementCacheSize))
 
     settings.statementTimeout.foreach { timeout =>
-      builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, JDuration.ofMillis(timeout.toMillis))
+      builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, timeout.toJava)
     }
 
     if (settings.sslEnabled) {
@@ -190,11 +191,11 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       if (maxIdleTime <= Duration.Zero && maxLifeTime <= Duration.Zero) {
         JDuration.ZERO
       } else if (maxIdleTime <= Duration.Zero) {
-        JDuration.ofMillis((maxLifeTime / 4).toMillis)
+        (maxLifeTime / 4).toJava
       } else if (maxLifeTime <= Duration.Zero) {
-        JDuration.ofMillis((maxIdleTime / 4).toMillis)
+        (maxIdleTime / 4).toJava
       } else {
-        JDuration.ofMillis((maxIdleTime.min(maxIdleTime) / 4).toMillis)
+        (maxIdleTime.min(maxIdleTime) / 4).toJava
       }
     }
 
@@ -204,10 +205,10 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       .maxSize(settings.maxSize)
       // Don't use maxCreateConnectionTime because it can cause connection leaks, see issue #182
       // ConnectionFactoryOptions.CONNECT_TIMEOUT is used instead.
-      .maxAcquireTime(JDuration.ofMillis(settings.acquireTimeout.toMillis))
+      .maxAcquireTime(settings.acquireTimeout.toJava)
       .acquireRetry(settings.acquireRetry)
-      .maxIdleTime(JDuration.ofMillis(settings.maxIdleTime.toMillis))
-      .maxLifeTime(JDuration.ofMillis(settings.maxLifeTime.toMillis))
+      .maxIdleTime(settings.maxIdleTime.toJava)
+      .maxLifeTime(settings.maxLifeTime.toJava)
       .backgroundEvictionInterval(evictionInterval)
 
     if (settings.validationQuery.nonEmpty)

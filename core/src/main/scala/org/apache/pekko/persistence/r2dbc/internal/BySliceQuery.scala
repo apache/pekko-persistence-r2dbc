@@ -22,6 +22,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.DurationConverters._
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.annotation.InternalApi
@@ -202,10 +203,10 @@ import org.slf4j.Logger
   import BySliceQuery._
   import TimestampOffset.toTimestampOffset
 
-  private val backtrackingWindow = JDuration.ofMillis(settings.backtrackingWindow.toMillis)
+  private val backtrackingWindow = settings.backtrackingWindow.toJava
   private val halfBacktrackingWindow = backtrackingWindow.dividedBy(2)
   private val firstBacktrackingQueryWindow =
-    backtrackingWindow.plus(JDuration.ofMillis(settings.backtrackingBehindCurrentTime.toMillis))
+    backtrackingWindow.plus(settings.backtrackingBehindCurrentTime.toJava)
   private val eventBucketCountInterval = JDuration.ofSeconds(60)
 
   def currentBySlices(

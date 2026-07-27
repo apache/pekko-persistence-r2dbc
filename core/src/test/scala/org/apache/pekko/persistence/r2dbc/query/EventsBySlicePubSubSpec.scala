@@ -14,11 +14,11 @@
 package org.apache.pekko.persistence.r2dbc.query
 
 import java.time.Instant
-import java.time.{ Duration => JDuration }
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.collection.immutable
+import scala.jdk.DurationConverters._
 
 import org.apache.pekko
 import pekko.Done
@@ -209,7 +209,7 @@ class EventsBySlicePubSubSpec
     }
 
     "skipPubSubTooFarAhead" in {
-      val backtrackingWindow = JDuration.ofMillis(querySettings.backtrackingWindow.toMillis)
+      val backtrackingWindow = querySettings.backtrackingWindow.toJava
       val (in, out) =
         TestSource[EventEnvelope[String]]()
           .via(

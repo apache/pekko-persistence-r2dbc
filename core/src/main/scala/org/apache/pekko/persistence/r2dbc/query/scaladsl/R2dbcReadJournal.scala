@@ -20,6 +20,7 @@ import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.DurationConverters._
 import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.NotUsed
@@ -194,7 +195,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       dbSource
         .mergePrioritized(pubSubSource, leftPriority = 1, rightPriority = 10)
         .via(skipPubSubTooFarAhead(settings.backtrackingEnabled,
-          JDuration.ofMillis(settings.backtrackingWindow.toMillis)))
+          settings.backtrackingWindow.toJava))
         .via(deduplicate(settings.deduplicateCapacity))
     } else
       dbSource
