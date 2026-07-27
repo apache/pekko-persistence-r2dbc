@@ -382,7 +382,6 @@ class R2dbcExecutor(
         .andThen { case _ =>
           try connection.close().asFutureDone()
           catch ignoreConnectionClosedException
-
         }
     catch ignoreConnectionClosedException
   }
