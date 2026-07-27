@@ -331,13 +331,18 @@ class EventsBySlicePubSubSpec
         }
       }
 
+      // warmup: ensure all streams are fully ready to receive events before the real assertions
+      val queryIndex = querySliceRanges.indexOf(querySliceRanges.find(_.contains(slice)).get)
+      persister ! PersistWithAck("warmup", probe.ref)
+      probe.expectMessage(Done)
+      queries(queryIndex).expectNext(5.seconds).event shouldBe "warmup"
+
       for (i <- 1 to 10) {
         persister ! PersistWithAck(s"e-$i", probe.ref)
         probe.expectMessage(Done)
       }
 
       for (i <- 1 to 10) {
-        val queryIndex = querySliceRanges.indexOf(querySliceRanges.find(_.contains(slice)).get)
         queries(queryIndex).expectNext().event shouldBe s"e-$i"
       }
 
