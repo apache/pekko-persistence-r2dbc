@@ -250,6 +250,10 @@ class R2dbcExecutor(
       logPrefix: String)(statement: Connection => Statement, mapRow: Row => A): Future[immutable.IndexedSeq[A]] = {
     getConnection(logPrefix).flatMap { connection =>
       val startTime = nanoTime()
+      val timeoutTask = closeCallsExceeding.map { timeout =>
+        system.scheduler.scheduleOnce(timeout, () => closeAfterTimeout(connection))
+      }
+
       val mappedRows =
         try {
           val boundStmt = statement(connection)
@@ -262,17 +266,20 @@ class R2dbcExecutor(
 
       mappedRows.failed.foreach { exc =>
         log.debug("{} - Select failed: {}", logPrefix: Any, exc: Any)
-        connection.close().asFutureDone()
+        val done = connection.close().asFutureDone()
+        timeoutTask.foreach { task => done.onComplete(_ => task.cancel()) }
       }
 
       mappedRows.flatMap { r =>
-        connection.close().asFutureDone().map { _ =>
+        val done = connection.close().asFutureDone().map { _ =>
           val durationMicros = durationInMicros(startTime)
           if (durationMicros >= logDbCallsExceedingMicros)
             log.info("{} - Selected [{}] rows in [{}] µs", logPrefix, r.size: java.lang.Integer,
               durationMicros: java.lang.Long)
           r
         }
+        timeoutTask.foreach { task => done.onComplete(_ => task.cancel()) }
+        done
       }
 
     }
