@@ -1,0 +1,310 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * license agreements; and to You under the Apache License, version 2.0:
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * This file is part of the Apache Pekko project, which was derived from Akka.
+ */
+
+/*
+ * Copyright (C) 2021 - 2023 Lightbend Inc. <https://www.lightbend.com>
+ */
+
+package org.apache.pekko.persistence.r2dbc.journal
+
+import java.time.Instant
+import scala.collection.immutable
+import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.util.{ Failure, Success, Try }
+import com.typesafe.config.Config
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import org.apache.pekko
+import pekko.Done
+import pekko.actor.{ ActorRef, Timers }
+import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.scaladsl.adapter._
+import pekko.annotation.InternalApi
+import pekko.event.Logging
+import pekko.persistence.AtomicWrite
+import pekko.persistence.Persistence
+import pekko.persistence.PersistentRepr
+import pekko.persistence.journal.AsyncWriteJournal
+import pekko.persistence.journal.Tagged
+import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.internal.InstantFactory
+import pekko.persistence.r2dbc.internal.PubSub
+import pekko.persistence.r2dbc.journal.JournalDao.SerializedEventMetadata
+import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
+import pekko.persistence.typed.PersistenceId
+import pekko.serialization.Serialization
+import pekko.serialization.SerializationExtension
+import pekko.serialization.Serializers
+import pekko.stream.scaladsl.Sink
+
+import scala.concurrent.duration.FiniteDuration
+import scala.jdk.DurationConverters.JavaDurationOps
+
+/**
+ * INTERNAL API
+ */
+@InternalApi
+private[r2dbc] object R2dbcBatchJournal {
+  case class WriteFinished(persistenceId: String, done: Future[?])
+  private case object Flush
+  private case object FlushDone
+
+  private final case class WriteRequest(
+      persistenceId: String,
+      rows: Seq[SerializedJournalRow],
+      messages: Seq[AtomicWrite],
+      promise: Promise[Seq[Try[Unit]]]
+  )
+
+  def deserializeRow(serialization: Serialization, row: SerializedJournalRow): PersistentRepr = {
+    if (row.payload.isEmpty)
+      throw new IllegalStateException("Expected event payload to be loaded.")
+    val payload = serialization.deserialize(row.payload.get, row.serId, row.serManifest).get
+    val repr = PersistentRepr(
+      payload,
+      row.seqNr,
+      row.persistenceId,
+      writerUuid = row.writerUuid,
+      manifest = "", // FIXME issue #84
+      deleted = false,
+      sender = ActorRef.noSender)
+
+    val reprWithMeta = row.metadata match {
+      case None       => repr
+      case Some(meta) =>
+        repr.withMetadata(serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
+    }
+    reprWithMeta
+  }
+
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalApi
+private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
+  import R2dbcBatchJournal.WriteFinished
+  import R2dbcBatchJournal.deserializeRow
+  import R2dbcBatchJournal.Flush
+  import R2dbcBatchJournal.FlushDone
+  import R2dbcBatchJournal.WriteRequest
+
+  implicit val system: ActorSystem[?] = context.system.toTyped
+  implicit val ec: ExecutionContext = context.dispatcher
+
+  private val log = Logging(context.system, classOf[R2dbcBatchJournal])
+
+  private val persistenceExt = Persistence(system)
+
+  private val serialization: Serialization = SerializationExtension(context.system)
+  private val journalSettings = JournalSettings(config)
+
+  require(journalSettings.useAppTimestamp, "use-app-timestamp must be 'on' when using R2dbcBatchJournal")
+  require(journalSettings.dbTimestampMonotonicIncreasing,
+    "db-timestamp-monotonic-increasing must be 'on' when using R2dbcBatchJournal")
+
+  private val maxBatchSize: Int = config.getInt("max-batch-size")
+  private val maxBatchTime: FiniteDuration = config.getDuration("max-batch-time").toScala
+
+  require(maxBatchSize > 0, "max-batch-size must be at least 1 when using R2dbcBatchJournal")
+
+  private val journalDao = JournalDao.fromConfig(journalSettings, config)
+
+  private val pubSub: Option[PubSub] =
+    if (journalSettings.journalPublishEvents) Some(PubSub(system))
+    else None
+
+  // if there are pending writes when an actor restarts we must wait for
+  // them to complete before we can read the highest sequence number, or we will miss it
+  private val writesInProgress = new java.util.HashMap[String, Future[?]]()
+
+  private val queue = collection.mutable.Queue[WriteRequest]()
+  private var noActiveWrite = true
+
+  private def doFlush(): Unit = {
+
+    val count = math.min(maxBatchSize, queue.size.toLong).toInt
+    val writeRequests = Array.fill(count)(queue.dequeue())
+
+    def write(requests: Array[WriteRequest]): Future[Unit] =
+      journalDao
+        .writeEvents(requests.flatMap(_.rows))
+        .map { _ =>
+          requests.foreach { w =>
+            publish(w.messages, Future.successful(w.rows.head.dbTimestamp))
+            w.promise.trySuccess(Nil)
+          }
+        }
+        .recoverWith {
+          case _: R2dbcDataIntegrityViolationException if requests.length > 1 =>
+            val (left, right) = requests.splitAt(requests.length / 2)
+            write(left).flatMap(_ => write(right))
+          case exception =>
+            requests.foreach(_.promise.tryFailure(exception))
+            Future.unit
+        }
+
+    write(writeRequests).onComplete(_ => self ! FlushDone)
+  }
+
+  override def receivePluginInternal: Receive = {
+    case WriteFinished(pid, f)                    => writesInProgress.remove(pid, f)
+    case Flush if noActiveWrite && queue.nonEmpty =>
+      noActiveWrite = false
+      doFlush()
+    case FlushDone =>
+      noActiveWrite = true
+      if (queue.size >= maxBatchSize) {
+        noActiveWrite = false
+        doFlush()
+      } else if (queue.nonEmpty && !timers.isTimerActive(Flush)) {
+        timers.startSingleTimer(Flush, Flush, maxBatchTime)
+      }
+  }
+
+  override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
+    val promise = Promise[immutable.Seq[Try[Unit]]]()
+
+    def atomicWrite(atomicWrite: AtomicWrite): Unit = {
+      val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
+      val serialized: Try[Seq[SerializedJournalRow]] = Try {
+        atomicWrite.payload.map { pr =>
+          val (event, tags) = pr.payload match {
+            case Tagged(payload, tags) =>
+              (payload.asInstanceOf[AnyRef], tags)
+            case other =>
+              (other.asInstanceOf[AnyRef], Set.empty[String])
+          }
+
+          val entityType = PersistenceId.extractEntityType(pr.persistenceId)
+          val slice = persistenceExt.sliceForPersistenceId(pr.persistenceId)
+
+          val serialized = serialization.serialize(event).get
+          val serializer = serialization.findSerializerFor(event)
+          val manifest = Serializers.manifestFor(serializer, event)
+          val id: Int = serializer.identifier
+
+          val metadata = pr.metadata.map { meta =>
+            val m = meta.asInstanceOf[AnyRef]
+            val serializedMeta = serialization.serialize(m).get
+            val metaSerializer = serialization.findSerializerFor(m)
+            val metaManifest = Serializers.manifestFor(metaSerializer, m)
+            val id: Int = metaSerializer.identifier
+            SerializedEventMetadata(id, metaManifest, serializedMeta)
+          }
+
+          SerializedJournalRow(
+            slice,
+            entityType,
+            pr.persistenceId,
+            pr.sequenceNr,
+            timestamp,
+            JournalDao.EmptyDbTimestamp,
+            Some(serialized),
+            id,
+            manifest,
+            pr.writerUuid,
+            tags,
+            metadata)
+        }
+      }
+
+      serialized match {
+        case Success(writes) =>
+          queue.enqueue(
+            WriteRequest(
+              writes.head.persistenceId,
+              writes,
+              Seq(atomicWrite),
+              promise
+            )
+          )
+
+          writesInProgress.put(writes.head.persistenceId, promise.future)
+          promise.future.onComplete(_ => self ! WriteFinished(writes.head.persistenceId, promise.future))
+
+          if (queue.size >= maxBatchSize && noActiveWrite)
+            self ! Flush
+          else if (!timers.isTimerActive(Flush))
+            timers.startSingleTimer(Flush, Flush, maxBatchTime)
+        case Failure(exception) =>
+          promise.tryFailure(exception)
+      }
+    }
+
+    if (messages.size == 1)
+      atomicWrite(messages.head)
+    else {
+      // persistAsync case
+      // easiest to just group all into a single AtomicWrite
+      val batch = AtomicWrite(messages.flatMap(_.payload))
+      atomicWrite(batch)
+    }
+
+    promise.future
+  }
+
+  private def publish(messages: immutable.Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
+    pubSub match {
+      case Some(ps) =>
+        dbTimestamp.map { timestamp =>
+          messages.iterator
+            .flatMap(_.payload.iterator)
+            .foreach(pr => ps.publish(pr, timestamp))
+
+          Done
+        }
+
+      case None =>
+        dbTimestamp.map(_ => Done)(ExecutionContext.parasitic)
+    }
+
+  override def asyncDeleteMessagesTo(persistenceId: String, toSequenceNr: Long): Future[Unit] = {
+    log.debug("asyncDeleteMessagesTo persistenceId [{}], toSequenceNr [{}]", persistenceId, toSequenceNr)
+    journalDao.deleteMessagesTo(persistenceId, toSequenceNr)
+  }
+
+  override def asyncReplayMessages(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Long, max: Long)(
+      recoveryCallback: PersistentRepr => Unit): Future[Unit] = {
+    log.debug("asyncReplayMessages persistenceId [{}], fromSequenceNr [{}]", persistenceId, fromSequenceNr)
+    val effectiveToSequenceNr =
+      if (max == Long.MaxValue) toSequenceNr
+      else math.min(toSequenceNr, fromSequenceNr + max - 1)
+    journalDao
+      .internalCurrentEventsByPersistenceId(persistenceId, fromSequenceNr, effectiveToSequenceNr)
+      .runWith(Sink.foreach { row =>
+        val repr = deserializeRow(serialization, row)
+        recoveryCallback(repr)
+      })
+      .map(_ => ())
+  }
+
+  override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {
+    log.debug("asyncReadHighestSequenceNr [{}] [{}]", persistenceId, fromSequenceNr)
+    val pendingWrite = Option(writesInProgress.get(persistenceId)) match {
+      case Some(f) =>
+        log.debug("Write in progress for [{}], deferring highest seq nr until write completed", persistenceId)
+        // we only want to make write - replay sequential, not fail if previous write failed
+        f.recover { case _ => Done }(ExecutionContext.parasitic)
+      case None => Future.successful(Done)
+    }
+    pendingWrite.flatMap(_ => journalDao.readHighestSequenceNr(persistenceId, fromSequenceNr))
+  }
+
+  override def postStop(): Unit = {
+    val cause = new IllegalStateException("Journal actor stopped with pending batched writes")
+
+    queue.foreach(_.promise.tryFailure(cause))
+    writesInProgress.clear()
+    queue.clear()
+
+    super.postStop()
+  }
+
+}
