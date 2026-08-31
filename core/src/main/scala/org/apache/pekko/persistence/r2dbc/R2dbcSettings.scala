@@ -246,7 +246,7 @@ trait UseAppTimestamp {
   def config: Config
 
   /**
-   * INTERNAL API FIXME remove when https://github.com/yugabyte/yugabyte-db/issues/10995 has been resolved
+   * INTERNAL API
    */
   @InternalApi private[pekko] val useAppTimestamp: Boolean = config.getBoolean("use-app-timestamp")
 }

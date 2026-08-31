@@ -175,8 +175,6 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
     VALUES (?, ?, ?, ?, $timestampSql, ?, ?, ?, ?, ?, ?)"""
 
   /**
-   * All events must be for the same persistenceId.
-   *
    * The returned timestamp should be the `db_timestamp` column and it is used in published events when that feature is
    * enabled.
    *
@@ -187,7 +185,9 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
   def writeEvents(events: Seq[SerializedJournalRow]): Future[Instant] = {
     require(events.nonEmpty)
 
-    // it's always the same persistenceId for all events
+    // Events for multiple persistenceIds may only be mixed when
+    // `use-app-timestamp` and `db-timestamp-monotonic-increasing`
+    // are enabled; otherwise all events must have the same persistenceId.
     val persistenceId = events.head.persistenceId
     val previousSeqNr = events.head.seqNr - 1
 

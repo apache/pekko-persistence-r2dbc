@@ -98,5 +98,17 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
         settings.useConnectionFactory shouldBe "pekko.persistence.r2dbc.connection-factory"
       }
     }
+
+    "read use-app-timestamp and db-timestamp-monotonic-increasing settings" in {
+      val config = ConfigFactory.load(
+        ConfigFactory.parseString("""
+          pekko.persistence.r2dbc.use-app-timestamp = on
+          pekko.persistence.r2dbc.db-timestamp-monotonic-increasing = on
+          """)
+      )
+      val journalSettings = JournalSettings(config.getConfig("pekko.persistence.r2dbc.journal"))
+      journalSettings.useAppTimestamp shouldBe true
+      journalSettings.dbTimestampMonotonicIncreasing shouldBe true
+    }
   }
 }
