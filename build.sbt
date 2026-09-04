@@ -61,7 +61,14 @@ lazy val core = (project in file("core"))
   .enablePlugins(ReproducibleBuildsPlugin)
   .settings(
     name := "pekko-persistence-r2dbc",
-    libraryDependencies ++= Dependencies.core)
+    libraryDependencies ++= Dependencies.core,
+    mimaPreviousArtifacts := {
+      // no MiMa check for the next Scala 3 version, there are no released artifacts built with it
+      if (scalaVersion.value == Dependencies.Scala3Next)
+        Set.empty
+      else
+        mimaPreviousArtifacts.value
+    })
 
 lazy val migration = (project in file("migration"))
   .enablePlugins(ReproducibleBuildsPlugin)
