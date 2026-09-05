@@ -45,7 +45,7 @@ import org.slf4j.Logger
 
   object QueryState {
     val empty: QueryState =
-      QueryState(TimestampOffset.Zero, 0, 0, 0, 0, backtrackingCount = 0, TimestampOffset.Zero, Buckets.empty)
+      QueryState(TimestampOffset.Zero, 0, 0, 0, 0, backtrackingCount = 0, TimestampOffset.Zero, 0, 0, Buckets.empty)
   }
 
   final case class QueryState(
@@ -56,6 +56,8 @@ import org.slf4j.Logger
       idleCount: Long,
       backtrackingCount: Int,
       latestBacktracking: TimestampOffset,
+      latestBacktrackingSeenCount: Int,
+      backtrackingExpectFiltered: Int,
       buckets: Buckets) {
 
     def backtracking: Boolean = backtrackingCount > 0
@@ -316,10 +318,26 @@ import org.slf4j.Logger
           throw new IllegalArgumentException(
             s"Unexpected offset [$offset] before latestBacktracking [${state.latestBacktracking}].")
 
-        state.copy(latestBacktracking = offset, rowCount = state.rowCount + 1)
+        val newSeenCount =
+          if (offset.timestamp == state.latestBacktracking.timestamp) state.latestBacktrackingSeenCount + 1 else 1
+
+        state.copy(
+          latestBacktracking = offset,
+          latestBacktrackingSeenCount = newSeenCount,
+          rowCount = state.rowCount + 1)
       } else {
         if (offset.timestamp.isBefore(state.latest.timestamp))
           throw new IllegalArgumentException(s"Unexpected offset [$offset] before latest [${state.latest}].")
+
+        if (log.isDebugEnabled()) {
+          if (state.latestBacktracking.seen.nonEmpty &&
+            offset.timestamp.isAfter(state.latestBacktracking.timestamp.plus(firstBacktrackingQueryWindow)))
+            log.debug(
+              "{} next offset is outside the backtracking window, latestBacktracking: [{}], offset: [{}]",
+              logPrefix,
+              state.latestBacktracking,
+              offset)
+        }
 
         state.copy(latest = offset, rowCount = state.rowCount + 1)
       }
@@ -351,7 +369,7 @@ import org.slf4j.Logger
     }
 
     def switchFromBacktracking(state: QueryState): Boolean = {
-      state.backtracking && state.rowCount < settings.bufferSize - 1
+      state.backtracking && state.rowCount < settings.bufferSize - state.backtrackingExpectFiltered
     }
 
     def nextQuery(state: QueryState): (QueryState, Option[Source[Envelope, NotUsed]]) = {
@@ -381,7 +399,8 @@ import org.slf4j.Logger
             queryCount = state.queryCount + 1,
             idleCount = newIdleCount,
             backtrackingCount = 1,
-            latestBacktracking = fromOffset)
+            latestBacktracking = fromOffset,
+            backtrackingExpectFiltered = state.latestBacktrackingSeenCount)
         } else if (switchFromBacktracking(state)) {
           // switch from backtracking
           state.copy(
@@ -398,7 +417,8 @@ import org.slf4j.Logger
             rowCountSinceBacktracking = state.rowCountSinceBacktracking + state.rowCount,
             queryCount = state.queryCount + 1,
             idleCount = newIdleCount,
-            backtrackingCount = newBacktrackingCount)
+            backtrackingCount = newBacktrackingCount,
+            backtrackingExpectFiltered = state.latestBacktrackingSeenCount)
         }
 
       val behindCurrentTime =
