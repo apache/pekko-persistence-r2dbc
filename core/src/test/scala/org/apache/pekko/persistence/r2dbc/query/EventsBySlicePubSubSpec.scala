@@ -32,6 +32,7 @@ import pekko.persistence.r2dbc.TestActors.Persister.PersistWithAck
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
@@ -79,9 +80,9 @@ class EventsBySlicePubSubSpec
   }
 
   private def createEnvelope(pid: PersistenceId, seqNr: Long, evt: String): EventEnvelope[String] = {
-    val now = Instant.now()
+    val now = InstantFactory.now()
     EventEnvelope(
-      TimestampOffset(Instant.now, Map(pid.id -> seqNr)),
+      TimestampOffset(now, Map(pid.id -> seqNr)),
       pid.id,
       seqNr,
       evt,
