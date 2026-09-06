@@ -266,12 +266,12 @@ class R2dbcExecutor(
 
       mappedRows.failed.foreach { exc =>
         log.debug("{} - Select failed: {}", logPrefix: Any, exc: Any)
-        val done = connection.close().asFutureDone()
+        val done = closeConnection(connection)
         timeoutTask.foreach { task => done.onComplete(_ => task.cancel()) }
       }
 
       mappedRows.flatMap { r =>
-        val done = connection.close().asFutureDone().map { _ =>
+        val done = closeConnection(connection).map { _ =>
           val durationMicros = durationInMicros(startTime)
           if (durationMicros >= logDbCallsExceedingMicros)
             log.info("{} - Selected [{}] rows in [{}] µs", logPrefix, r.size: java.lang.Integer,
@@ -292,11 +292,22 @@ class R2dbcExecutor(
   def withConnection[A](logPrefix: String)(fun: Connection => Future[A]): Future[A] = {
     getConnection(logPrefix).flatMap { connection =>
       val startTime = nanoTime()
-      connection.beginTransaction().asFutureDone().flatMap { _ =>
-        val timeoutTask = closeCallsExceeding.map { timeout =>
-          system.scheduler.scheduleOnce(timeout, () => closeAfterTimeout(connection))
-        }
+      // scheduled before the first call on the connection, so that the connection is released
+      // also when that call fails or never completes
+      val timeoutTask = closeCallsExceeding.map { timeout =>
+        system.scheduler.scheduleOnce(timeout, () => closeAfterTimeout(connection))
+      }
 
+      val transactionBegun = connection.beginTransaction().asFutureDone()
+
+      transactionBegun.failed.foreach { exc =>
+        log.debug("{} - Begin transaction failed: {}", logPrefix: Any, exc.toString: Any)
+        // no transaction was started, so nothing to rollback, but the connection must be released
+        val done = closeConnection(connection)
+        timeoutTask.foreach { task => done.onComplete(_ => task.cancel()) }
+      }
+
+      transactionBegun.flatMap { _ =>
         val result =
           try {
             fun(connection)
@@ -340,7 +351,15 @@ class R2dbcExecutor(
         system.scheduler.scheduleOnce(timeout, () => closeAfterTimeout(connection))
       }
 
-      connection.setAutoCommit(true).asFutureDone().flatMap { _ =>
+      val autoCommitSet = connection.setAutoCommit(true).asFutureDone()
+
+      autoCommitSet.failed.foreach { exc =>
+        log.debug("{} - Setting auto-commit failed: {}", logPrefix: Any, exc.toString: Any)
+        val done = closeConnection(connection)
+        timeoutTask.foreach { task => done.onComplete(_ => task.cancel()) }
+      }
+
+      autoCommitSet.flatMap { _ =>
         val result =
           try {
             fun(connection)
@@ -353,14 +372,12 @@ class R2dbcExecutor(
         result.failed.foreach { exc =>
           log.debug("{} - DB call failed: {}", logPrefix: Any, exc: Any)
           // auto-commit so nothing to rollback
-          val done = connection.close().asFutureDone()
+          val done = closeConnection(connection)
           timeoutTask.foreach { task => done.onComplete(_ => task.cancel()) }
         }
 
         result.flatMap { r =>
-          val done = connection
-            .close()
-            .asFutureDone()
+          val done = closeConnection(connection)
             .map { _ =>
               val durationMicros = durationInMicros(startTime)
               if (durationMicros >= logDbCallsExceedingMicros)
@@ -375,21 +392,20 @@ class R2dbcExecutor(
     }
   }
 
+  private def closeConnection(connection: Connection): Future[Done] = {
+    try connection.close().asFutureDone()
+    catch ignoreConnectionClosedException
+  }
+
   private def commitAndClose(connection: Connection): Future[Done] = {
-    connection.commitTransaction().asFutureDone().andThen { case _ =>
-      try connection.close().asFutureDone()
-      catch ignoreConnectionClosedException
-    }
+    connection.commitTransaction().asFutureDone().andThen { case _ => closeConnection(connection) }
   }
 
   private def rollbackAndClose(connection: Connection): Future[Done] = {
     try connection
         .rollbackTransaction()
         .asFutureDone()
-        .andThen { case _ =>
-          try connection.close().asFutureDone()
-          catch ignoreConnectionClosedException
-        }
+        .andThen { case _ => closeConnection(connection) }
     catch ignoreConnectionClosedException
   }
 
