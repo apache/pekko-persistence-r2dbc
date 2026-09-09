@@ -47,6 +47,15 @@ object MultiPluginSpec {
       journal {
         # specific journal properties here
       }
+      batched-journal {
+        # specific batched-journal properties here
+        class = "org.apache.pekko.persistence.r2dbc.journal.R2dbcBatchJournal"
+        db-timestamp-monotonic-increasing = on
+        use-app-timestamp = on
+        max-queue-size = 10000
+        max-batch-size = 100
+        max-batch-time = 2ms
+      }
       snapshot {
         # specific snapshot properties here
       }

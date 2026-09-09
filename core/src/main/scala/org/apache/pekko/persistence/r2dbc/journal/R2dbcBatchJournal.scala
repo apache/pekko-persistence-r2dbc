@@ -20,6 +20,7 @@ import scala.util.{ Failure, Success, Try }
 import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import org.apache.pekko
+import org.apache.pekko.persistence.r2dbc.Dialect.{ Postgres, Yugabyte }
 import pekko.Done
 import pekko.actor.{ ActorRef, Timers }
 import pekko.actor.typed.ActorSystem
@@ -86,6 +87,27 @@ private[r2dbc] object R2dbcBatchJournal {
 
 /**
  * INTERNAL API
+ *
+ * Opt-in journal plugin (`pekko.persistence.r2dbc.batched-journal`) that coalesces concurrent
+ * writes from different persistence ids into one multi-row statement, trading up to
+ * `max-batch-time` of write latency for higher throughput at high concurrency.
+ *
+ * Mixing persistence ids in a single statement is only safe because the plugin requires
+ * `use-app-timestamp = on` and `db-timestamp-monotonic-increasing = on`: in that mode
+ * [[JournalDao]] does not bind the per-persistence-id previous sequence number subselect, and
+ * timestamps come from the application clock, which therefore must not move backwards.
+ * The Postgres and Yugabyte dialects are required because the flush relies on `RETURNING`.
+ *
+ * Writes are buffered in a bounded queue (`max-queue-size`); incoming writes are rejected with
+ * a failed future once the queue is full. Flushed batches are serialized: only one batch is in
+ * flight at a time, which keeps same-persistence-id writes committed in order without relying on
+ * replay-time coordination, at the cost of not using spare pool capacity. Concurrent flushing can
+ * be added later if a single flush saturates.
+ *
+ * A batch that fails with a database integrity violation is retried in halves so that only the
+ * offending persistence ids fail. Infrastructure errors fail the whole batch. A batch can contain
+ * an arbitrarily large number of rows when callers use `persistAll` or `persistAsync` bursts, the
+ * same as the default journal; this plugin targets many small concurrent writes.
  */
 @InternalApi
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
@@ -105,14 +127,19 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = JournalSettings(config)
 
+  require(journalSettings.dialect == Postgres || journalSettings.dialect == Yugabyte,
+    "Batching is only supported for Postgres and Yugabyte")
   require(journalSettings.useAppTimestamp, "use-app-timestamp must be 'on' when using R2dbcBatchJournal")
   require(journalSettings.dbTimestampMonotonicIncreasing,
     "db-timestamp-monotonic-increasing must be 'on' when using R2dbcBatchJournal")
 
+  private val maxQueueSize: Int = config.getInt("max-queue-size")
   private val maxBatchSize: Int = config.getInt("max-batch-size")
   private val maxBatchTime: FiniteDuration = config.getDuration("max-batch-time").toScala
 
+  require(maxQueueSize > 0, "max-queue-size must be at least 1 when using R2dbcBatchJournal")
   require(maxBatchSize > 0, "max-batch-size must be at least 1 when using R2dbcBatchJournal")
+  require(maxBatchSize <= maxQueueSize, "max-batch-size must be less than or equal to `max-queue-size`")
 
   private val journalDao = JournalDao.fromConfig(journalSettings, config)
 
@@ -124,22 +151,27 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   // them to complete before we can read the highest sequence number, or we will miss it
   private val writesInProgress = new java.util.HashMap[String, Future[?]]()
 
-  private val queue = collection.mutable.Queue[WriteRequest]()
+  private val queue = collection.mutable.ArrayDeque[WriteRequest]()
   private var noActiveWrite = true
+
+  // set in postStop; failing queued promises completes their futures, whose callbacks must
+  // not send WriteFinished to an actor that is already terminating
+  @volatile private var stopping = false
 
   private def doFlush(): Unit = {
 
     val count = math.min(maxBatchSize, queue.size.toLong).toInt
-    val writeRequests = Array.fill(count)(queue.dequeue())
+    val writeRequests = new Array[WriteRequest](count)
+
+    queue.copyToArray(writeRequests, 0, count)
+    queue.dropInPlace(count)
 
     def write(requests: Array[WriteRequest]): Future[Unit] =
       journalDao
-        .writeEvents(requests.flatMap(_.rows))
+        .writeEvents(immutable.ArraySeq.unsafeWrapArray(requests.view.flatMap(_.rows).toArray))
         .map { _ =>
-          requests.foreach { w =>
-            publish(w.messages, Future.successful(w.rows.head.dbTimestamp))
-            w.promise.trySuccess(Nil)
-          }
+          requests.foreach(_.promise.trySuccess(Nil))
+          requests.foreach(w => publish(w.messages, Future.successful(w.rows.head.dbTimestamp)))
         }
         .recoverWith {
           case _: R2dbcDataIntegrityViolationException if requests.length > 1 =>
@@ -150,14 +182,16 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
             Future.unit
         }
 
-    write(writeRequests).onComplete(_ => self ! FlushDone)
+    write(writeRequests).onComplete(_ => if (!stopping) self ! FlushDone)
   }
 
   override def receivePluginInternal: Receive = {
-    case WriteFinished(pid, f)                    => writesInProgress.remove(pid, f)
-    case Flush if noActiveWrite && queue.nonEmpty =>
-      noActiveWrite = false
-      doFlush()
+    case WriteFinished(pid, f) => writesInProgress.remove(pid, f)
+    case Flush                 =>
+      if (noActiveWrite && queue.nonEmpty) {
+        noActiveWrite = false
+        doFlush()
+      }
     case FlushDone =>
       noActiveWrite = true
       if (queue.size >= maxBatchSize) {
@@ -169,85 +203,93 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   }
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
-    val promise = Promise[immutable.Seq[Try[Unit]]]()
+    if (queue.length >= maxQueueSize)
+      Promise
+        .failed(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
+        .future
+    else {
+      val promise = Promise[immutable.Seq[Try[Unit]]]()
 
-    def atomicWrite(atomicWrite: AtomicWrite): Unit = {
-      val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
-      val serialized: Try[Seq[SerializedJournalRow]] = Try {
-        atomicWrite.payload.map { pr =>
-          val (event, tags) = pr.payload match {
-            case Tagged(payload, tags) =>
-              (payload.asInstanceOf[AnyRef], tags)
-            case other =>
-              (other.asInstanceOf[AnyRef], Set.empty[String])
+      def atomicWrite(atomicWrite: AtomicWrite): Unit = {
+        val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
+        val serialized: Try[Seq[SerializedJournalRow]] = Try {
+          atomicWrite.payload.map { pr =>
+            val (event, tags) = pr.payload match {
+              case Tagged(payload, tags) =>
+                (payload.asInstanceOf[AnyRef], tags)
+              case other =>
+                (other.asInstanceOf[AnyRef], Set.empty[String])
+            }
+
+            val entityType = PersistenceId.extractEntityType(pr.persistenceId)
+            val slice = persistenceExt.sliceForPersistenceId(pr.persistenceId)
+
+            val serialized = serialization.serialize(event).get
+            val serializer = serialization.findSerializerFor(event)
+            val manifest = Serializers.manifestFor(serializer, event)
+            val id: Int = serializer.identifier
+
+            val metadata = pr.metadata.map { meta =>
+              val m = meta.asInstanceOf[AnyRef]
+              val serializedMeta = serialization.serialize(m).get
+              val metaSerializer = serialization.findSerializerFor(m)
+              val metaManifest = Serializers.manifestFor(metaSerializer, m)
+              val id: Int = metaSerializer.identifier
+              SerializedEventMetadata(id, metaManifest, serializedMeta)
+            }
+
+            SerializedJournalRow(
+              slice,
+              entityType,
+              pr.persistenceId,
+              pr.sequenceNr,
+              timestamp,
+              JournalDao.EmptyDbTimestamp,
+              Some(serialized),
+              id,
+              manifest,
+              pr.writerUuid,
+              tags,
+              metadata)
           }
+        }
 
-          val entityType = PersistenceId.extractEntityType(pr.persistenceId)
-          val slice = persistenceExt.sliceForPersistenceId(pr.persistenceId)
+        serialized match {
+          case Success(writes) =>
+            queue.addOne(
+              WriteRequest(
+                writes.head.persistenceId,
+                writes,
+                Seq(atomicWrite),
+                promise
+              )
+            )
 
-          val serialized = serialization.serialize(event).get
-          val serializer = serialization.findSerializerFor(event)
-          val manifest = Serializers.manifestFor(serializer, event)
-          val id: Int = serializer.identifier
+            writesInProgress.put(writes.head.persistenceId, promise.future)
+            promise.future.onComplete { _ =>
+              if (!stopping) self ! WriteFinished(writes.head.persistenceId, promise.future)
+            }
 
-          val metadata = pr.metadata.map { meta =>
-            val m = meta.asInstanceOf[AnyRef]
-            val serializedMeta = serialization.serialize(m).get
-            val metaSerializer = serialization.findSerializerFor(m)
-            val metaManifest = Serializers.manifestFor(metaSerializer, m)
-            val id: Int = metaSerializer.identifier
-            SerializedEventMetadata(id, metaManifest, serializedMeta)
-          }
-
-          SerializedJournalRow(
-            slice,
-            entityType,
-            pr.persistenceId,
-            pr.sequenceNr,
-            timestamp,
-            JournalDao.EmptyDbTimestamp,
-            Some(serialized),
-            id,
-            manifest,
-            pr.writerUuid,
-            tags,
-            metadata)
+            if (queue.size >= maxBatchSize && noActiveWrite)
+              self ! Flush
+            else if (!timers.isTimerActive(Flush))
+              timers.startSingleTimer(Flush, Flush, maxBatchTime)
+          case Failure(exception) =>
+            promise.tryFailure(exception)
         }
       }
 
-      serialized match {
-        case Success(writes) =>
-          queue.enqueue(
-            WriteRequest(
-              writes.head.persistenceId,
-              writes,
-              Seq(atomicWrite),
-              promise
-            )
-          )
-
-          writesInProgress.put(writes.head.persistenceId, promise.future)
-          promise.future.onComplete(_ => self ! WriteFinished(writes.head.persistenceId, promise.future))
-
-          if (queue.size >= maxBatchSize && noActiveWrite)
-            self ! Flush
-          else if (!timers.isTimerActive(Flush))
-            timers.startSingleTimer(Flush, Flush, maxBatchTime)
-        case Failure(exception) =>
-          promise.tryFailure(exception)
+      if (messages.size == 1)
+        atomicWrite(messages.head)
+      else {
+        // persistAsync case
+        // easiest to just group all into a single AtomicWrite
+        val batch = AtomicWrite(messages.flatMap(_.payload))
+        atomicWrite(batch)
       }
-    }
 
-    if (messages.size == 1)
-      atomicWrite(messages.head)
-    else {
-      // persistAsync case
-      // easiest to just group all into a single AtomicWrite
-      val batch = AtomicWrite(messages.flatMap(_.payload))
-      atomicWrite(batch)
+      promise.future
     }
-
-    promise.future
   }
 
   private def publish(messages: immutable.Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
@@ -298,6 +340,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   }
 
   override def postStop(): Unit = {
+    stopping = true
     val cause = new IllegalStateException("Journal actor stopped with pending batched writes")
 
     queue.foreach(_.promise.tryFailure(cause))

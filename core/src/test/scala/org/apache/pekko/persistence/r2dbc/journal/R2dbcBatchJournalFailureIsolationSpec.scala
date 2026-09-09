@@ -41,8 +41,10 @@ object R2dbcBatchJournalFailureIsolationSpec {
   // long batch window so that the concurrent writes in the test are guaranteed
   // to be coalesced into one batch flush
   val config: Config = ConfigFactory
-    .parseString("pekko.persistence.r2dbc.journal.max-batch-time = 1s")
+    .parseString("pekko.persistence.r2dbc.batched-journal.max-batch-time = 1s")
     .withFallback(R2dbcBatchJournalSpec.config)
+
+  final case class StoredRow(pid: String, seqNr: Long, event: String, dbTimestamp: Instant)
 }
 
 class R2dbcBatchJournalFailureIsolationSpec
@@ -56,9 +58,8 @@ class R2dbcBatchJournalFailureIsolationSpec
 
   private implicit val journalPayloadCodec: PayloadCodec = journalSettings.journalPayloadCodec
   private val serialization = SerializationExtension(system)
-  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.journal")
-
-  private final case class StoredRow(pid: String, seqNr: Long, event: String, dbTimestamp: Instant)
+  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  import R2dbcBatchJournalFailureIsolationSpec.StoredRow
 
   private def sendWrite(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): Unit =
     journal ! WriteMessages(

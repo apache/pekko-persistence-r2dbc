@@ -22,12 +22,13 @@ object R2dbcBatchJournalSpec {
       |pekko.persistence.r2dbc {
       |  use-app-timestamp = on
       |  db-timestamp-monotonic-increasing = on
-      |  journal {
+      |  batched-journal {
       |    class = "org.apache.pekko.persistence.r2dbc.journal.R2dbcBatchJournal"
       |    use-app-timestamp = on
       |    db-timestamp-monotonic-increasing = on
       |  }
       |}
+      |pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.batched-journal"
       |""".stripMargin
   ).withFallback(R2dbcJournalSpec.config)
 }
