@@ -38,32 +38,33 @@ plugin (`R2dbcBatchJournal`) instead coalesces concurrent write requests from di
 multi-row insert. This reduces database round trips and commits when many persistence ids write small events at
 the same time. It adds latency and changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
 
-The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing` to be enabled, which is
-the same timestamp mode that the MySQL dialect requires. With `db-timestamp-monotonic-increasing` the database
-does not enforce increasing timestamps per persistence id, so the application clock must not move backwards
-between two writes of the same entity. The backtracking queries of @ref:[eventsBySlices](query.md) recover events
-that were stored with an out-of-order timestamp.
+The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, which the
+`batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the MySQL
+dialect requires. With `db-timestamp-monotonic-increasing` the database does not enforce increasing timestamps per
+persistence id, so the application clock must not move backwards between two writes of the same entity. The
+backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored with an out-of-order
+timestamp. Batching is only supported for the Postgres and Yugabyte dialects.
 
 ### Batched Journal Configuration
 
-To enable the batched journal, update `application.conf`:
+To enable the batched journal, point the journal plugin at the `batched-journal` block and update
+`application.conf`:
 
 ```
-pekko.persistence.r2dbc {
-  # required by the batched journal
-  use-app-timestamp = on
-  db-timestamp-monotonic-increasing = on
+pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.batched-journal"
 
-  journal {
-    class = "org.apache.pekko.persistence.r2dbc.journal.R2dbcBatchJournal"
-    max-batch-size = 100 # optional, default value
-    max-batch-time = 2ms # optional, default value
-  }
+pekko.persistence.r2dbc.batched-journal {
+  max-queue-size = 10000 # optional, default value
+  max-batch-size = 100 # optional, default value
+  max-batch-time = 2ms # optional, default value
 }
 ```
 
 The batched journal uses the following settings, in addition to the settings of the default journal:
 
+- `max-queue-size`: Maximum number of write requests buffered before they are flushed. A write request is
+  rejected with a failure when the queue has reached this limit. Must be at least 1. `max-batch-size` must be
+  less than or equal to `max-queue-size`.
 - `max-batch-size`: Maximum number of write requests in one batch. One request can contain several events when
   the persistent actor uses `persistAll` or `persistAsync`. A batch is flushed when this many requests are
   buffered.
@@ -82,12 +83,16 @@ a single persistence id, for example a duplicate sequence number caused by a zom
 retries the batch in halves until only the offending write fails. The other persistent actors are not affected.
 Failures that are not caused by a single persistence id, for example a lost database connection, fail all writes
 of the batch. The affected persistent actors see a journal write failure and are stopped by the default
-supervision, as with the default journal.
+supervision, as with the default journal. Retrying a batch with a single offending write costs at most
+twice `max-batch-size` statements, which is the number of statements the default journal would have used for the
+same writes.
 
 Memory:
-`max-batch-size` limits one batch, not the queue of buffered writes. With `persist()` each persistent actor has
-at most one outstanding write, so the queue grows with the number of actively writing actors. `persistAsync()`
-can queue several writes per actor. Buffered writes are held in memory until they are flushed.
+`max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited
+by `max-queue-size`, which rejects writes once the limit is reached. A single request can contain an arbitrary
+number of events when the persistent actor uses `persistAll` or `persistAsync`; neither journal caps that, as in
+the default journal. With `persist()` each persistent actor has at most one outstanding write, so the queue grows
+with the number of actively writing actors. Buffered writes are held in memory until they are flushed.
 
 When to use:
 Batching is most effective when many persistence ids concurrently write small events. With a low number of

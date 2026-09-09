@@ -41,7 +41,7 @@ object R2dbcBatchJournalPublishTimestampSpec {
   // long batch window so that the staggered writes below are guaranteed to be
   // coalesced into one batch flush
   val config: Config = ConfigFactory
-    .parseString("pekko.persistence.r2dbc.journal.max-batch-time = 1s")
+    .parseString("pekko.persistence.r2dbc.batched-journal.max-batch-time = 1s")
     .withFallback(R2dbcBatchJournalSpec.config)
 }
 
@@ -56,7 +56,7 @@ class R2dbcBatchJournalPublishTimestampSpec
 
   private implicit val ec: ExecutionContext = system.executionContext
 
-  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.journal")
+  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
 
   private def writeMessages(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): WriteMessages =
     WriteMessages(
