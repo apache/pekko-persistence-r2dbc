@@ -107,7 +107,8 @@ object R2dbcBatchJournalValidationSpec {
 class R2dbcBatchJournalZeroBatchSizeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.zeroBatchSizeConfig)
     with AnyWordSpecLike
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
 
   "R2dbcBatchJournal validation" should {
 
@@ -122,7 +123,8 @@ class R2dbcBatchJournalZeroBatchSizeSpec
 class R2dbcBatchJournalZeroQueueSizeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.zeroQueueSizeConfig)
     with AnyWordSpecLike
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
 
   "R2dbcBatchJournal validation" should {
 
@@ -137,7 +139,8 @@ class R2dbcBatchJournalZeroQueueSizeSpec
 class R2dbcBatchJournalBatchSizeExceedsQueueSizeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.batchSizeExceedsQueueSizeConfig)
     with AnyWordSpecLike
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
 
   "R2dbcBatchJournal validation" should {
 
@@ -152,7 +155,8 @@ class R2dbcBatchJournalBatchSizeExceedsQueueSizeSpec
 class R2dbcBatchJournalAppTimestampOffSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.appTimestampOffConfig)
     with AnyWordSpecLike
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
 
   "R2dbcBatchJournal validation" should {
 
@@ -167,7 +171,8 @@ class R2dbcBatchJournalAppTimestampOffSpec
 class R2dbcBatchJournalMonotonicIncreasingOffSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.monotonicIncreasingOffConfig)
     with AnyWordSpecLike
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
 
   "R2dbcBatchJournal validation" should {
 

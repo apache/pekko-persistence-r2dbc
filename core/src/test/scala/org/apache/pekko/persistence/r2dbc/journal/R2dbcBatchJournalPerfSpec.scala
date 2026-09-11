@@ -23,7 +23,8 @@ object R2dbcBatchJournalPerfSpec {
   val config: Config = R2dbcBatchJournalSpec.config
 }
 
-class R2dbcBatchJournalPerfSpec extends JournalPerfSpec(R2dbcBatchJournalPerfSpec.config) with TestDbLifecycle {
+class R2dbcBatchJournalPerfSpec extends JournalPerfSpec(R2dbcBatchJournalPerfSpec.config) with TestDbLifecycle
+    with BatchedJournalDialectGate {
   override def eventsCount: Int = 200
 
   override def measurementIterations: Int = 2 // increase when testing for real

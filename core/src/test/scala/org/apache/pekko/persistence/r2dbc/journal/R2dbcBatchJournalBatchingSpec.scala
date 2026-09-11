@@ -82,12 +82,13 @@ class R2dbcBatchJournalSizeFlushSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
   import R2dbcBatchJournalBatchingSpec.writeMessages
 
   override def typedSystem: ActorSystem[?] = system
 
-  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
 
   "R2dbcBatchJournal size flush" should {
 
@@ -122,12 +123,13 @@ class R2dbcBatchJournalTimerFlushSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
   import R2dbcBatchJournalBatchingSpec.writeMessages
 
   override def typedSystem: ActorSystem[?] = system
 
-  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
 
   "R2dbcBatchJournal timer flush" should {
 
@@ -153,12 +155,13 @@ class R2dbcBatchJournalQueueLimitSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
   import R2dbcBatchJournalBatchingSpec.writeMessages
 
   override def typedSystem: ActorSystem[?] = system
 
-  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
   private val journalConnectionFactory =
     ConnectionFactoryProvider(system).connectionFactoryFor(
       "pekko.persistence.r2dbc.queue-limit-test-connection-factory")

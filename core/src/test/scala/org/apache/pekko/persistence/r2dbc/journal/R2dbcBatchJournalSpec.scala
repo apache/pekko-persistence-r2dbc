@@ -33,7 +33,8 @@ object R2dbcBatchJournalSpec {
   ).withFallback(R2dbcJournalSpec.config)
 }
 
-class R2dbcBatchJournalSpec extends JournalSpec(R2dbcBatchJournalSpec.config) with TestDbLifecycle {
+class R2dbcBatchJournalSpec extends JournalSpec(R2dbcBatchJournalSpec.config) with TestDbLifecycle
+    with BatchedJournalDialectGate {
   override protected def supportsRejectingNonSerializableObjects: CapabilityFlag = CapabilityFlag.off()
   override def typedSystem: ActorSystem[?] = system.toTyped
 }
