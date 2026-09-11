@@ -7,10 +7,6 @@
  * This file is part of the Apache Pekko project, which was derived from Akka.
  */
 
-/*
- * Copyright (C) 2021 - 2023 Lightbend Inc. <https://www.lightbend.com>
- */
-
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
