@@ -52,13 +52,14 @@ class R2dbcBatchJournalFailureIsolationSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing {
+    with LogCapturing
+    with BatchedJournalDialectGate {
 
   override def typedSystem: ActorSystem[?] = system
 
   private implicit val journalPayloadCodec: PayloadCodec = journalSettings.journalPayloadCodec
   private val serialization = SerializationExtension(system)
-  private val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
   import R2dbcBatchJournalFailureIsolationSpec.StoredRow
 
   private def sendWrite(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): Unit =

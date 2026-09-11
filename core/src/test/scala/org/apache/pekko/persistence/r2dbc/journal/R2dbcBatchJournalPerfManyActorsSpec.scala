@@ -24,7 +24,8 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.testkit.TestProbe
 
 class R2dbcBatchJournalPerfManyActorsSpec extends JournalPerfSpec(R2dbcBatchJournalPerfSpec.config)
-    with TestDbLifecycle {
+    with TestDbLifecycle
+    with BatchedJournalDialectGate {
   override def eventsCount: Int = 10
 
   override def measurementIterations: Int = 2 // increase when testing for real
