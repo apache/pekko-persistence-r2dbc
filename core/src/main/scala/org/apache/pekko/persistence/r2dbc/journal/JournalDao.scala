@@ -187,7 +187,9 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
   def writeEvents(events: Seq[SerializedJournalRow]): Future[Instant] = {
     require(events.nonEmpty)
 
-    // it's always the same persistenceId for all events
+    // the same persistenceId for all events, except for R2dbcBatchJournal, which mixes persistence ids
+    // in one batch (only possible with db-timestamp-monotonic-increasing, where previousSeqNr is not bound)
+    // and in that case the persistenceId is only used for logging
     val persistenceId = events.head.persistenceId
     val previousSeqNr = events.head.seqNr - 1
 

@@ -19,7 +19,6 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.JavaDurationOps
@@ -29,7 +28,7 @@ import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import org.apache.pekko
 import pekko.Done
-import pekko.actor.{ ActorRef, Timers }
+import pekko.actor.Timers
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
@@ -56,45 +55,23 @@ import pekko.stream.scaladsl.Sink
  */
 @InternalApi
 private[r2dbc] object R2dbcBatchJournal {
-  case class WriteFinished(persistenceId: String, done: Future[?])
   private case object Flush
   private case object FlushDone
 
+  // the promise is completed with Done only after the batch containing this request is committed;
+  // the AsyncWriteJournal result is derived from it at the API boundary
   private final case class WriteRequest(
-      persistenceId: String,
       rows: Seq[SerializedJournalRow],
       messages: Seq[AtomicWrite],
-      promise: Promise[Seq[Try[Unit]]]
+      promise: Promise[Done]
   )
-
-  def deserializeRow(serialization: Serialization, row: SerializedJournalRow): PersistentRepr = {
-    if (row.payload.isEmpty)
-      throw new IllegalStateException("Expected event payload to be loaded.")
-    val payload = serialization.deserialize(row.payload.get, row.serId, row.serManifest).get
-    val repr = PersistentRepr(
-      payload,
-      row.seqNr,
-      row.persistenceId,
-      writerUuid = row.writerUuid,
-      manifest = "", // FIXME issue #84
-      deleted = false,
-      sender = ActorRef.noSender)
-
-    val reprWithMeta = row.metadata match {
-      case None       => repr
-      case Some(meta) =>
-        repr.withMetadata(serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
-    }
-    reprWithMeta
-  }
-
 }
 
 /**
  * INTERNAL API
  *
  * Opt-in journal plugin (`pekko.persistence.r2dbc.batched-journal`) that coalesces concurrent
- * writes from different persistence ids into one multi-row statement, trading up to
+ * writes from different persistence ids into one transaction, trading up to
  * `max-batch-time` of write latency for higher throughput at high concurrency.
  *
  * Mixing persistence ids in a single statement is only safe because the plugin requires
@@ -116,8 +93,8 @@ private[r2dbc] object R2dbcBatchJournal {
  */
 @InternalApi
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
-  import R2dbcBatchJournal.WriteFinished
-  import R2dbcBatchJournal.deserializeRow
+  import R2dbcJournal.WriteFinished
+  import R2dbcJournal.deserializeRow
   import R2dbcBatchJournal.Flush
   import R2dbcBatchJournal.FlushDone
   import R2dbcBatchJournal.WriteRequest
@@ -163,23 +140,23 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   @volatile private var stopping = false
 
   private def doFlush(): Unit = {
+    // a pending timer would otherwise flush the next, partial batch early
+    timers.cancel(Flush)
 
     val count = math.min(maxBatchSize, queue.size)
-    val writeRequests = new Array[WriteRequest](count)
-
-    queue.copyToArray(writeRequests, 0, count)
+    val writeRequests = queue.take(count).toVector
     queue.dropInPlace(count)
 
-    def write(requests: Array[WriteRequest]): Future[Unit] =
+    def write(requests: Vector[WriteRequest]): Future[Unit] =
       journalDao
-        .writeEvents(immutable.ArraySeq.unsafeWrapArray(requests.view.flatMap(_.rows).toArray))
+        .writeEvents(requests.flatMap(_.rows))
         .map { _ =>
-          requests.foreach(_.promise.trySuccess(Nil))
+          requests.foreach(_.promise.trySuccess(Done))
           requests.foreach(w => publish(w.messages, Future.successful(w.rows.head.dbTimestamp)))
         }
         .recoverWith {
-          case _: R2dbcDataIntegrityViolationException if requests.length > 1 =>
-            val (left, right) = requests.splitAt(requests.length / 2)
+          case _: R2dbcDataIntegrityViolationException if requests.size > 1 =>
+            val (left, right) = requests.splitAt(requests.size / 2)
             write(left).flatMap(_ => write(right))
           case exception =>
             requests.foreach(_.promise.tryFailure(exception))
@@ -206,15 +183,16 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
       }
   }
 
-  override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
+  override def asyncWriteMessages(messages: Seq[AtomicWrite]): Future[Seq[Try[Unit]]] = {
     if (queue.length >= maxQueueSize)
       Future
         .failed(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
     else {
-      val promise = Promise[immutable.Seq[Try[Unit]]]()
+      val promise = Promise[Done]()
 
       def atomicWrite(atomicWrite: AtomicWrite): Try[Seq[SerializedJournalRow]] = {
-        val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
+        // use-app-timestamp is required, so the timestamp always comes from the application clock
+        val timestamp = InstantFactory.now()
         val serialized: Try[Seq[SerializedJournalRow]] = Try {
           atomicWrite.payload.map { pr =>
             val (event, tags) = pr.payload match {
@@ -259,14 +237,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
 
         serialized match {
           case Success(writes) =>
-            queue.addOne(
-              WriteRequest(
-                writes.head.persistenceId,
-                writes,
-                Seq(atomicWrite),
-                promise
-              )
-            )
+            queue.addOne(WriteRequest(writes, Seq(atomicWrite), promise))
 
             writesInProgress.put(writes.head.persistenceId, promise.future)
             promise.future.onComplete { _ =>
@@ -293,11 +264,12 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         atomicWrite(batch)
       }
 
-      promise.future
+      // an empty result means that all messages were written, as in R2dbcJournal
+      promise.future.map(_ => Nil)(ExecutionContext.parasitic)
     }
   }
 
-  private def publish(messages: immutable.Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
+  private def publish(messages: Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
     pubSub match {
       case Some(ps) =>
         dbTimestamp.map { timestamp =>
