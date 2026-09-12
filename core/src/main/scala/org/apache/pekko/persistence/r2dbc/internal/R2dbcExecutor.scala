@@ -15,7 +15,6 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import java.util.function.BiConsumer
 
-import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -74,10 +73,10 @@ import reactor.core.publisher.Mono
       .asFuture()
   }
 
-  def updateInTx(statements: immutable.IndexedSeq[Statement])(implicit
-      ec: ExecutionContext): Future[immutable.IndexedSeq[Long]] =
+  def updateInTx(statements: IndexedSeq[Statement])(implicit
+      ec: ExecutionContext): Future[IndexedSeq[Long]] =
     // connection not intended for concurrent calls, make sure statements are executed one at a time
-    statements.foldLeft(Future.successful(immutable.IndexedSeq.empty[Long])) { (acc, stmt) =>
+    statements.foldLeft(Future.successful(IndexedSeq.empty[Long])) { (acc, stmt) =>
       acc.flatMap { seq =>
         stmt.execute().asFuture().flatMap { res =>
           res.getRowsUpdated.asFuture().map(seq :+ _.longValue())(ExecutionContext.parasitic)
@@ -95,15 +94,15 @@ import reactor.core.publisher.Mono
   def selectInTx[A](statement: Statement, mapRow: Row => A)(
       implicit
       ec: ExecutionContext,
-      system: ActorSystem[?]): Future[immutable.IndexedSeq[A]] = {
+      system: ActorSystem[?]): Future[IndexedSeq[A]] = {
     statement.execute().asFuture().flatMap { result =>
-      val consumer: BiConsumer[mutable.Builder[A, immutable.IndexedSeq[A]], A] = (builder, elem) => builder += elem
+      val consumer: BiConsumer[mutable.Builder[A, IndexedSeq[A]], A] = (builder, elem) => builder += elem
       Flux
         .from[A](result.map((row, _) => mapRow(row)))
-        .collect(() => immutable.IndexedSeq.newBuilder[A], consumer)
+        .collect(() => IndexedSeq.newBuilder[A], consumer)
         // Explicit type annotation required for map due to Scala 2.12,
         // see https://github.com/scala/bug/issues/9756#issuecomment-292440564
-        .map[immutable.IndexedSeq[A]](_.result())
+        .map[IndexedSeq[A]](_.result())
         .asFuture()
     }
   }
@@ -164,7 +163,7 @@ class R2dbcExecutor(
   /**
    * Run DDL statements in the same transaction.
    */
-  def executeDdls(logPrefix: String)(statementFactory: Connection => immutable.IndexedSeq[Statement]): Future[Done] =
+  def executeDdls(logPrefix: String)(statementFactory: Connection => IndexedSeq[Statement]): Future[Done] =
     withConnection(logPrefix) { connection =>
       val stmts = statementFactory(connection)
       // connection not intended for concurrent calls, make sure statements are executed one at a time
@@ -197,7 +196,7 @@ class R2dbcExecutor(
    * Several update statements in the same transaction.
    */
   def update(logPrefix: String)(
-      statementsFactory: Connection => immutable.IndexedSeq[Statement]): Future[immutable.IndexedSeq[Long]] =
+      statementsFactory: Connection => IndexedSeq[Statement]): Future[IndexedSeq[Long]] =
     withConnection(logPrefix) { connection =>
       updateInTx(statementsFactory(connection))
     }
@@ -229,7 +228,7 @@ class R2dbcExecutor(
    */
   def updateInBatchReturning[A](logPrefix: String)(
       statementFactory: Connection => Statement,
-      mapRow: Row => A): Future[immutable.IndexedSeq[A]] = {
+      mapRow: Row => A): Future[IndexedSeq[A]] = {
     import scala.jdk.CollectionConverters._
     withConnection(logPrefix) { connection =>
       val stmt = statementFactory(connection)
@@ -247,7 +246,7 @@ class R2dbcExecutor(
   }
 
   def select[A](
-      logPrefix: String)(statement: Connection => Statement, mapRow: Row => A): Future[immutable.IndexedSeq[A]] = {
+      logPrefix: String)(statement: Connection => Statement, mapRow: Row => A): Future[IndexedSeq[A]] = {
     getConnection(logPrefix).flatMap { connection =>
       val startTime = nanoTime()
       val timeoutTask = closeCallsExceeding.map { timeout =>

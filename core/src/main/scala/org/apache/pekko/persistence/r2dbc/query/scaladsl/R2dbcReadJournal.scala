@@ -16,7 +16,6 @@ package org.apache.pekko.persistence.r2dbc.query.scaladsl
 import java.time.Instant
 import java.time.{ Duration => JDuration }
 
-import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -123,7 +122,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     persistenceExt.sliceForPersistenceId(persistenceId)
   }
 
-  override def sliceRanges(numberOfRanges: Int): immutable.Seq[Range] =
+  override def sliceRanges(numberOfRanges: Int): Seq[Range] =
     persistenceExt.sliceRanges(numberOfRanges)
 
   override def currentEventsBySlices[Event](

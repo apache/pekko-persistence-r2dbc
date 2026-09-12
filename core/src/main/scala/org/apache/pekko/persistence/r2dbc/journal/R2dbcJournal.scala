@@ -15,7 +15,6 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success, Try }
 
@@ -104,7 +103,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
     writesInProgress.remove(pid, f)
   }
 
-  override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
+  override def asyncWriteMessages(messages: Seq[AtomicWrite]): Future[Seq[Try[Unit]]] = {
     def atomicWrite(atomicWrite: AtomicWrite): Future[Instant] = {
       val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
       val serialized: Try[Seq[SerializedJournalRow]] = Try {
@@ -178,7 +177,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
     writeAndPublishResult.map(_ => Nil)(ExecutionContext.parasitic)
   }
 
-  private def publish(messages: immutable.Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
+  private def publish(messages: Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
     pubSub match {
       case Some(ps) =>
         dbTimestamp.map { timestamp =>

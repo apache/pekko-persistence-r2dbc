@@ -13,7 +13,6 @@
 
 package org.apache.pekko.persistence.r2dbc.session.scaladsl
 
-import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -68,13 +67,13 @@ final class R2dbcSession(val connection: Connection)(implicit val ec: ExecutionC
   def updateOne(statement: Statement): Future[Long] =
     R2dbcExecutor.updateOneInTx(statement)
 
-  def update(statements: immutable.IndexedSeq[Statement]): Future[immutable.IndexedSeq[Long]] =
+  def update(statements: IndexedSeq[Statement]): Future[IndexedSeq[Long]] =
     R2dbcExecutor.updateInTx(statements)
 
   def selectOne[A](statement: Statement)(mapRow: Row => A): Future[Option[A]] =
     R2dbcExecutor.selectOneInTx(statement, mapRow)
 
-  def select[A](statement: Statement)(mapRow: Row => A): Future[immutable.IndexedSeq[A]] =
+  def select[A](statement: Statement)(mapRow: Row => A): Future[IndexedSeq[A]] =
     R2dbcExecutor.selectInTx(statement, mapRow)
 
 }

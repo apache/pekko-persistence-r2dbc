@@ -13,7 +13,6 @@
 
 package org.apache.pekko.persistence.r2dbc.cleanup.scaladsl
 
-import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.Failure
@@ -98,12 +97,12 @@ final class DurableStateCleanup(systemProvider: ClassicActorSystemProvider, conf
   /**
    * Delete all states related to the given list of `persistenceIds`.
    */
-  def deleteStates(persistenceIds: immutable.Seq[String], resetRevisionNumber: Boolean): Future[Done] = {
+  def deleteStates(persistenceIds: Seq[String], resetRevisionNumber: Boolean): Future[Done] = {
     foreach(persistenceIds, "deleteStates", pid => deleteState(pid, resetRevisionNumber))
   }
 
   private def foreach(
-      persistenceIds: immutable.Seq[String],
+      persistenceIds: Seq[String],
       operationName: String,
       pidOperation: String => Future[Done]): Future[Done] = {
     val size = persistenceIds.size

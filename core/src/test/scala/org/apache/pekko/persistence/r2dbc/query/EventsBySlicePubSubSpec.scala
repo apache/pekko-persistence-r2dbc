@@ -17,7 +17,6 @@ import java.time.Instant
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.collection.immutable
 import scala.jdk.DurationConverters._
 
 import org.apache.pekko
@@ -312,7 +311,7 @@ class EventsBySlicePubSubSpec
       val numberOfTopics =
         typedSystem.settings.config.getInt("pekko.persistence.r2dbc.journal.publish-events-number-of-topics")
       val querySliceRanges = Persistence(typedSystem).sliceRanges(numberOfTopics * 2)
-      val queries: immutable.IndexedSeq[TestSubscriber.Probe[EventEnvelope[String]]] = {
+      val queries: IndexedSeq[TestSubscriber.Probe[EventEnvelope[String]]] = {
         querySliceRanges.map { range =>
           query
             .eventsBySlices[String](setupEntityType, range.min, range.max, NoOffset)
