@@ -31,14 +31,20 @@ The following can be overridden in your `application.conf` for the journal speci
 
 @@snip [reference.conf](/core/src/main/resources/reference.conf) {#journal-settings}
 
-## Batched Journal - EXPERIMENTAL
+## Batched Journal
 
-**NOTE:** This feature is experimental and not recommended for production unless it has been thoroughly road tested by the user in their own test environments.
+@@@ warning { title="Experimental" }
+
+This feature is experimental and not recommended for production unless it has been thoroughly road tested by the
+user in their own test environments.
+
+@@@
 
 The default journal writes each incoming write request with its own statement and commit. The batched journal
 plugin (`R2dbcBatchJournal`) instead coalesces concurrent write requests from different persistence ids into one
-multi-row insert. This reduces database round trips and commits when many persistence ids write small events at
-the same time. It adds latency and changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
+transaction: the rows are written as a batch of one cached prepared statement and committed once. This reduces
+commits and statement prepares when many persistence ids write small events at the same time. It adds latency and
+changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
 
 The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, which the
 `batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the MySQL
@@ -71,13 +77,15 @@ The batched journal uses the following settings, in addition to the settings of 
   the persistent actor uses `persistAll` or `persistAsync`. A batch is flushed when this many requests are
   buffered.
 - `max-batch-time`: Maximum time a write request is buffered. If the batch does not reach `max-batch-size`
-  first, it is flushed when this duration has elapsed since the first buffered request.
+  first, it is flushed when this duration has elapsed, even if the batch holds only one request.
 
 ### Tradeoffs
 
 Latency:
-A write completes when its batch is flushed, so each write waits up to `max-batch-time`. When `max-batch-size`
-requests are buffered the batch is flushed without waiting.
+A write completes when its batch is flushed. A batch is flushed when `max-batch-size` requests are buffered,
+immediately, or when `max-batch-time` has elapsed, even if the batch holds only one request. The maximum time a
+request is buffered is therefore the duration of one flush plus `max-batch-time`. Under sustained load a new
+flush starts as soon as the previous one completes, so batches form back to back.
 
 Failures:
 Writes of different persistence ids share one database statement. If the database rejects a statement because of
@@ -85,9 +93,10 @@ a single persistence id, for example a duplicate sequence number caused by a zom
 retries the batch in halves until only the offending write fails. The other persistent actors are not affected.
 Failures that are not caused by a single persistence id, for example a lost database connection, fail all writes
 of the batch. The affected persistent actors see a journal write failure and are stopped by the default
-supervision, as with the default journal. Retrying a batch with a single offending write costs at most
-twice `max-batch-size` statements, which is the number of statements the default journal would have used for the
-same writes.
+supervision, as with the default journal. Isolating a single offending write costs about 2 * log2(`max-batch-size`)
+additional statements; only when many writes in the batch are offending does the retry approach twice
+`max-batch-size` statements, which is the number of statements the default journal would have used for the same
+writes.
 
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited

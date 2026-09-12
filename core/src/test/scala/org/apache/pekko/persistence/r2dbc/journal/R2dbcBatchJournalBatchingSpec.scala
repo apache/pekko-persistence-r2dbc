@@ -17,7 +17,6 @@
 
 package org.apache.pekko.persistence.r2dbc.journal
 
-import scala.collection.immutable
 import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -80,7 +79,7 @@ object R2dbcBatchJournalBatchingSpec {
 
   def writeMessages(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): WriteMessages =
     WriteMessages(
-      immutable.Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
+      Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
       replyTo.toClassic,
       actorInstanceId = 1)
 }
