@@ -83,7 +83,11 @@ The batched journal uses the following settings, in addition to the settings of 
 
 Latency:
 A write completes when its batch is flushed, so each write waits up to `max-batch-time`. When `max-batch-size`
-requests are buffered the batch is flushed without waiting.
+requests are buffered the batch is flushed without waiting. Only one batch is written at a time; requests that
+arrive while a batch is in flight are flushed as soon as it completes, so under sustained load the journal
+batches naturally: batch size follows the number of requests that accumulate during one database round trip
+rather than always waiting for `max-batch-time`. This yields smaller batches with lower latency than waiting for
+the timer between batches; `max-batch-time` remains the upper bound on how long a request is buffered.
 
 Failures:
 Writes of different persistence ids share one database statement. If the database rejects a statement because of
