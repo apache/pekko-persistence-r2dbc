@@ -31,6 +31,85 @@ The following can be overridden in your `application.conf` for the journal speci
 
 @@snip [reference.conf](/core/src/main/resources/reference.conf) {#journal-settings}
 
+## Batched Journal
+
+@@@ warning { title="Experimental" }
+
+This feature is experimental and not recommended for production unless it has been thoroughly road tested by the
+user in their own test environments.
+
+@@@
+
+The default journal writes each incoming write request with its own statement and commit. The batched journal
+plugin (`R2dbcBatchJournal`) instead coalesces concurrent write requests from different persistence ids into one
+transaction: the rows are written as a batch of one cached prepared statement and committed once. This reduces
+commits and statement prepares when many persistence ids write small events at the same time. It adds latency and
+changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
+
+The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, which the
+`batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the MySQL
+dialect requires. With `db-timestamp-monotonic-increasing` the database does not enforce increasing timestamps per
+persistence id, so the application clock must not move backwards between two writes of the same entity. The
+backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored with an out-of-order
+timestamp. Batching is only supported for the Postgres and Yugabyte dialects.
+
+### Batched Journal Configuration
+
+To enable the batched journal, point the journal plugin at the `batched-journal` block and update
+`application.conf`:
+
+```
+pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.batched-journal"
+
+pekko.persistence.r2dbc.batched-journal {
+  max-queue-size = 10000 # optional, default value
+  max-batch-size = 100 # optional, default value
+  max-batch-time = 2ms # optional, default value
+}
+```
+
+The batched journal uses the following settings, in addition to the settings of the default journal:
+
+- `max-queue-size`: Maximum number of write requests buffered before they are flushed. A write request is
+  rejected with a failure when the queue has reached this limit. Must be at least 1. `max-batch-size` must be
+  less than or equal to `max-queue-size`.
+- `max-batch-size`: Maximum number of write requests in one batch. One request can contain several events when
+  the persistent actor uses `persistAll` or `persistAsync`. A batch is flushed when this many requests are
+  buffered.
+- `max-batch-time`: Maximum time a write request is buffered. If the batch does not reach `max-batch-size`
+  first, it is flushed when this duration has elapsed, even if the batch holds only one request.
+
+### Tradeoffs
+
+Latency:
+A write completes when its batch is flushed. A batch is flushed when `max-batch-size` requests are buffered,
+immediately, or when `max-batch-time` has elapsed, even if the batch holds only one request. The maximum time a
+request is buffered is therefore the duration of one flush plus `max-batch-time`. Under sustained load a new
+flush starts as soon as the previous one completes, so batches form back to back.
+
+Failures:
+Writes of different persistence ids share one database statement. If the database rejects a statement because of
+a single persistence id, for example a duplicate sequence number caused by a zombie writer, the batched journal
+retries the batch in halves until only the offending write fails. The other persistent actors are not affected.
+Failures that are not caused by a single persistence id, for example a lost database connection, fail all writes
+of the batch. The affected persistent actors see a journal write failure and are stopped by the default
+supervision, as with the default journal. Isolating a single offending write costs about 2 * log2(`max-batch-size`)
+additional statements; only when many writes in the batch are offending does the retry approach twice
+`max-batch-size` statements, which is the number of statements the default journal would have used for the same
+writes.
+
+Memory:
+`max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited
+by `max-queue-size`, which rejects writes once the limit is reached. A single request can contain an arbitrary
+number of events when the persistent actor uses `persistAll` or `persistAsync`; neither journal caps that, as in
+the default journal. With `persist()` each persistent actor has at most one outstanding write, so the queue grows
+with the number of actively writing actors. Buffered writes are held in memory until they are flushed.
+
+When to use:
+Batching is most effective when many persistence ids concurrently write small events. With a low number of
+concurrent writers, or with large events, the default journal performs better because it adds no buffering
+delay.
+
 ## Deletes
 
 The journal supports deletes through hard deletes, which means the journal entries are actually deleted from the database. 
