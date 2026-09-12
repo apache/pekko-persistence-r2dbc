@@ -1,17 +1,27 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * license agreements; and to You under the Apache License, version 2.0:
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * This file is part of the Apache Pekko project, which was derived from Akka.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.pekko.persistence.r2dbc.journal
 
 import org.apache.pekko
 import pekko.persistence.r2dbc.TestConfig
-import org.scalatest.{ Outcome, Pending }
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.Outcome
+import org.scalatest.Pending
 import org.scalatest.TestSuite
 
 /**
@@ -19,9 +29,21 @@ import org.scalatest.TestSuite
  */
 private[r2dbc] trait BatchedJournalDialectGate extends TestSuite {
 
-  private val dialect = TestConfig.config.getString("pekko.persistence.r2dbc.dialect")
+  protected def batchedJournalDialectSupported: Boolean = {
+    val dialect = TestConfig.config.getString("pekko.persistence.r2dbc.dialect")
+    dialect == "postgres" || dialect == "yugabyte"
+  }
 
   override def withFixture(test: NoArgTest): Outcome =
-    if (dialect == "mysql") Pending
-    else super.withFixture(test)
+    if (batchedJournalDialectSupported) super.withFixture(test)
+    else Pending
+}
+
+/**
+ * INTERNAL API
+ */
+private[r2dbc] trait BatchedJournalTckDialectGate extends BatchedJournalDialectGate with BeforeAndAfterEach {
+
+  abstract override protected def beforeEach(): Unit =
+    if (batchedJournalDialectSupported) super.beforeEach()
 }

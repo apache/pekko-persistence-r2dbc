@@ -1,22 +1,33 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * license agreements; and to You under the Apache License, version 2.0:
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * This file is part of the Apache Pekko project, which was derived from Akka.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+
 import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.duration.FiniteDuration
+import scala.jdk.DurationConverters.JavaDurationOps
 import scala.util.{ Failure, Success, Try }
+
 import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import org.apache.pekko
-import org.apache.pekko.persistence.r2dbc.Dialect.{ Postgres, Yugabyte }
 import pekko.Done
 import pekko.actor.{ ActorRef, Timers }
 import pekko.actor.typed.ActorSystem
@@ -28,6 +39,7 @@ import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
+import pekko.persistence.r2dbc.Dialect.{ Postgres, Yugabyte }
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PubSub
@@ -38,9 +50,6 @@ import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
-
-import scala.concurrent.duration.FiniteDuration
-import scala.jdk.DurationConverters.JavaDurationOps
 
 /**
  * INTERNAL API
@@ -140,8 +149,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   private val journalDao = JournalDao.fromConfig(journalSettings, config)
 
   private val pubSub: Option[PubSub] =
-    if (journalSettings.journalPublishEvents) Some(PubSub(system))
-    else None
+    Option.when(journalSettings.journalPublishEvents)(PubSub(system))
 
   // if there are pending writes when an actor restarts we must wait for
   // them to complete before we can read the highest sequence number, or we will miss it
@@ -156,7 +164,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
 
   private def doFlush(): Unit = {
 
-    val count = math.min(maxBatchSize, queue.size.toLong).toInt
+    val count = math.min(maxBatchSize, queue.size)
     val writeRequests = new Array[WriteRequest](count)
 
     queue.copyToArray(writeRequests, 0, count)
@@ -200,13 +208,12 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
     if (queue.length >= maxQueueSize)
-      Promise
+      Future
         .failed(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
-        .future
     else {
       val promise = Promise[immutable.Seq[Try[Unit]]]()
 
-      def atomicWrite(atomicWrite: AtomicWrite): Unit = {
+      def atomicWrite(atomicWrite: AtomicWrite): Try[Seq[SerializedJournalRow]] = {
         val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
         val serialized: Try[Seq[SerializedJournalRow]] = Try {
           atomicWrite.payload.map { pr =>
@@ -273,6 +280,8 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
           case Failure(exception) =>
             promise.tryFailure(exception)
         }
+
+        serialized
       }
 
       if (messages.size == 1)

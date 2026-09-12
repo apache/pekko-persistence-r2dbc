@@ -31,7 +31,9 @@ The following can be overridden in your `application.conf` for the journal speci
 
 @@snip [reference.conf](/core/src/main/resources/reference.conf) {#journal-settings}
 
-## Batched Journal
+## Batched Journal - EXPERIMENTAL
+
+**NOTE:** This feature is experimental and not recommended for production unless it has been thoroughly road tested by the user in their own test environments.
 
 The default journal writes each incoming write request with its own statement and commit. The batched journal
 plugin (`R2dbcBatchJournal`) instead coalesces concurrent write requests from different persistence ids into one
