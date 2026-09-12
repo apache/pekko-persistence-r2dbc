@@ -15,7 +15,6 @@ package org.apache.pekko.persistence.r2dbc
 
 import java.util.Locale
 
-import scala.collection.immutable
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.jdk.DurationConverters._
@@ -140,7 +139,7 @@ final class StateSettings(val config: Config) extends ConnectionSettings with Us
   /**
    * INTERNAL API
    */
-  @InternalApi private[pekko] val durableStateAdditionalColumnClasses: Map[String, immutable.IndexedSeq[String]] = {
+  @InternalApi private[pekko] val durableStateAdditionalColumnClasses: Map[String, IndexedSeq[String]] = {
     val cfg = config.getConfig("additional-columns")
     cfg.root.unwrapped.asScala.toMap.map {
       case (k, v: java.util.List[?]) => k -> v.iterator.asScala.map(_.toString).toVector

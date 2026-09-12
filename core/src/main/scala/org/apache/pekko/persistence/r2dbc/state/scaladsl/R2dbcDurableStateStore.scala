@@ -13,7 +13,6 @@
 
 package org.apache.pekko.persistence.r2dbc.state.scaladsl
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future }
 
 import com.typesafe.config.Config
@@ -153,7 +152,7 @@ class R2dbcDurableStateStore[A](system: ExtendedActorSystem, config: Config, cfg
   override def sliceForPersistenceId(persistenceId: String): Int =
     persistenceExt.sliceForPersistenceId(persistenceId)
 
-  override def sliceRanges(numberOfRanges: Int): immutable.Seq[Range] =
+  override def sliceRanges(numberOfRanges: Int): Seq[Range] =
     persistenceExt.sliceRanges(numberOfRanges)
 
   override def currentChangesBySlices(

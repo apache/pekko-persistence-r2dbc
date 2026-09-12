@@ -13,7 +13,6 @@
 
 package org.apache.pekko.persistence.r2dbc.cleanup.scaladsl
 
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
@@ -120,7 +119,7 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
   /**
    * Delete all events related to the given list of `persistenceIds`. Snapshots are not deleted.
    */
-  def deleteAllEvents(persistenceIds: immutable.Seq[String], resetSequenceNumber: Boolean): Future[Done] = {
+  def deleteAllEvents(persistenceIds: Seq[String], resetSequenceNumber: Boolean): Future[Done] = {
     foreach(persistenceIds, "deleteAllEvents", pid => deleteAllEvents(pid, resetSequenceNumber))
   }
 
@@ -136,7 +135,7 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
   /**
    * Delete all snapshots related to the given list of `persistenceIds`. Events are not deleted.
    */
-  def deleteSnapshots(persistenceIds: immutable.Seq[String]): Future[Done] = {
+  def deleteSnapshots(persistenceIds: Seq[String]): Future[Done] = {
     foreach(persistenceIds, "deleteSnapshots", pid => deleteSnapshot(pid))
   }
 
@@ -154,7 +153,7 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
   /**
    * See single persistenceId overload for what is done for each persistence id.
    */
-  def cleanupBeforeSnapshot(persistenceIds: immutable.Seq[String]): Future[Done] = {
+  def cleanupBeforeSnapshot(persistenceIds: Seq[String]): Future[Done] = {
     foreach(persistenceIds, "cleanupBeforeSnapshot", pid => cleanupBeforeSnapshot(pid))
   }
 
@@ -171,12 +170,12 @@ final class EventSourcedCleanup(systemProvider: ClassicActorSystemProvider, conf
   /**
    * Delete everything related to the given list of `persistenceIds`. All events and snapshots are deleted.
    */
-  def deleteAll(persistenceIds: immutable.Seq[String], resetSequenceNumber: Boolean): Future[Done] = {
+  def deleteAll(persistenceIds: Seq[String], resetSequenceNumber: Boolean): Future[Done] = {
     foreach(persistenceIds, "deleteAll", pid => deleteAll(pid, resetSequenceNumber))
   }
 
   private def foreach(
-      persistenceIds: immutable.Seq[String],
+      persistenceIds: Seq[String],
       operationName: String,
       pidOperation: String => Future[Done]): Future[Done] = {
     val size = persistenceIds.size

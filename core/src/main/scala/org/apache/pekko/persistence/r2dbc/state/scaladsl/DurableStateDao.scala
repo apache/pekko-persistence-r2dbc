@@ -17,7 +17,6 @@ import java.lang
 import java.time.Instant
 import java.util
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 import scala.util.control.NonFatal
@@ -136,7 +135,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     if (tags.isEmpty) stmt.bindNull(index, classOf[Array[String]])
     else stmt.bind(index, tags.toArray)
 
-  private lazy val additionalColumns: Map[String, immutable.IndexedSeq[AdditionalColumn[Any, Any]]] = {
+  private lazy val additionalColumns: Map[String, IndexedSeq[AdditionalColumn[Any, Any]]] = {
     settings.durableStateAdditionalColumnClasses.map { case (entityType, columnClasses) =>
       val instances = columnClasses.map(fqcn => AdditionalColumnFactory.create(system, fqcn))
       entityType -> instances
@@ -178,7 +177,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
   private def insertStateSql(
       entityType: String,
-      additionalBindings: immutable.IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
+      additionalBindings: IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
     val table = settings.getDurableStateTableWithSchema(entityType)
     val additionalCols = additionalInsertColumns(additionalBindings)
     val additionalParams = additionalInsertParameters(additionalBindings)
@@ -189,7 +188,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   }
 
   private def additionalInsertColumns(
-      additionalBindings: immutable.IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
+      additionalBindings: IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
     if (additionalBindings.isEmpty) ""
     else {
       val strB = new lang.StringBuilder()
@@ -205,7 +204,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   }
 
   private def additionalInsertParameters(
-      additionalBindings: immutable.IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
+      additionalBindings: IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
     if (additionalBindings.isEmpty) ""
     else {
       val strB = new lang.StringBuilder()
@@ -222,7 +221,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   private def updateStateSql(
       entityType: String,
       updateTags: Boolean,
-      additionalBindings: immutable.IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
+      additionalBindings: IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
     val table = settings.getDurableStateTableWithSchema(entityType)
 
     val timestamp =
@@ -247,7 +246,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   }
 
   private def additionalUpdateParameters(
-      additionalBindings: immutable.IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
+      additionalBindings: IndexedSeq[EvaluatedAdditionalColumnBindings]): String = {
     if (additionalBindings.isEmpty) ""
     else {
       val strB = new lang.StringBuilder()
@@ -742,8 +741,8 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
       persistenceIdsFromTable(afterId, limit, stateTable)
     else {
       def readFromCustomTables(
-          acc: immutable.IndexedSeq[String],
-          remainingTables: Vector[String]): Future[immutable.IndexedSeq[String]] = {
+          acc: IndexedSeq[String],
+          remainingTables: Vector[String]): Future[IndexedSeq[String]] = {
         if (acc.size >= limit) {
           Future.successful(acc)
         } else if (remainingTables.isEmpty) {
@@ -782,7 +781,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   private def readPersistenceIds(
       afterId: Option[String],
       limit: Long,
-      table: String): Future[immutable.IndexedSeq[String]] = {
+      table: String): Future[IndexedSeq[String]] = {
     val result = r2dbcExecutor.select(s"select persistenceIds")(
       connection =>
         afterId match {
