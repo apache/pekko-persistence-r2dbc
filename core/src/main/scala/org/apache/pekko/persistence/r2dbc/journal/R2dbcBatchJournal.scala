@@ -29,7 +29,7 @@ import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import org.apache.pekko
 import pekko.Done
-import pekko.actor.{ ActorRef, Timers }
+import pekko.actor.Timers
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
@@ -56,38 +56,14 @@ import pekko.stream.scaladsl.Sink
  */
 @InternalApi
 private[r2dbc] object R2dbcBatchJournal {
-  case class WriteFinished(persistenceId: String, done: Future[?])
   private case object Flush
   private case object FlushDone
 
   private final case class WriteRequest(
-      persistenceId: String,
       rows: Seq[SerializedJournalRow],
       messages: Seq[AtomicWrite],
       promise: Promise[Seq[Try[Unit]]]
   )
-
-  def deserializeRow(serialization: Serialization, row: SerializedJournalRow): PersistentRepr = {
-    if (row.payload.isEmpty)
-      throw new IllegalStateException("Expected event payload to be loaded.")
-    val payload = serialization.deserialize(row.payload.get, row.serId, row.serManifest).get
-    val repr = PersistentRepr(
-      payload,
-      row.seqNr,
-      row.persistenceId,
-      writerUuid = row.writerUuid,
-      manifest = "", // FIXME issue #84
-      deleted = false,
-      sender = ActorRef.noSender)
-
-    val reprWithMeta = row.metadata match {
-      case None       => repr
-      case Some(meta) =>
-        repr.withMetadata(serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
-    }
-    reprWithMeta
-  }
-
 }
 
 /**
@@ -116,8 +92,8 @@ private[r2dbc] object R2dbcBatchJournal {
  */
 @InternalApi
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
-  import R2dbcBatchJournal.WriteFinished
-  import R2dbcBatchJournal.deserializeRow
+  import R2dbcJournal.WriteFinished
+  import R2dbcJournal.deserializeRow
   import R2dbcBatchJournal.Flush
   import R2dbcBatchJournal.FlushDone
   import R2dbcBatchJournal.WriteRequest
@@ -163,6 +139,8 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   @volatile private var stopping = false
 
   private def doFlush(): Unit = {
+    // a pending timer would otherwise flush the next, partial batch early
+    timers.cancel(Flush)
 
     val count = math.min(maxBatchSize, queue.size)
     val writeRequests = new Array[WriteRequest](count)
@@ -197,13 +175,12 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         doFlush()
       }
     case FlushDone =>
-      noActiveWrite = true
-      if (queue.size >= maxBatchSize) {
-        noActiveWrite = false
+      // requests that arrived during the flush have already waited for it, so flush them
+      // right away instead of holding them for another max-batch-time
+      if (queue.nonEmpty)
         doFlush()
-      } else if (queue.nonEmpty && !timers.isTimerActive(Flush)) {
-        timers.startSingleTimer(Flush, Flush, maxBatchTime)
-      }
+      else
+        noActiveWrite = true
   }
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
@@ -214,7 +191,8 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
       val promise = Promise[immutable.Seq[Try[Unit]]]()
 
       def atomicWrite(atomicWrite: AtomicWrite): Try[Seq[SerializedJournalRow]] = {
-        val timestamp = if (journalSettings.useAppTimestamp) InstantFactory.now() else JournalDao.EmptyDbTimestamp
+        // use-app-timestamp is required, so the timestamp always comes from the application clock
+        val timestamp = InstantFactory.now()
         val serialized: Try[Seq[SerializedJournalRow]] = Try {
           atomicWrite.payload.map { pr =>
             val (event, tags) = pr.payload match {
@@ -259,14 +237,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
 
         serialized match {
           case Success(writes) =>
-            queue.addOne(
-              WriteRequest(
-                writes.head.persistenceId,
-                writes,
-                Seq(atomicWrite),
-                promise
-              )
-            )
+            queue.addOne(WriteRequest(writes, Seq(atomicWrite), promise))
 
             writesInProgress.put(writes.head.persistenceId, promise.future)
             promise.future.onComplete { _ =>

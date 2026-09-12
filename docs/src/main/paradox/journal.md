@@ -31,9 +31,14 @@ The following can be overridden in your `application.conf` for the journal speci
 
 @@snip [reference.conf](/core/src/main/resources/reference.conf) {#journal-settings}
 
-## Batched Journal - EXPERIMENTAL
+## Batched Journal
 
-**NOTE:** This feature is experimental and not recommended for production unless it has been thoroughly road tested by the user in their own test environments.
+@@@ warning { title="Experimental" }
+
+This feature is experimental and not recommended for production unless it has been thoroughly road tested by the
+user in their own test environments.
+
+@@@
 
 The default journal writes each incoming write request with its own statement and commit. The batched journal
 plugin (`R2dbcBatchJournal`) instead coalesces concurrent write requests from different persistence ids into one
@@ -71,7 +76,8 @@ The batched journal uses the following settings, in addition to the settings of 
   the persistent actor uses `persistAll` or `persistAsync`. A batch is flushed when this many requests are
   buffered.
 - `max-batch-time`: Maximum time a write request is buffered. If the batch does not reach `max-batch-size`
-  first, it is flushed when this duration has elapsed since the first buffered request.
+  first, it is flushed when this duration has elapsed since the first buffered request. Requests that arrive
+  while a batch is being written are flushed as soon as that batch completes.
 
 ### Tradeoffs
 
@@ -85,9 +91,10 @@ a single persistence id, for example a duplicate sequence number caused by a zom
 retries the batch in halves until only the offending write fails. The other persistent actors are not affected.
 Failures that are not caused by a single persistence id, for example a lost database connection, fail all writes
 of the batch. The affected persistent actors see a journal write failure and are stopped by the default
-supervision, as with the default journal. Retrying a batch with a single offending write costs at most
-twice `max-batch-size` statements, which is the number of statements the default journal would have used for the
-same writes.
+supervision, as with the default journal. Isolating a single offending write costs about 2·log₂(`max-batch-size`)
+additional statements; only when many writes in the batch are offending does the retry approach twice
+`max-batch-size` statements, which is the number of statements the default journal would have used for the same
+writes.
 
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited
