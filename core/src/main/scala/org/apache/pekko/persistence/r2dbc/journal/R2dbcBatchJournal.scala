@@ -19,7 +19,6 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.JavaDurationOps
@@ -145,13 +144,11 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     timers.cancel(Flush)
 
     val count = math.min(maxBatchSize, queue.size)
-    val writeRequests = new Array[WriteRequest](count)
-
-    queue.copyToArray(writeRequests, 0, count)
+    val writeRequests = queue.take(count).toVector
     queue.dropInPlace(count)
 
-    def write(requests: Array[WriteRequest]): Future[Unit] = {
-      val rows = immutable.ArraySeq.unsafeWrapArray(requests.view.flatMap(_.rows).toArray)
+    def write(requests: Vector[WriteRequest]): Future[Unit] = {
+      val rows = requests.flatMap(_.rows)
       journalDao
         .writeEventsReturningTimestamps(rows)
         .map { timestamps =>
@@ -163,8 +160,8 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
           requests.foreach(w => publish(w.messages, Future.successful(w.rows.head.dbTimestamp)))
         }
         .recoverWith {
-          case _: R2dbcDataIntegrityViolationException if requests.length > 1 =>
-            val (left, right) = requests.splitAt(requests.length / 2)
+          case _: R2dbcDataIntegrityViolationException if requests.size > 1 =>
+            val (left, right) = requests.splitAt(requests.size / 2)
             write(left).flatMap(_ => write(right))
           case exception =>
             requests.foreach(_.promise.tryFailure(exception))
@@ -191,7 +188,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         noActiveWrite = true
   }
 
-  override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
+  override def asyncWriteMessages(messages: Seq[AtomicWrite]): Future[Seq[Try[Unit]]] = {
     if (queue.length >= maxQueueSize)
       Future
         .failed(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
@@ -277,7 +274,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     }
   }
 
-  private def publish(messages: immutable.Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
+  private def publish(messages: Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
     pubSub match {
       case Some(ps) =>
         dbTimestamp.map { timestamp =>

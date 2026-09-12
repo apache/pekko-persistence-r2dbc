@@ -15,7 +15,6 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
-import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
@@ -199,7 +198,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
    * Used by the batched journal, which inserts rows of several persistence ids in one batch and
    * verifies that exactly one timestamp was returned per row.
    */
-  def writeEventsReturningTimestamps(events: Seq[SerializedJournalRow]): Future[immutable.IndexedSeq[Instant]] = {
+  def writeEventsReturningTimestamps(events: Seq[SerializedJournalRow]): Future[IndexedSeq[Instant]] = {
     require(events.nonEmpty)
 
     // the same persistenceId for all events, except for R2dbcBatchJournal, which mixes persistence ids

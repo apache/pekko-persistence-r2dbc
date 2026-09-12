@@ -18,7 +18,6 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
-import scala.collection.immutable
 import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -72,7 +71,7 @@ class R2dbcBatchJournalFailureIsolationSpec
 
   private def sendWrite(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): Unit =
     journal ! WriteMessages(
-      immutable.Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
+      Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
       replyTo.toClassic,
       actorInstanceId = 1)
 
@@ -81,7 +80,7 @@ class R2dbcBatchJournalFailureIsolationSpec
     probe.expectMessageType[WriteMessageSuccess](10.seconds).persistent.persistenceId shouldBe pid
   }
 
-  private def storedRows(): immutable.IndexedSeq[StoredRow] =
+  private def storedRows(): IndexedSeq[StoredRow] =
     r2dbcExecutor
       .select[StoredRow]("test")(
         connection =>
@@ -138,9 +137,9 @@ class R2dbcBatchJournalFailureIsolationSpec
       expectSuccess(probeC, pidC)
 
       val rows = storedRows()
-      rows.filter(_.pid == pidA).map(r => (r.seqNr, r.event)) shouldBe immutable.IndexedSeq((1L, "a1"))
-      rows.filter(_.pid == pidB).map(r => (r.seqNr, r.event)) shouldBe immutable.IndexedSeq((1L, "b1"))
-      rows.filter(_.pid == pidC).map(r => (r.seqNr, r.event)) shouldBe immutable.IndexedSeq((1L, "c1"))
+      rows.filter(_.pid == pidA).map(r => (r.seqNr, r.event)) shouldBe Vector((1L, "a1"))
+      rows.filter(_.pid == pidB).map(r => (r.seqNr, r.event)) shouldBe Vector((1L, "b1"))
+      rows.filter(_.pid == pidC).map(r => (r.seqNr, r.event)) shouldBe Vector((1L, "c1"))
     }
 
   }
