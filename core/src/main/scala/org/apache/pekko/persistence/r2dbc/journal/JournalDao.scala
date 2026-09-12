@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
+import scala.collection.immutable
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
@@ -186,6 +187,20 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
    */
   def writeEvents(events: Seq[SerializedJournalRow]): Future[Instant] = {
     require(events.nonEmpty)
+    // The MigrationTool defines the dbTimestamp to preserve the original event timestamp
+    val useTimestampFromDb = events.head.dbTimestamp == Instant.EPOCH
+    writeEventsReturningTimestamps(events).map { timestamps =>
+      if (useTimestampFromDb) timestamps.head else events.head.dbTimestamp
+    }(ExecutionContext.parasitic)
+  }
+
+  /**
+   * Same as [[writeEvents]] but returns the `db_timestamp` of every inserted row, in insertion order.
+   * Used by the batched journal, which inserts rows of several persistence ids in one batch and
+   * verifies that exactly one timestamp was returned per row.
+   */
+  def writeEventsReturningTimestamps(events: Seq[SerializedJournalRow]): Future[immutable.IndexedSeq[Instant]] = {
+    require(events.nonEmpty)
 
     // the same persistenceId for all events, except for R2dbcBatchJournal, which mixes persistence ids
     // in one batch (only possible with db-timestamp-monotonic-increasing, where previousSeqNr is not bound)
@@ -193,7 +208,6 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
     val persistenceId = events.head.persistenceId
     val previousSeqNr = events.head.seqNr - 1
 
-    // The MigrationTool defines the dbTimestamp to preserve the original event timestamp
     val useTimestampFromDb = events.head.dbTimestamp == Instant.EPOCH
 
     def bind(stmt: Statement, write: SerializedJournalRow): Statement = {
@@ -256,11 +270,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         result.foreach { _ =>
           log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
         }
-      if (useTimestampFromDb) {
-        result
-      } else {
-        result.map(_ => events.head.dbTimestamp)(ExecutionContext.parasitic)
-      }
+      result.map(Vector(_))(ExecutionContext.parasitic)
     } else {
       val result = r2dbcExecutor.updateInBatchReturning(s"batch insert [$persistenceId], [$totalEvents] events")(
         connection =>
@@ -273,13 +283,9 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         row => row.get(0, classOf[Instant]))
       if (log.isDebugEnabled())
         result.foreach { _ =>
-          log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
+          log.debug("Wrote [{}] events for persistenceId [{}]", totalEvents, events.head.persistenceId)
         }
-      if (useTimestampFromDb) {
-        result.map(_.head)(ExecutionContext.parasitic)
-      } else {
-        result.map(_ => events.head.dbTimestamp)(ExecutionContext.parasitic)
-      }
+      result
     }
   }
 

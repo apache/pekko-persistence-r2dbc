@@ -59,10 +59,12 @@ private[r2dbc] object R2dbcBatchJournal {
   private case object Flush
   private case object FlushDone
 
+  // the promise is completed with Done only after all rows of the request are committed and the
+  // database returned one row per inserted event; the AsyncWriteJournal result is derived from it
   private final case class WriteRequest(
       rows: Seq[SerializedJournalRow],
       messages: Seq[AtomicWrite],
-      promise: Promise[Seq[Try[Unit]]]
+      promise: Promise[Done]
   )
 }
 
@@ -148,11 +150,16 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     queue.copyToArray(writeRequests, 0, count)
     queue.dropInPlace(count)
 
-    def write(requests: Array[WriteRequest]): Future[Unit] =
+    def write(requests: Array[WriteRequest]): Future[Unit] = {
+      val rows = immutable.ArraySeq.unsafeWrapArray(requests.view.flatMap(_.rows).toArray)
       journalDao
-        .writeEvents(immutable.ArraySeq.unsafeWrapArray(requests.view.flatMap(_.rows).toArray))
-        .map { _ =>
-          requests.foreach(_.promise.trySuccess(Nil))
+        .writeEventsReturningTimestamps(rows)
+        .map { timestamps =>
+          // RETURNING yields one row per inserted event, so a mismatch means the batch is incomplete
+          if (timestamps.size != rows.size)
+            throw new IllegalStateException(
+              s"Batch insert of [${rows.size}] events returned [${timestamps.size}] rows")
+          requests.foreach(_.promise.trySuccess(Done))
           requests.foreach(w => publish(w.messages, Future.successful(w.rows.head.dbTimestamp)))
         }
         .recoverWith {
@@ -163,6 +170,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
             requests.foreach(_.promise.tryFailure(exception))
             Future.unit
         }
+    }
 
     write(writeRequests).onComplete(_ => if (!stopping) self ! FlushDone)
   }
@@ -188,7 +196,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
       Future
         .failed(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
     else {
-      val promise = Promise[immutable.Seq[Try[Unit]]]()
+      val promise = Promise[Done]()
 
       def atomicWrite(atomicWrite: AtomicWrite): Try[Seq[SerializedJournalRow]] = {
         // use-app-timestamp is required, so the timestamp always comes from the application clock
@@ -264,7 +272,8 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         atomicWrite(batch)
       }
 
-      promise.future
+      // an empty result means that all messages were written, as in R2dbcJournal
+      promise.future.map(_ => Nil)(ExecutionContext.parasitic)
     }
   }
 
