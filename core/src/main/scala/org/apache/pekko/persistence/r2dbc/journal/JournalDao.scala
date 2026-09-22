@@ -175,7 +175,10 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
     VALUES (?, ?, ?, ?, $timestampSql, ?, ?, ?, ?, ?, ?)"""
 
   /**
-   * All events must be for the same persistenceId.
+   * All events must be for the same persistenceId, except when called by `R2dbcBatchJournal`, which mixes
+   * persistence ids in one batch. Mixing is only possible with `db-timestamp-monotonic-increasing`, where the
+   * per-persistence-id previous sequence number is not bound, and in that case the persistenceId is only used
+   * for logging.
    *
    * The returned timestamp should be the `db_timestamp` column and it is used in published events when that feature is
    * enabled.
@@ -187,9 +190,6 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
   def writeEvents(events: Seq[SerializedJournalRow]): Future[Instant] = {
     require(events.nonEmpty)
 
-    // the same persistenceId for all events, except for R2dbcBatchJournal, which mixes persistence ids
-    // in one batch (only possible with db-timestamp-monotonic-increasing, where previousSeqNr is not bound)
-    // and in that case the persistenceId is only used for logging
     val persistenceId = events.head.persistenceId
     val previousSeqNr = events.head.seqNr - 1
 
@@ -254,7 +254,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         row => row.get(0, classOf[Instant]))
       if (log.isDebugEnabled())
         result.foreach { _ =>
-          log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
+          log.debug("Wrote [{}] events for persistenceId [{}]", totalEvents, events.head.persistenceId)
         }
       if (useTimestampFromDb) {
         result
@@ -273,7 +273,7 @@ private[r2dbc] class JournalDao(val settings: JournalSettings, connectionFactory
         row => row.get(0, classOf[Instant]))
       if (log.isDebugEnabled())
         result.foreach { _ =>
-          log.debug("Wrote [{}] events for persistenceId [{}]", 1, events.head.persistenceId)
+          log.debug("Wrote [{}] events for persistenceId [{}]", totalEvents, events.head.persistenceId)
         }
       if (useTimestampFromDb) {
         result.map(_.head)(ExecutionContext.parasitic)

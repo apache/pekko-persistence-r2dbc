@@ -84,7 +84,7 @@ class R2dbcBatchJournalPublishTimestampSpec
 
   "R2dbcBatchJournal publish" should {
 
-    "publish each write of a coalesced batch with its own stored db timestamp" in {
+    "publish each write of a coalesced batch with the shared stored db timestamp" in {
       val entityType = nextEntityType()
       val pids = (1 to 3).map(_ => nextPid(entityType))
 
@@ -103,8 +103,8 @@ class R2dbcBatchJournalPublishTimestampSpec
         }
       }
 
-      // stagger the writes slightly so that each gets a distinct application timestamp,
-      // they still all fall inside the 1 second batch window and are coalesced into one flush
+      // stagger the writes slightly; they all fall inside the 1 second batch window
+      // and are coalesced into one flush
       val probes = pids.map(_ => createTestProbe[Any]())
       pids.zip(probes).zipWithIndex.foreach {
         case ((pid, probe), i) =>
@@ -120,9 +120,10 @@ class R2dbcBatchJournalPublishTimestampSpec
 
       val stored = storedTimestamps()
       stored.keySet shouldBe pids.toSet
-      // guard the test premise: coalesced writes must have distinct stored timestamps,
-      // otherwise a wrong shared publish timestamp could not be detected
-      stored.values.toSet.size shouldBe 3
+      // the batch is stamped once at flush time, so all coalesced writes share one
+      // db timestamp, and every published envelope carries that stored timestamp
+      val sharedTimestamp = stored(pids(0))
+      stored.values.forall(_ == sharedTimestamp) shouldBe true
 
       val envelopes = envelopeProbe.receiveMessages(3, 10.seconds)
       envelopes.map(_.persistenceId).toSet shouldBe pids.toSet

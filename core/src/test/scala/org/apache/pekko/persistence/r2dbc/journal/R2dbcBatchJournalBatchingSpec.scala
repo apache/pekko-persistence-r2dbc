@@ -20,15 +20,15 @@ package org.apache.pekko.persistence.r2dbc.journal
 import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorRef
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.persistence.AtomicWrite
-import pekko.persistence.JournalProtocol.WriteMessageFailure
+import pekko.persistence.JournalProtocol.WriteMessageRejected
 import pekko.persistence.JournalProtocol.WriteMessageSuccess
 import pekko.persistence.JournalProtocol.WriteMessages
-import pekko.persistence.JournalProtocol.WriteMessagesFailed
 import pekko.persistence.JournalProtocol.WriteMessagesSuccessful
 import pekko.persistence.PersistentRepr
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
@@ -61,6 +61,7 @@ object R2dbcBatchJournalBatchingSpec {
   // write stays in progress and the queue fills deterministically
   val queueLimitConfig: Config = ConfigFactory
     .parseString("""
+      pekko.loglevel = DEBUG
       pekko.persistence.r2dbc {
         batched-journal {
           max-queue-size = 3
@@ -175,7 +176,7 @@ class R2dbcBatchJournalQueueLimitSpec
 
   "R2dbcBatchJournal queue limit" should {
 
-    "reject a write when the queue is full" in {
+    "reject writes beyond the queue limit" in {
       val entityType = nextEntityType()
       val pids = (1 to 6).map(_ => nextPid(entityType))
       val probes = pids.map(_ => createTestProbe[Any]())
@@ -183,29 +184,82 @@ class R2dbcBatchJournalQueueLimitSpec
       // hold the only pooled connection so the flush of the first write stays in progress
       val blockingConnection = journalConnectionFactory.create().asFuture().futureValue
 
-      // the first write starts a flush that waits for the held connection, so at most one
-      // write request is removed from the queue before it is released. Writes 1 - 3 are
-      // therefore always accepted, and write 6 is always rejected by the full queue
-      pids.zip(probes).foreach {
+      // wait until the flush has dequeued the first write. The queue then has room for
+      // exactly max-queue-size (3) more writes, so writes 2 - 4 are accepted and
+      // writes 5 and 6 are rejected
+      LoggingTestKit.debug("flushing [1] write requests").expect {
+        journal ! writeMessages(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
+      }
+
+      pids.drop(1).zip(probes.drop(1)).foreach {
         case (pid, probe) =>
           journal ! writeMessages(pid, 1L, s"e-$pid", probe.ref)
       }
 
-      // release the connection so the buffered writes can complete and the write
-      // results are delivered
+      // release the connection so the accepted writes can complete
       blockingConnection.close().asFuture().futureValue
 
-      val failed = probes(5).expectMessageType[WriteMessagesFailed](10.seconds)
-      failed.cause.getMessage shouldBe "Unable to accept the request, max-queue-size [3] reached"
-      val failure = probes(5).expectMessageType[WriteMessageFailure](10.seconds)
-      failure.message.persistenceId shouldBe pids(5)
-
-      // the accepted writes complete after the connection is released
-      pids.take(3).zip(probes.take(3)).foreach {
+      pids.take(4).zip(probes.take(4)).foreach {
         case (pid, probe) =>
           probe.expectMessage(10.seconds, WriteMessagesSuccessful)
           probe.expectMessageType[WriteMessageSuccess](10.seconds).persistent.persistenceId shouldBe pid
       }
+
+      pids.takeRight(2).zip(probes.takeRight(2)).foreach {
+        case (pid, probe) =>
+          probe.expectMessage(10.seconds, WriteMessagesSuccessful)
+          val rejected = probe.expectMessageType[WriteMessageRejected](10.seconds)
+          rejected.message.persistenceId shouldBe pid
+          rejected.cause.getMessage shouldBe "Unable to accept the request, max-queue-size [3] reached"
+      }
+    }
+
+    "not trip the journal circuit breaker when the queue is full" in {
+      val entityType = nextEntityType()
+      val pids = (1 to 17).map(_ => nextPid(entityType))
+      val probes = pids.map(_ => createTestProbe[Any]())
+
+      // hold the only pooled connection so the flush of the first write stays in progress
+      val blockingConnection = journalConnectionFactory.create().asFuture().futureValue
+
+      // wait until the flush has dequeued the first write
+      LoggingTestKit.debug("flushing [1] write requests").expect {
+        journal ! writeMessages(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
+      }
+
+      // writes 2 - 4 fill the queue; writes 5 - 16 are rejected, which is more than the
+      // default circuit-breaker max-failures (10). The rejections are returned as
+      // per-message rejections in a successful Future, so they must not count as
+      // circuit-breaker failures. The rejections are delivered immediately, but with
+      // write-response-global-order = on (the default) the AsyncWriteJournal resequencer
+      // orders responses by request arrival, so they only reach the probes after the
+      // blocked write 1 has completed.
+      pids.slice(1, 16).zip(probes.slice(1, 16)).foreach {
+        case (pid, probe) =>
+          journal ! writeMessages(pid, 1L, s"e-$pid", probe.ref)
+      }
+
+      // release the connection so the accepted writes complete
+      blockingConnection.close().asFuture().futureValue
+
+      pids.take(4).zip(probes.take(4)).foreach {
+        case (pid, probe) =>
+          probe.expectMessage(10.seconds, WriteMessagesSuccessful)
+          probe.expectMessageType[WriteMessageSuccess](10.seconds).persistent.persistenceId shouldBe pid
+      }
+
+      pids.slice(4, 16).zip(probes.slice(4, 16)).foreach {
+        case (pid, probe) =>
+          probe.expectMessage(10.seconds, WriteMessagesSuccessful)
+          val rejected = probe.expectMessageType[WriteMessageRejected](10.seconds)
+          rejected.message.persistenceId shouldBe pid
+          rejected.cause.getMessage shouldBe "Unable to accept the request, max-queue-size [3] reached"
+      }
+
+      // if the rejections had tripped the circuit breaker, this write would fail
+      journal ! writeMessages(pids(16), 1L, s"e-${pids(16)}", probes(16).ref)
+      probes(16).expectMessage(10.seconds, WriteMessagesSuccessful)
+      probes(16).expectMessageType[WriteMessageSuccess](10.seconds).persistent.persistenceId shouldBe pids(16)
     }
 
   }

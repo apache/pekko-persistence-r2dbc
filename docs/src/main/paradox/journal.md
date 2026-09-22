@@ -47,11 +47,14 @@ commits and statement prepares when many persistence ids write small events at t
 changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
 
 The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, which the
-`batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the MySQL
-dialect requires. With `db-timestamp-monotonic-increasing` the database does not enforce increasing timestamps per
-persistence id, so the application clock must not move backwards between two writes of the same entity. The
-backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored with an out-of-order
-timestamp. Batching is only supported for the Postgres and Yugabyte dialects.
+`batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the
+MySQL dialect requires. With `db-timestamp-monotonic-increasing` the database does not enforce increasing
+timestamps per persistence id, so the application clock must not move backwards between two writes of the
+same entity. The backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored
+with an out-of-order timestamp. The `db_timestamp` is taken from the application clock when the batch is
+flushed, just before the insert. The lag between the timestamp and the commit is bounded by the connection
+acquisition plus one transaction. Keep `query.behind-current-time` comfortably above that lag. Batching is
+only supported and tested for the Postgres and Yugabyte dialects.
 
 ### Batched Journal Configuration
 
@@ -64,39 +67,48 @@ pekko.persistence.journal.plugin = "pekko.persistence.r2dbc.batched-journal"
 pekko.persistence.r2dbc.batched-journal {
   max-queue-size = 10000 # optional, default value
   max-batch-size = 100 # optional, default value
-  max-batch-time = 2ms # optional, default value
+  max-batch-time = 10ms # optional, default value
 }
 ```
 
 The batched journal uses the following settings, in addition to the settings of the default journal:
 
-- `max-queue-size`: Maximum number of write requests buffered before they are flushed. A write request is
-  rejected with a failure when the queue has reached this limit. Must be at least 1. `max-batch-size` must be
-  less than or equal to `max-queue-size`.
+- `max-queue-size`: Maximum number of write requests buffered before they are flushed. When the queue has
+  reached this limit, new writes are rejected per message in the journal write results, without failing the
+  request `Future`, so the rejection does not count toward the journal circuit breaker. This is the standard
+  journal rejection handling: a classic persistent actor by default logs the rejection in `onPersistRejected`
+  and continues without the event being stored, and a typed persistent actor restarts with an
+  `EventRejectedException`. Must be at least 1. `max-batch-size` must be less than or equal to
+  `max-queue-size`.
 - `max-batch-size`: Maximum number of write requests in one batch. One request can contain several events when
   the persistent actor uses `persistAll` or `persistAsync`. A batch is flushed when this many requests are
   buffered.
 - `max-batch-time`: Maximum time a write request is buffered. If the batch does not reach `max-batch-size`
-  first, it is flushed when this duration has elapsed, even if the batch holds only one request.
+  first, it is flushed when this duration has elapsed, even if the batch holds only one request. The default
+  is 10ms. Pekko timers are rounded up to whole scheduler ticks (`pekko.scheduler.tick-duration`, default
+  10ms), so a value below the tick duration takes effect as one tick. Lowering `tick-duration` changes the
+  timer resolution for the entire actor system.
 
 ### Tradeoffs
 
 Latency:
 A write completes when its batch is flushed. A batch is flushed when `max-batch-size` requests are buffered,
-immediately, or when `max-batch-time` has elapsed, even if the batch holds only one request. The maximum time a
-request is buffered is therefore the duration of one flush plus `max-batch-time`. Under sustained load a new
-flush starts as soon as the previous one completes, so batches form back to back.
+immediately, or when `max-batch-time` has elapsed, even if the batch holds only one request. The maximum time
+a request is buffered is therefore the duration of one flush plus `max-batch-time`. When `max-batch-size`
+requests are already buffered when a flush completes, the next flush starts immediately, so batches form back
+to back.
 
 Failures:
 Writes of different persistence ids share one database statement. If the database rejects a statement because of
 a single persistence id, for example a duplicate sequence number caused by a zombie writer, the batched journal
-retries the batch in halves until only the offending write fails. The other persistent actors are not affected.
-Failures that are not caused by a single persistence id, for example a lost database connection, fail all writes
-of the batch. The affected persistent actors see a journal write failure and are stopped by the default
-supervision, as with the default journal. Isolating a single offending write costs about 2 * log2(`max-batch-size`)
-additional statements; only when many writes in the batch are offending does the retry approach twice
-`max-batch-size` statements, which is the number of statements the default journal would have used for the same
-writes.
+retries the batch in halves until only the offending write fails. The retry halves run concurrently and can
+briefly use several pool connections at once. The other persistent actors wait while the retries run. Failures
+that are not caused by a single persistence id, for example a lost database connection, fail all writes of the
+batch. The affected persistent actors see a journal write failure, as with the default journal: a classic
+persistent actor stops, a typed persistent actor restarts. Isolating a single offending write costs about
+2 * log2(`max-batch-size`) additional statements; only when many writes in the batch are offending does the
+retry approach twice `max-batch-size` statements, which is the number of statements the default journal would
+have used for the same writes.
 
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited

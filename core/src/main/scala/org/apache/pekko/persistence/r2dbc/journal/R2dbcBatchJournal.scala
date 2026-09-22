@@ -15,6 +15,12 @@
  * limitations under the License.
  */
 
+/*
+ * This file is part of the Apache Pekko project, which was derived from Akka.
+ *
+ * Copyright (C) 2021 - 2023 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
@@ -78,13 +84,20 @@ private[r2dbc] object R2dbcBatchJournal {
  * `use-app-timestamp = on` and `db-timestamp-monotonic-increasing = on`: in that mode
  * [[JournalDao]] does not bind the per-persistence-id previous sequence number subselect, and
  * timestamps come from the application clock, which therefore must not move backwards.
- * The Postgres and Yugabyte dialects are required because the flush relies on `RETURNING`.
+ * Batching is only supported and tested for the Postgres and Yugabyte dialects.
  *
- * Writes are buffered in a bounded queue (`max-queue-size`); incoming writes are rejected with
- * a failed future once the queue is full. Flushed batches are serialized: only one batch is in
- * flight at a time, which keeps same-persistence-id writes committed in order without relying on
- * replay-time coordination, at the cost of not using spare pool capacity. Concurrent flushing can
- * be added later if a single flush saturates.
+ * Writes are buffered in a bounded queue (`max-queue-size`); incoming writes are rejected per
+ * message once the queue is full. The rejection is returned in the per-message `Try` results,
+ * not as a failed `Future`, so a full queue does not count toward the journal circuit breaker.
+ * Flushed batches are serialized: only one flush is in flight at a time, which keeps
+ * same-persistence-id writes committed in order without relying on replay-time coordination, at
+ * the cost of not using spare pool capacity. When a batch is retried after an integrity
+ * violation, its halves are written concurrently and can use several pool connections at once.
+ * Each half stamps its own timestamp. A single split preserves order, but if the half holding
+ * the earlier sequence numbers is retried after its sibling committed, its re-stamped rows can
+ * invert the `db_timestamp` order of two same-persistence-id writes. Replay still orders by
+ * sequence number; only timestamp-ordered read sides see the inversion.
+ * Concurrent flushing can be added later if a single flush saturates.
  *
  * A batch that fails with a database integrity violation is retried in halves so that only the
  * offending persistence ids fail. Infrastructure errors fail the whole batch. A batch can contain
@@ -135,10 +148,6 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   private val queue = collection.mutable.ArrayDeque[WriteRequest]()
   private var noActiveWrite = true
 
-  // set in postStop; failing queued promises completes their futures, whose callbacks must
-  // not send WriteFinished to an actor that is already terminating
-  @volatile private var stopping = false
-
   private def doFlush(): Unit = {
     // a pending timer would otherwise flush the next, partial batch early
     timers.cancel(Flush)
@@ -146,24 +155,30 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     val count = math.min(maxBatchSize, queue.size)
     val writeRequests = queue.take(count).toVector
     queue.dropInPlace(count)
+    log.debug("flushing [{}] write requests", count)
 
-    def write(requests: Vector[WriteRequest]): Future[Unit] =
+    def write(requests: Vector[WriteRequest]): Future[Unit] = {
+      val timestamp = InstantFactory.now()
+
       journalDao
-        .writeEvents(requests.flatMap(_.rows))
-        .map { _ =>
+        .writeEvents(requests.flatMap { w =>
+          w.rows.map(_.copy(dbTimestamp = timestamp))
+        })
+        .map { dbTimestamp =>
           requests.foreach(_.promise.trySuccess(Done))
-          requests.foreach(w => publish(w.messages, Future.successful(w.rows.head.dbTimestamp)))
+          publish(requests, dbTimestamp)
         }
         .recoverWith {
           case _: R2dbcDataIntegrityViolationException if requests.size > 1 =>
             val (left, right) = requests.splitAt(requests.size / 2)
-            write(left).flatMap(_ => write(right))
+            write(left).zipWith(write(right))((_, _) => ())
           case exception =>
             requests.foreach(_.promise.tryFailure(exception))
             Future.unit
         }
+    }
 
-    write(writeRequests).onComplete(_ => if (!stopping) self ! FlushDone)
+    write(writeRequests).onComplete(_ => self ! FlushDone)
   }
 
   override def receivePluginInternal: Receive = {
@@ -184,15 +199,14 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   }
 
   override def asyncWriteMessages(messages: Seq[AtomicWrite]): Future[Seq[Try[Unit]]] = {
-    if (queue.length >= maxQueueSize)
-      Future
-        .failed(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
-    else {
+    if (queue.length >= maxQueueSize) {
+      val queueFullFailure =
+        Failure(new IllegalStateException(s"Unable to accept the request, max-queue-size [$maxQueueSize] reached"))
+      Future.successful(messages.map(_ => queueFullFailure))
+    } else {
       val promise = Promise[Done]()
 
       def atomicWrite(atomicWrite: AtomicWrite): Try[Seq[SerializedJournalRow]] = {
-        // use-app-timestamp is required, so the timestamp always comes from the application clock
-        val timestamp = InstantFactory.now()
         val serialized: Try[Seq[SerializedJournalRow]] = Try {
           atomicWrite.payload.map { pr =>
             val (event, tags) = pr.payload match {
@@ -224,7 +238,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
               entityType,
               pr.persistenceId,
               pr.sequenceNr,
-              timestamp,
+              JournalDao.EmptyDbTimestamp,
               JournalDao.EmptyDbTimestamp,
               Some(serialized),
               id,
@@ -241,12 +255,13 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
 
             writesInProgress.put(writes.head.persistenceId, promise.future)
             promise.future.onComplete { _ =>
-              if (!stopping) self ! WriteFinished(writes.head.persistenceId, promise.future)
+              self ! WriteFinished(writes.head.persistenceId, promise.future)
             }
 
-            if (queue.size >= maxBatchSize && noActiveWrite)
-              self ! Flush
-            else if (!timers.isTimerActive(Flush))
+            if (queue.size >= maxBatchSize && noActiveWrite) {
+              noActiveWrite = false
+              doFlush()
+            } else if (!timers.isTimerActive(Flush))
               timers.startSingleTimer(Flush, Flush, maxBatchTime)
           case Failure(exception) =>
             promise.tryFailure(exception)
@@ -269,19 +284,13 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     }
   }
 
-  private def publish(messages: Seq[AtomicWrite], dbTimestamp: Future[Instant]): Future[Done] =
-    pubSub match {
-      case Some(ps) =>
-        dbTimestamp.map { timestamp =>
-          messages.iterator
-            .flatMap(_.payload.iterator)
-            .foreach(pr => ps.publish(pr, timestamp))
-
-          Done
-        }
-
-      case None =>
-        dbTimestamp.map(_ => Done)(ExecutionContext.parasitic)
+  private def publish(requests: Vector[WriteRequest], timestamp: Instant): Unit =
+    pubSub.foreach { ps =>
+      for {
+        w <- requests
+        m <- w.messages
+        pr <- m.payload
+      } ps.publish(pr, timestamp)
     }
 
   override def asyncDeleteMessagesTo(persistenceId: String, toSequenceNr: Long): Future[Unit] = {
@@ -317,7 +326,6 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   }
 
   override def postStop(): Unit = {
-    stopping = true
     val cause = new IllegalStateException("Journal actor stopped with pending batched writes")
 
     queue.foreach(_.promise.tryFailure(cause))
