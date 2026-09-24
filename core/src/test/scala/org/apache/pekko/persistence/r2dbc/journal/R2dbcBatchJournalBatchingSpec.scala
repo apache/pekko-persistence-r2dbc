@@ -78,6 +78,27 @@ object R2dbcBatchJournalBatchingSpec {
     .withFallback(R2dbcBatchJournalSpec.config)
     .resolve()
 
+  // A long batch window so only the size trigger can flush, used to assert that a stale FlushDone
+  // does not start a second flush while the first one is still in progress
+  val staleFlushDoneConfig: Config = ConfigFactory
+    .parseString("""
+      pekko.loglevel = DEBUG
+      pekko.persistence.r2dbc {
+        batched-journal {
+          max-queue-size = 3
+          max-batch-size = 1
+          max-batch-time = 10s
+          use-connection-factory = "pekko.persistence.r2dbc.queue-limit-test-connection-factory"
+        }
+      }
+      pekko.persistence.r2dbc.queue-limit-test-connection-factory = ${pekko.persistence.r2dbc.connection-factory} {
+        initial-size = 1
+        max-size = 1
+        acquire-timeout = 30s
+      }""")
+    .withFallback(R2dbcBatchJournalSpec.config)
+    .resolve()
+
   def writeMessages(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): WriteMessages =
     WriteMessages(
       Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
@@ -152,6 +173,58 @@ class R2dbcBatchJournalTimerFlushSpec
       probe.expectNoMessage(200.millis)
       probe.expectMessage(5.seconds, WriteMessagesSuccessful)
       probe.expectMessageType[WriteMessageSuccess](5.seconds).persistent.persistenceId shouldBe pid
+    }
+
+  }
+
+}
+
+class R2dbcBatchJournalStaleFlushDoneSpec
+    extends ScalaTestWithActorTestKit(R2dbcBatchJournalBatchingSpec.staleFlushDoneConfig)
+    with AnyWordSpecLike
+    with TestDbLifecycle
+    with TestData
+    with LogCapturing
+    with BatchedJournalDialectGate {
+  import R2dbcBatchJournalBatchingSpec.writeMessages
+
+  override def typedSystem: ActorSystem[?] = system
+
+  private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private val journalConnectionFactory =
+    ConnectionFactoryProvider(system).connectionFactoryFor(
+      "pekko.persistence.r2dbc.queue-limit-test-connection-factory")
+
+  "R2dbcBatchJournal stale FlushDone" should {
+
+    "ignore a FlushDone from a previous incarnation" in {
+      val entityType = nextEntityType()
+      val pids = (1 to 2).map(_ => nextPid(entityType))
+      val probes = pids.map(_ => createTestProbe[Any]())
+
+      // hold the only pooled connection so the flush of the first write stays in progress
+      val blockingConnection = journalConnectionFactory.create().asFuture().futureValue
+
+      // the first write starts a flush that is blocked waiting for the held connection
+      LoggingTestKit.debug("flushing [1] write requests").expect {
+        journal ! writeMessages(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
+      }
+
+      // a FlushDone carrying a generation from a previous incarnation must be ignored:
+      // no second flush may start while the first one is still in progress
+      journal ! R2dbcBatchJournal.FlushDone(-1L)
+      LoggingTestKit.debug("flushing").withOccurrences(0).expect {
+        journal ! writeMessages(pids(1), 1L, s"e-${pids(1)}", probes(1).ref)
+      }
+
+      // release the connection so the blocked flush and then the second write can complete
+      blockingConnection.close().asFuture().futureValue
+
+      pids.zip(probes).foreach {
+        case (pid, probe) =>
+          probe.expectMessage(10.seconds, WriteMessagesSuccessful)
+          probe.expectMessageType[WriteMessageSuccess](10.seconds).persistent.persistenceId shouldBe pid
+      }
     }
 
   }

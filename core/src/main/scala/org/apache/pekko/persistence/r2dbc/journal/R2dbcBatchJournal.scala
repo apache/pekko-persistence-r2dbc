@@ -14,11 +14,13 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 import scala.concurrent.{ ExecutionContext, Future, Promise }
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{ Duration, FiniteDuration }
 import scala.jdk.DurationConverters.JavaDurationOps
 import scala.util.{ Failure, Success, Try }
+import scala.util.control.NonFatal
 
 import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
@@ -52,7 +54,7 @@ import pekko.stream.scaladsl.Sink
 @InternalApi
 private[r2dbc] object R2dbcBatchJournal {
   private case object Flush
-  private case object FlushDone
+  private[r2dbc] final case class FlushDone(generation: Long)
 
   // the promise is completed with Done only after the batch containing this request is committed;
   // the AsyncWriteJournal result is derived from it at the API boundary
@@ -61,6 +63,16 @@ private[r2dbc] object R2dbcBatchJournal {
       messages: Seq[AtomicWrite],
       promise: Promise[Done]
   )
+
+  private val generationCounter = new java.util.concurrent.atomic.AtomicLong(0L)
+  private[r2dbc] def nextGeneration(): Long = generationCounter.incrementAndGet()
+
+  private val lastTimestampMicros = new java.util.concurrent.atomic.AtomicLong(0L)
+  private[r2dbc] def nextTimestamp(): Instant = {
+    val nowMicros = ChronoUnit.MICROS.between(Instant.EPOCH, InstantFactory.now())
+    val next = lastTimestampMicros.updateAndGet(prev => math.max(prev + 1, nowMicros))
+    Instant.EPOCH.plus(next, ChronoUnit.MICROS)
+  }
 }
 
 /**
@@ -81,18 +93,25 @@ private[r2dbc] object R2dbcBatchJournal {
  * not as a failed `Future`, so a full queue does not count toward the journal circuit breaker.
  * Flushed batches are serialized: only one flush is in flight at a time, which keeps
  * same-persistence-id writes committed in order without relying on replay-time coordination, at
- * the cost of not using spare pool capacity. When a batch is retried after an integrity
- * violation, its halves are written concurrently and can use several pool connections at once.
- * Each half stamps its own timestamp. A single split preserves order, but if the half holding
- * the earlier sequence numbers is retried after its sibling committed, its re-stamped rows can
- * invert the `db_timestamp` order of two same-persistence-id writes. Replay still orders by
- * sequence number; only timestamp-ordered read sides see the inversion.
- * Concurrent flushing can be added later if a single flush saturates.
+ * the cost of not using spare pool capacity. Concurrent flushing can be added later if a single
+ * flush saturates.
+ *
+ * Each write request is stamped at flush time with the application clock truncated to
+ * microseconds and bumped to stay strictly increasing within this journal actor. Equal
+ * `db_timestamp` values therefore never span more than one write request within this actor, so
+ * the `eventsBySlices` query can page through any batch regardless of its buffer size. The
+ * stamps can lead the wall clock by at most `max-batch-size` microseconds per flush. A single
+ * request can still contain many events when the caller uses `persistAll` or `persistAsync`
+ * bursts, the same as the default journal.
  *
  * A batch that fails with a database integrity violation is retried in halves so that only the
- * offending persistence ids fail. Infrastructure errors fail the whole batch. A batch can contain
- * an arbitrarily large number of rows when callers use `persistAll` or `persistAsync` bursts, the
- * same as the default journal; this plugin targets many small concurrent writes.
+ * offending persistence ids fail. Infrastructure errors fail the whole batch. The retried
+ * halves are written concurrently and can use several pool connections at once. Each half
+ * re-stamps its requests with new, later timestamps. A single split preserves order, but if the
+ * half holding the earlier sequence numbers is retried after its sibling committed, its
+ * re-stamped rows can invert the `db_timestamp` order of two same-persistence-id writes.
+ * Replay still orders by sequence number; only timestamp-ordered read sides see the inversion.
+ * This plugin targets many small concurrent writes.
  */
 @InternalApi
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
@@ -125,6 +144,9 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   require(maxQueueSize > 0, "max-queue-size must be at least 1 when using R2dbcBatchJournal")
   require(maxBatchSize > 0, "max-batch-size must be at least 1 when using R2dbcBatchJournal")
   require(maxBatchSize <= maxQueueSize, "max-batch-size must be less than or equal to `max-queue-size`")
+  require(maxBatchTime > Duration.Zero, "max-batch-time must be greater than zero when using R2dbcBatchJournal")
+
+  private val generation = R2dbcBatchJournal.nextGeneration()
 
   private val journalDao = JournalDao.fromConfig(journalSettings, config)
 
@@ -148,15 +170,15 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     log.debug("flushing [{}] write requests", count)
 
     def write(requests: Vector[WriteRequest]): Future[Unit] = {
-      val timestamp = InstantFactory.now()
+      val stampedRequests = requests.map(request => request -> R2dbcBatchJournal.nextTimestamp())
 
       journalDao
-        .writeEvents(requests.flatMap { w =>
-          w.rows.map(_.copy(dbTimestamp = timestamp))
+        .writeEvents(stampedRequests.flatMap {
+          case (request, timestamp) => request.rows.map(_.copy(dbTimestamp = timestamp))
         })
-        .map { dbTimestamp =>
+        .map { _ =>
           requests.foreach(_.promise.trySuccess(Done))
-          publish(requests, dbTimestamp)
+          publish(stampedRequests)
         }
         .recoverWith {
           case _: R2dbcDataIntegrityViolationException if requests.size > 1 =>
@@ -168,7 +190,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         }
     }
 
-    write(writeRequests).onComplete(_ => self ! FlushDone)
+    write(writeRequests).onComplete(_ => self ! FlushDone(generation))
   }
 
   override def receivePluginInternal: Receive = {
@@ -178,7 +200,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         noActiveWrite = false
         doFlush()
       }
-    case FlushDone =>
+    case FlushDone(g) if g == generation =>
       noActiveWrite = true
       if (queue.size >= maxBatchSize) {
         noActiveWrite = false
@@ -274,13 +296,22 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     }
   }
 
-  private def publish(requests: Vector[WriteRequest], timestamp: Instant): Unit =
+  private def publish(requests: Vector[(WriteRequest, Instant)]): Unit =
     pubSub.foreach { ps =>
-      for {
-        w <- requests
-        m <- w.messages
-        pr <- m.payload
-      } ps.publish(pr, timestamp)
+      requests.foreach {
+        case (request, timestamp) =>
+          try {
+            request.messages.foreach { messages =>
+              messages.payload.foreach(pr => ps.publish(pr, timestamp))
+            }
+          } catch {
+            case NonFatal(exception) =>
+              log.warning(
+                "Failed to publish events for persistence id [{}]: [{}]",
+                request.messages.head.persistenceId,
+                exception.getMessage)
+          }
+      }
     }
 
   override def asyncDeleteMessagesTo(persistenceId: String, toSequenceNr: Long): Future[Unit] = {

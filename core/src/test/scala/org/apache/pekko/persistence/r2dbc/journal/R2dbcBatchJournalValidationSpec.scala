@@ -85,6 +85,34 @@ object R2dbcBatchJournalValidationSpec {
       }""")
     .withFallback(TestConfig.config)
 
+  val zeroBatchTimeConfig: Config = ConfigFactory
+    .parseString("""
+      pekko.persistence.r2dbc {
+        use-app-timestamp = on
+        db-timestamp-monotonic-increasing = on
+        batched-journal {
+          class = "org.apache.pekko.persistence.r2dbc.journal.R2dbcBatchJournal"
+          use-app-timestamp = on
+          db-timestamp-monotonic-increasing = on
+          max-batch-time = 0ms
+        }
+      }""")
+    .withFallback(TestConfig.config)
+
+  val negativeBatchTimeConfig: Config = ConfigFactory
+    .parseString("""
+      pekko.persistence.r2dbc {
+        use-app-timestamp = on
+        db-timestamp-monotonic-increasing = on
+        batched-journal {
+          class = "org.apache.pekko.persistence.r2dbc.journal.R2dbcBatchJournal"
+          use-app-timestamp = on
+          db-timestamp-monotonic-increasing = on
+          max-batch-time = -1ms
+        }
+      }""")
+    .withFallback(TestConfig.config)
+
   val monotonicIncreasingOffConfig: Config = ConfigFactory
     .parseString("""
       pekko.persistence.r2dbc {
@@ -154,6 +182,38 @@ class R2dbcBatchJournalBatchSizeExceedsQueueSizeSpec
 
     "fail fast when max-batch-size exceeds max-queue-size" in {
       LoggingTestKit.error("max-batch-size must be less than or equal to `max-queue-size`").expect {
+        Persistence(system).journalFor("pekko.persistence.r2dbc.batched-journal")
+      }
+    }
+  }
+}
+
+class R2dbcBatchJournalZeroBatchTimeSpec
+    extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.zeroBatchTimeConfig)
+    with AnyWordSpecLike
+    with LogCapturing
+    with BatchedJournalDialectGate {
+
+  "R2dbcBatchJournal validation" should {
+
+    "fail fast when max-batch-time is zero" in {
+      LoggingTestKit.error("max-batch-time must be greater than zero").expect {
+        Persistence(system).journalFor("pekko.persistence.r2dbc.batched-journal")
+      }
+    }
+  }
+}
+
+class R2dbcBatchJournalNegativeBatchTimeSpec
+    extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.negativeBatchTimeConfig)
+    with AnyWordSpecLike
+    with LogCapturing
+    with BatchedJournalDialectGate {
+
+  "R2dbcBatchJournal validation" should {
+
+    "fail fast when max-batch-time is negative" in {
+      LoggingTestKit.error("max-batch-time must be greater than zero").expect {
         Persistence(system).journalFor("pekko.persistence.r2dbc.batched-journal")
       }
     }

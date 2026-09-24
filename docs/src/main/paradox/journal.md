@@ -51,10 +51,14 @@ The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-inc
 MySQL dialect requires. With `db-timestamp-monotonic-increasing` the database does not enforce increasing
 timestamps per persistence id, so the application clock must not move backwards between two writes of the
 same entity. The backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored
-with an out-of-order timestamp. The `db_timestamp` is taken from the application clock when the batch is
-flushed, just before the insert. The lag between the timestamp and the commit is bounded by the connection
-acquisition plus one transaction. Keep `query.behind-current-time` comfortably above that lag. Batching is
-only supported and tested for the Postgres and Yugabyte dialects.
+with an out-of-order timestamp. Each write request is stamped when the batch is flushed, just before the
+insert, with the application clock truncated to microseconds and bumped to stay strictly increasing within
+the journal actor. Equal `db_timestamp` values therefore never span more than one write request within the
+journal actor (a single request can still contain several events with `persistAll` or `persistAsync`), so
+the `eventsBySlices` query can page through any batch regardless of its buffer size. The stamps can lead
+the wall clock by at most `max-batch-size` microseconds per flush. The lag between the timestamp and the
+commit is bounded by the connection acquisition plus one transaction. Keep `query.behind-current-time`
+comfortably above that lag. Batching is only supported and tested for the Postgres and Yugabyte dialects.
 
 ### Batched Journal Configuration
 
@@ -69,6 +73,10 @@ pekko.persistence.r2dbc.batched-journal {
   max-batch-size = 100 # optional, default value
   max-batch-time = 10ms # optional, default value
 }
+
+# The lag between timestamp and commit includes connection acquisition.
+# Under pool contention, raise query behind-current-time above the expected lag.
+# pekko.persistence.r2dbc.query.behind-current-time = 1s
 ```
 
 The batched journal uses the following settings, in addition to the settings of the default journal:
@@ -85,9 +93,9 @@ The batched journal uses the following settings, in addition to the settings of 
   buffered.
 - `max-batch-time`: Maximum time a write request is buffered. If the batch does not reach `max-batch-size`
   first, it is flushed when this duration has elapsed, even if the batch holds only one request. The default
-  is 10ms. Pekko timers are rounded up to whole scheduler ticks (`pekko.scheduler.tick-duration`, default
-  10ms), so a value below the tick duration takes effect as one tick. Lowering `tick-duration` changes the
-  timer resolution for the entire actor system.
+  is 10ms. Must be greater than zero. Pekko timers are rounded up to whole scheduler ticks
+  (`pekko.scheduler.tick-duration`, default 10ms), so a value below the tick duration takes effect as one
+  tick. Lowering `tick-duration` changes the timer resolution for the entire actor system.
 
 ### Tradeoffs
 
