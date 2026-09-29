@@ -97,8 +97,8 @@ private[r2dbc] object R2dbcBatchJournal {
  * flush saturates.
  *
  * Each write request is stamped at flush time with the application clock truncated to
- * microseconds and bumped to stay strictly increasing within this journal actor. Equal
- * `db_timestamp` values therefore never span more than one write request within this actor, so
+ * microseconds and bumped to stay strictly increasing across all journal actor instances in the JVM.
+ * Equal `db_timestamp` values therefore never span more than one write request within the JVM, so
  * the `eventsBySlices` query can page through any batch regardless of its buffer size. The
  * stamps can lead the wall clock by at most `max-batch-size` microseconds per flush. A single
  * request can still contain many events when the caller uses `persistAll` or `persistAsync`
@@ -200,13 +200,15 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
         noActiveWrite = false
         doFlush()
       }
-    case FlushDone(g) if g == generation =>
-      noActiveWrite = true
-      if (queue.size >= maxBatchSize) {
-        noActiveWrite = false
-        doFlush()
-      } else if (queue.nonEmpty && !timers.isTimerActive(Flush)) {
-        timers.startSingleTimer(Flush, Flush, maxBatchTime)
+    case FlushDone(g) =>
+      if (g == generation) {
+        noActiveWrite = true
+        if (queue.size >= maxBatchSize) {
+          noActiveWrite = false
+          doFlush()
+        } else if (queue.nonEmpty && !timers.isTimerActive(Flush)) {
+          timers.startSingleTimer(Flush, Flush, maxBatchTime)
+        }
       }
   }
 
@@ -307,9 +309,9 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
           } catch {
             case NonFatal(exception) =>
               log.warning(
-                "Failed to publish events for persistence id [{}]: [{}]",
-                request.messages.head.persistenceId,
-                exception.getMessage)
+                exception,
+                "Failed to publish events for persistence id [{}]",
+                request.messages.head.persistenceId)
           }
       }
     }

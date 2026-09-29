@@ -52,9 +52,9 @@ MySQL dialect requires. With `db-timestamp-monotonic-increasing` the database do
 timestamps per persistence id, so the application clock must not move backwards between two writes of the
 same entity. The backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored
 with an out-of-order timestamp. Each write request is stamped when the batch is flushed, just before the
-insert, with the application clock truncated to microseconds and bumped to stay strictly increasing within
-the journal actor. Equal `db_timestamp` values therefore never span more than one write request within the
-journal actor (a single request can still contain several events with `persistAll` or `persistAsync`), so
+insert, with the application clock truncated to microseconds and bumped to stay strictly increasing across
+all journal actor instances in the JVM. Equal `db_timestamp` values therefore never span more than one write request within the
+JVM (a single request can still contain several events with `persistAll` or `persistAsync`), so
 the `eventsBySlices` query can page through any batch regardless of its buffer size. The stamps can lead
 the wall clock by at most `max-batch-size` microseconds per flush. The lag between the timestamp and the
 commit is bounded by the connection acquisition plus one transaction. Keep `query.behind-current-time`
