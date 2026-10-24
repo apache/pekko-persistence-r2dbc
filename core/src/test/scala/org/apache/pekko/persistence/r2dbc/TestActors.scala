@@ -22,6 +22,7 @@ import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.persistence.typed.ReplicaId
 import pekko.persistence.typed.ReplicationId
+import pekko.persistence.typed.SnapshotCompleted
 import pekko.persistence.typed.scaladsl.EventSourcedBehavior
 import pekko.persistence.typed.scaladsl.ReplicatedEventSourcing
 import pekko.persistence.typed.state.scaladsl.DurableStateBehavior
@@ -64,6 +65,29 @@ object TestActors {
             event.toString.contains("snap")
           }
           .withTagger(_ => tags)
+      }
+    }
+
+    def withSnapshotAck(pid: PersistenceId, tags: Set[String], snapshotProbe: ActorRef[Long]): Behavior[Command] =
+      withSnapshotAck(pid, "", "", tags, snapshotProbe)
+
+    def withSnapshotAck(
+        pid: PersistenceId,
+        journalPluginId: String,
+        snapshotPluginId: String,
+        tags: Set[String],
+        snapshotProbe: ActorRef[Long]): Behavior[Command] = {
+      Behaviors.setup { context =>
+        eventSourcedBehavior(pid, context)
+          .withJournalPluginId(journalPluginId)
+          .withSnapshotPluginId(snapshotPluginId)
+          .snapshotWhen { case (_, event, _) =>
+            event.toString.contains("snap")
+          }
+          .withTagger(_ => tags)
+          .receiveSignal { case (_, SnapshotCompleted(metadata)) =>
+            snapshotProbe ! metadata.sequenceNr
+          }
       }
     }
 

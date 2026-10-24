@@ -29,6 +29,33 @@ Java
 Scala
 :  @@snip [create](/docs/src/test/scala/docs/home/query/QueryDocCompileOnly.scala) { #currentEventsByPersistenceId }
 
+### eventsByPersistenceIdStartingFromSnapshot
+
+Same as `eventsByPersistenceId` but with the purpose to use snapshot as starting point and thereby reducing number of
+events that have to be loaded.
+
+First it tries to load the snapshot, if any, with sequence number within the given `fromSequenceNr` and
+`toSequenceNr` (inclusive) range. There is at most one snapshot per persistenceId. The snapshot is transformed to
+an event with the given `transformSnapshot` function.
+
+After emitting the snapshot event the ordinary events with sequence numbers after the snapshots are emitted.
+
+Example of `currentEventsByPersistenceIdStartingFromSnapshot`:
+
+Java
+:  @@snip [create](/docs/src/test/java/jdocs/home/query/QueryDocCompileOnly.java) { #currentEventsByPersistenceIdStartingFromSnapshot }
+
+Scala
+:  @@snip [create](/docs/src/test/scala/docs/home/query/QueryDocCompileOnly.scala) { #currentEventsByPersistenceIdStartingFromSnapshot }
+
+To use `eventsByPersistenceIdStartingFromSnapshot` or `currentEventsByPersistenceIdStartingFromSnapshot` you must
+follow the instructions in the @ref:[migration guide](migration-guides.md#eventsBySlicesStartingFromSnapshots) and
+enable configuration:
+
+```hocon
+pekko.persistence.r2dbc.query.start-from-snapshot.enabled = true
+```
+
 ### eventsBySlices
 
 The `eventsBySlices` and `currentEventsBySlices` queries are useful for retrieving all events for a given entity type.
@@ -87,6 +114,37 @@ with the same timestamp are ordered by sequence number.
 
 `currentEventsBySlices` doesn't perform these backtracking queries and will not emit duplicates and the
 event payload is always full loaded.
+
+### eventsBySlicesStartingFromSnapshots
+
+Same as `eventsBySlices` but with the purpose to use snapshots as starting points and thereby reducing number of
+events that have to be loaded. This can be useful if the consumer start from zero without any previously processed
+offset or if it has been disconnected for a long while and its offset is far behind.
+
+First it loads all snapshots with timestamps greater than or equal to the offset timestamp. There is at most one
+snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
+
+After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+
+Example of `currentEventsBySlicesStartingFromSnapshots`:
+
+Java
+:  @@snip [create](/docs/src/test/java/jdocs/home/query/QueryDocCompileOnly.java) { #currentEventsBySlicesStartingFromSnapshots }
+
+Scala
+:  @@snip [create](/docs/src/test/scala/docs/home/query/QueryDocCompileOnly.scala) { #currentEventsBySlicesStartingFromSnapshots }
+
+To use `eventsBySlicesStartingFromSnapshots` or `currentEventsBySlicesStartingFromSnapshots` you must follow
+the instructions in the @ref:[migration guide](migration-guides.md#eventsBySlicesStartingFromSnapshots) and enable
+configuration:
+
+```hocon
+pekko.persistence.r2dbc.query.start-from-snapshot.enabled = true
+```
+
+Events published via `journal.publish-events` are not filtered by the snapshots, so an event with a sequence number
+before a snapshot may in rare cases be emitted. Such duplicates must be handled downstream, for example by the R2DBC
+Projection.
 
 ## Publish events for lower latency of eventsBySlices
 

@@ -40,6 +40,13 @@ database with a high consistency.
 
 See also @ref[EventSourcedCleanup tool](cleanup.md#event-sourced-cleanup-tool).
 
+## Snapshots as starting points for queries
+
+When `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` is on, the snapshot plugin also stores the
+timestamp and tags of the corresponding event in the `db_timestamp` and `tags` columns. Those are used by the
+@ref:[queries that use snapshots as starting points](query.md#eventsbyslicesstartingfromsnapshots). See the
+@ref:[migration guide](migration-guides.md#eventsBySlicesStartingFromSnapshots) for the schema changes.
+
 ## Snapshot serialization
 
 The state is serialized with @extref:[Pekko Serialization](pekko:serialization.html) and the binary snapshot representation

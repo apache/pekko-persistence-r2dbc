@@ -19,14 +19,20 @@
 
 package org.apache.pekko.persistence.r2dbc.snapshot.mysql
 
+import java.time.Instant
+
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.snapshot.SnapshotDao
 
 /**
@@ -39,17 +45,54 @@ private[r2dbc] class MySQLSnapshotDao(
 )(implicit ec: ExecutionContext, system: ActorSystem[?])
     extends SnapshotDao(settings, connectionFactory, closeCallsExceeding) {
 
-  override val upsertSql = sql"""
-    INSERT INTO $snapshotTable
-    (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS excluded
-    ON DUPLICATE KEY UPDATE
-      seq_nr = excluded.seq_nr,
-      write_timestamp = excluded.write_timestamp,
-      snapshot = excluded.snapshot,
-      ser_id = excluded.ser_id,
-      ser_manifest = excluded.ser_manifest,
-      meta_payload = excluded.meta_payload,
-      meta_ser_id = excluded.meta_ser_id,
-      meta_ser_manifest = excluded.meta_ser_manifest"""
+  override protected def createUpsertSql: String =
+    if (settings.startFromSnapshotEnabled)
+      sql"""
+        INSERT INTO $snapshotTable
+        (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest, db_timestamp, tags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS excluded
+        ON DUPLICATE KEY UPDATE
+          seq_nr = excluded.seq_nr,
+          db_timestamp = excluded.db_timestamp,
+          write_timestamp = excluded.write_timestamp,
+          snapshot = excluded.snapshot,
+          ser_id = excluded.ser_id,
+          tags = excluded.tags,
+          ser_manifest = excluded.ser_manifest,
+          meta_payload = excluded.meta_payload,
+          meta_ser_id = excluded.meta_ser_id,
+          meta_ser_manifest = excluded.meta_ser_manifest"""
+    else
+      sql"""
+        INSERT INTO $snapshotTable
+        (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS excluded
+        ON DUPLICATE KEY UPDATE
+          seq_nr = excluded.seq_nr,
+          write_timestamp = excluded.write_timestamp,
+          snapshot = excluded.snapshot,
+          ser_id = excluded.ser_id,
+          ser_manifest = excluded.ser_manifest,
+          meta_payload = excluded.meta_payload,
+          meta_ser_id = excluded.meta_ser_id,
+          meta_ser_manifest = excluded.meta_ser_manifest"""
+
+  override protected def tagsFromRow(row: Row): Set[String] =
+    MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
+
+  override protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
+    if (tags.isEmpty) stmt.bindNull(index, classOf[String])
+    else stmt.bind(index, MySQLJournalDao.tagsToJson(tags))
+
+  override protected def selectBucketsSql(minSlice: Int, maxSlice: Int): String =
+    sql"""
+      SELECT CAST(UNIX_TIMESTAMP(db_timestamp) AS SIGNED) / 10 AS bucket, count(*) AS count
+      FROM $snapshotTable
+      WHERE entity_type = ?
+      AND ${sliceCondition(minSlice, maxSlice)}
+      AND db_timestamp >= ? AND db_timestamp <= ?
+      GROUP BY bucket ORDER BY bucket LIMIT ?
+      """
+
+  override def currentDbTimestamp(): Future[Instant] = Future.successful(Instant.now())
 }

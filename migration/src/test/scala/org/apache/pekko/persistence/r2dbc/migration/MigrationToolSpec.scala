@@ -13,6 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.migration
 
+import java.time.Instant
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -63,6 +65,9 @@ object MigrationToolSpec {
       use-shared-db = "default"
       tables.event_journal.tableName = "jdbc_event_journal"
     }
+
+    # migrated snapshots get the timestamp of the corresponding event
+    pekko.persistence.r2dbc.snapshot.start-from-snapshot.enabled = true
     """)
     .withFallback(TestConfig.config)
 }
@@ -220,6 +225,27 @@ class MigrationToolSpec
       migration.migrateSnapshot(pid.id).futureValue shouldBe 1L
 
       assertState(pid, "e-1|e-2-snap")
+    }
+
+    "migrate snapshot with the timestamp of the corresponding event" in {
+      val pid = PersistenceId.ofUniqueId(nextPid())
+
+      persistEvents(pid, List("e-1", "e-2-snap", "e-3"))
+
+      migration.migrateEvents(pid.id).futureValue shouldBe 3L
+      migration.migrateSnapshot(pid.id).futureValue shouldBe 1L
+
+      def dbTimestamp(table: String): Option[Instant] =
+        r2dbcExecutor
+          .selectOne(s"select db_timestamp from $table")(
+            _.createStatement(s"SELECT db_timestamp FROM $table WHERE persistence_id = $$1 AND seq_nr = 2")
+              .bind(0, pid.id),
+            _.get("db_timestamp", classOf[Instant]))
+          .futureValue
+
+      val eventTimestamp = dbTimestamp(journalSettings.journalTableWithSchema)
+      eventTimestamp should not be None
+      dbTimestamp(snapshotSettings.snapshotsTableWithSchema) shouldBe eventTimestamp
     }
 
     "migrate snapshot of a persistenceId several times" in {

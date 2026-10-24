@@ -48,6 +48,10 @@ public class QueryDocCompileOnly {
 
   interface MyState {}
 
+  static MyEvent toEvent(MyState state) {
+    throw new UnsupportedOperationException();
+  }
+
   private final ActorSystem<?> system = ActorSystem.create(Behaviors.empty(), "Docs");
 
   // #readJournalFor
@@ -73,6 +77,17 @@ public class QueryDocCompileOnly {
     // #currentEventsByPersistenceId
   }
 
+  void exampleEventsByPidStartingFromSnapshot() {
+    // #currentEventsByPersistenceIdStartingFromSnapshot
+    PersistenceId persistenceId = PersistenceId.of("MyEntity", "id1");
+    eventQueries
+        .<MyState, MyEvent>currentEventsByPersistenceIdStartingFromSnapshot(
+            persistenceId.id(), 1, Long.MAX_VALUE, QueryDocCompileOnly::toEvent)
+        .map(envelope -> "event with seqNr " + envelope.sequenceNr() + ": " + envelope.event())
+        .runWith(Sink.foreach(System.out::println), system);
+    // #currentEventsByPersistenceIdStartingFromSnapshot
+  }
+
   void exampleEventsBySlices() {
     // #currentEventsBySlices
     // Split the slices into 4 ranges
@@ -96,6 +111,28 @@ public class QueryDocCompileOnly {
                     + envelope.event())
         .runWith(Sink.foreach(System.out::println), system);
     // #currentEventsBySlices
+  }
+
+  void exampleEventsBySlicesStartingFromSnapshots() {
+    // #currentEventsBySlicesStartingFromSnapshots
+    List<Pair<Integer, Integer>> sliceRanges = eventQueries.sliceRanges(4);
+    int minSlice = sliceRanges.get(0).first();
+    int maxSlice = sliceRanges.get(0).second();
+    String entityType = "MyEntity";
+    Source<EventEnvelope<MyEvent>, NotUsed> source =
+        eventQueries.<MyState, MyEvent>currentEventsBySlicesStartingFromSnapshots(
+            entityType, minSlice, maxSlice, NoOffset.getInstance(), QueryDocCompileOnly::toEvent);
+    source
+        .map(
+            envelope ->
+                "event from persistenceId "
+                    + envelope.persistenceId()
+                    + " with seqNr "
+                    + envelope.sequenceNr()
+                    + ": "
+                    + envelope.event())
+        .runWith(Sink.foreach(System.out::println), system);
+    // #currentEventsBySlicesStartingFromSnapshots
   }
 
   void exampleStateBySlices() {

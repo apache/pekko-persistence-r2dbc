@@ -30,11 +30,15 @@ import pekko.persistence.query.Offset
 import pekko.persistence.query.javadsl._
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.javadsl.{
+  CurrentEventsByPersistenceIdStartingFromSnapshotQuery,
   CurrentEventsByPersistenceIdTypedQuery,
   CurrentEventsBySliceQuery,
+  CurrentEventsBySliceStartingFromSnapshotsQuery,
   EventTimestampQuery,
+  EventsByPersistenceIdStartingFromSnapshotQuery,
   EventsByPersistenceIdTypedQuery,
   EventsBySliceQuery,
+  EventsBySliceStartingFromSnapshotsQuery,
   LoadEventQuery
 }
 import pekko.persistence.r2dbc.query.scaladsl
@@ -48,6 +52,8 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
     extends ReadJournal
     with CurrentEventsBySliceQuery
     with EventsBySliceQuery
+    with CurrentEventsBySliceStartingFromSnapshotsQuery
+    with EventsBySliceStartingFromSnapshotsQuery
     with EventTimestampQuery
     with LoadEventQuery
     with CurrentEventsByPersistenceIdQuery
@@ -55,7 +61,9 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
     with EventsByPersistenceIdQuery
     with EventsByPersistenceIdTypedQuery
     with CurrentPersistenceIdsQuery
-    with PagedPersistenceIdsQuery {
+    with PagedPersistenceIdsQuery
+    with EventsByPersistenceIdStartingFromSnapshotQuery
+    with CurrentEventsByPersistenceIdStartingFromSnapshotQuery {
 
   override def sliceForPersistenceId(persistenceId: String): Int =
     delegate.sliceForPersistenceId(persistenceId)
@@ -73,6 +81,50 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
       maxSlice: Int,
       offset: Offset): Source[EventEnvelope[Event], NotUsed] =
     delegate.eventsBySlices(entityType, minSlice, maxSlice, offset).asJava
+
+  /**
+   * Same as `currentEventsBySlices` but with the purpose to use snapshots as starting points and thereby reducing
+   * number of events that have to be loaded. This can be useful if the consumer start from zero without any previously
+   * processed offset or if it has been disconnected for a long while and its offset is far behind.
+   *
+   * First it loads all snapshots with timestamps greater than or equal to the offset timestamp. There is at most one
+   * snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
+   *
+   * After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+   *
+   * To use `currentEventsBySlicesStartingFromSnapshots` you must enable configuration
+   * `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` and follow the instructions in the migration guide.
+   */
+  override def currentEventsBySlicesStartingFromSnapshots[Snapshot, Event](
+      entityType: String,
+      minSlice: Int,
+      maxSlice: Int,
+      offset: Offset,
+      transformSnapshot: java.util.function.Function[Snapshot, Event]): Source[EventEnvelope[Event], NotUsed] =
+    delegate
+      .currentEventsBySlicesStartingFromSnapshots(entityType, minSlice, maxSlice, offset, transformSnapshot(_))
+      .asJava
+
+  /**
+   * Same as `eventsBySlices` but with the purpose to use snapshots as starting points and thereby reducing number of
+   * events that have to be loaded. This can be useful if the consumer start from zero without any previously processed
+   * offset or if it has been disconnected for a long while and its offset is far behind.
+   *
+   * First it loads all snapshots with timestamps greater than or equal to the offset timestamp. There is at most one
+   * snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
+   *
+   * After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+   *
+   * To use `eventsBySlicesStartingFromSnapshots` you must enable configuration
+   * `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` and follow the instructions in the migration guide.
+   */
+  override def eventsBySlicesStartingFromSnapshots[Snapshot, Event](
+      entityType: String,
+      minSlice: Int,
+      maxSlice: Int,
+      offset: Offset,
+      transformSnapshot: java.util.function.Function[Snapshot, Event]): Source[EventEnvelope[Event], NotUsed] =
+    delegate.eventsBySlicesStartingFromSnapshots(entityType, minSlice, maxSlice, offset, transformSnapshot(_)).asJava
 
   override def sliceRanges(numberOfRanges: Int): util.List[Pair[Integer, Integer]] = {
     import scala.jdk.CollectionConverters._
@@ -105,6 +157,28 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
       fromSequenceNr: Long,
       toSequenceNr: Long): Source[EventEnvelope[Event], NotUsed] =
     delegate.eventsByPersistenceIdTyped[Event](persistenceId, fromSequenceNr, toSequenceNr).asJava
+
+  override def currentEventsByPersistenceIdStartingFromSnapshot[Snapshot, Event](
+      persistenceId: String,
+      fromSequenceNr: Long,
+      toSequenceNr: Long,
+      transformSnapshot: java.util.function.Function[Snapshot, Event]): Source[EventEnvelope[Event], NotUsed] =
+    delegate
+      .currentEventsByPersistenceIdStartingFromSnapshot(
+        persistenceId,
+        fromSequenceNr,
+        toSequenceNr,
+        transformSnapshot(_))
+      .asJava
+
+  override def eventsByPersistenceIdStartingFromSnapshot[Snapshot, Event](
+      persistenceId: String,
+      fromSequenceNr: Long,
+      toSequenceNr: Long,
+      transformSnapshot: java.util.function.Function[Snapshot, Event]): Source[EventEnvelope[Event], NotUsed] =
+    delegate
+      .eventsByPersistenceIdStartingFromSnapshot(persistenceId, fromSequenceNr, toSequenceNr, transformSnapshot(_))
+      .asJava
 
   override def currentPersistenceIds(): Source[String, NotUsed] =
     delegate.currentPersistenceIds().asJava

@@ -25,6 +25,7 @@ import pekko.annotation.InternalStableApi
 import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.util.Helpers.toRootLowerCase
 import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 
 /**
  * INTERNAL API
@@ -91,13 +92,23 @@ object JournalSettings {
  * INTERNAL API
  */
 @InternalStableApi
-final class SnapshotSettings(val config: Config) extends ConnectionSettings with UseConnnectionFactory {
+final class SnapshotSettings(val config: Config) extends ConnectionSettings with UseConnnectionFactory
+    with BufferSize {
 
   val snapshotsTable: String = config.getString("table")
   val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
 
   val snapshotPayloadCodec: PayloadCodec =
     if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
+
+  /**
+   * When enabled the timestamp and tags of the corresponding event are stored with the snapshot, which is needed by
+   * the queries that use snapshots as starting points.
+   */
+  val startFromSnapshotEnabled: Boolean = config.getBoolean("start-from-snapshot.enabled")
+
+  val journalTable: String = config.getString("journal-table")
+  val journalTableWithSchema: String = schema.map(_ + ".").getOrElse("") + journalTable
 }
 
 /**
@@ -187,6 +198,25 @@ final class QuerySettings(val config: Config) extends ConnectionSettings with Us
 
   val journalPayloadCodec: PayloadCodec =
     if (useJsonPayload("payload-column-type")) PayloadCodec.JsonCodec else PayloadCodec.ByteArrayCodec
+
+  val startFromSnapshotEnabled: Boolean = config.getBoolean("start-from-snapshot.enabled")
+
+  val snapshotsTable: String = config.getString("snapshot-table")
+  val snapshotsTableWithSchema: String = schema.map(_ + ".").getOrElse("") + snapshotsTable
+
+  /**
+   * INTERNAL API: settings for reading the snapshot table from the queries that use snapshots as starting points
+   */
+  @InternalApi private[pekko] lazy val snapshotSettings: SnapshotSettings =
+    SnapshotSettings(
+      ConfigFactory
+        .parseMap(
+          Map[String, Any](
+            "table" -> snapshotsTable,
+            "payload-column-type" -> config.getString("snapshot-payload-column-type"),
+            "start-from-snapshot.enabled" -> startFromSnapshotEnabled,
+            "journal-table" -> journalTable).asJava)
+        .withFallback(config))
 }
 
 /**

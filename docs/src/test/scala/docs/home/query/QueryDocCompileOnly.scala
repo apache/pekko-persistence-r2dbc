@@ -23,6 +23,7 @@ object QueryDocCompileOnly {
   implicit val system: ActorSystem[?] = ???
   trait MyEvent
   trait MyState
+  def toEvent(state: MyState): MyEvent = ???
 
   // #readJournalFor
   import org.apache.pekko
@@ -53,6 +54,20 @@ object QueryDocCompileOnly {
   }
 
   {
+    // #currentEventsByPersistenceIdStartingFromSnapshot
+    val persistenceId = PersistenceId("MyEntity", "id1")
+    eventQueries
+      .currentEventsByPersistenceIdStartingFromSnapshot[MyState, MyEvent](
+        persistenceId.id,
+        1,
+        Long.MaxValue,
+        transformSnapshot = (state: MyState) => toEvent(state))
+      .map(envelope => s"event with seqNr ${envelope.sequenceNr}: ${envelope.event}")
+      .runWith(Sink.foreach(println))
+    // #currentEventsByPersistenceIdStartingFromSnapshot
+  }
+
+  {
     // #currentEventsBySlices
     import pekko.persistence.query.typed.EventEnvelope
 
@@ -71,6 +86,26 @@ object QueryDocCompileOnly {
         s"seqNr ${envelope.sequenceNr}: ${envelope.event}")
       .runWith(Sink.foreach(println))
     // #currentEventsBySlices
+  }
+
+  {
+    // #currentEventsBySlicesStartingFromSnapshots
+    val sliceRanges = eventQueries.sliceRanges(4)
+    val minSlice: Int = sliceRanges.head.min
+    val maxSlice: Int = sliceRanges.head.max
+    val entityType: String = "MyEntity"
+    eventQueries
+      .currentEventsBySlicesStartingFromSnapshots[MyState, MyEvent](
+        entityType,
+        minSlice,
+        maxSlice,
+        NoOffset.getInstance,
+        transformSnapshot = (state: MyState) => toEvent(state))
+      .map(envelope =>
+        s"event from persistenceId ${envelope.persistenceId} with " +
+        s"seqNr ${envelope.sequenceNr}: ${envelope.event}")
+      .runWith(Sink.foreach(println))
+    // #currentEventsBySlicesStartingFromSnapshots
   }
 
   {

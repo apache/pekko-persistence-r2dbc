@@ -295,8 +295,15 @@ class MigrationTool(system: ActorSystem[?]) {
       case None                                                           => Future.successful(0)
       case Some(selectedSnapshot @ SelectedSnapshot(snapshotMetadata, _)) =>
         for {
+          correspondingEvent <- {
+            // same as R2dbcSnapshotStore.saveAsync, use timestamp and tags from the corresponding (migrated) event
+            if (targetSnapshotettings.startFromSnapshotEnabled)
+              targetSnapshotDao.eventTimestampAndTags(snapshotMetadata.persistenceId, snapshotMetadata.sequenceNr)
+            else
+              Future.successful(None)
+          }
           seqNr <- {
-            val serializedRow = serializedSnapotRow(selectedSnapshot)
+            val serializedRow = serializedSnapotRow(selectedSnapshot, correspondingEvent)
             targetSnapshotDao
               .store(serializedRow)
               .map(_ => snapshotMetadata.sequenceNr)(ExecutionContext.parasitic)
@@ -306,7 +313,9 @@ class MigrationTool(system: ActorSystem[?]) {
     }
   }
 
-  private def serializedSnapotRow(selectedSnapshot: SelectedSnapshot): SerializedSnapshotRow = {
+  private def serializedSnapotRow(
+      selectedSnapshot: SelectedSnapshot,
+      correspondingEvent: Option[(Instant, Set[String])]): SerializedSnapshotRow = {
     val snapshotMetadata = selectedSnapshot.metadata
     val snapshotAnyRef = selectedSnapshot.snapshot.asInstanceOf[AnyRef]
     val serializedSnapshot = serialization.serialize(snapshotAnyRef).get
@@ -321,13 +330,20 @@ class MigrationTool(system: ActorSystem[?]) {
       SerializedSnapshotMetadata(serializedMeta, metaSerializer.identifier, metaManifest)
     }
 
+    val (dbTimestamp, tags) =
+      correspondingEvent.getOrElse(Instant.ofEpochMilli(snapshotMetadata.timestamp) -> Set.empty[String])
+
     val serializedRow = SerializedSnapshotRow(
+      persistenceExt.sliceForPersistenceId(snapshotMetadata.persistenceId),
+      PersistenceId.extractEntityType(snapshotMetadata.persistenceId),
       snapshotMetadata.persistenceId,
       snapshotMetadata.sequenceNr,
+      dbTimestamp,
       snapshotMetadata.timestamp,
       serializedSnapshot,
       snapshotSerializer.identifier,
       snapshotManifest,
+      tags,
       serializedMeta)
     serializedRow
   }
