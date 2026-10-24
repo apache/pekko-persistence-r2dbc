@@ -21,6 +21,7 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.FilteredPayload
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.Offset
 import pekko.persistence.query.PersistenceQuery
@@ -75,6 +76,17 @@ class EventsBySliceBacktrackingSpec
   // to be able to store events with specific timestamps
   private def writeEvent(slice: Int, persistenceId: String, seqNr: Long, timestamp: Instant, event: String): Unit = {
     log.debug("Write test event [{}] [{}] [{}] at time [{}]", persistenceId, seqNr: java.lang.Long, event, timestamp)
+    writeSerializedEvent(slice, persistenceId, seqNr, timestamp, stringSerializer.identifier,
+      stringSerializer.toBinary(event))
+  }
+
+  private def writeSerializedEvent(
+      slice: Int,
+      persistenceId: String,
+      seqNr: Long,
+      timestamp: Instant,
+      serId: Int,
+      payload: Array[Byte]): Unit = {
     implicit val dialect: Dialect = settings.dialect
     val insertEventSql = sql"""
       INSERT INTO ${settings.journalTableWithSchema}
@@ -90,8 +102,8 @@ class EventsBySliceBacktrackingSpec
         .bind(2, persistenceId)
         .bind(3, seqNr)
         .bind(4, timestamp)
-        .bind(5, stringSerializer.identifier)
-        .bindPayload(6, stringSerializer.toBinary(event))
+        .bind(5, serId)
+        .bindPayload(6, payload)
     }
     result.futureValue shouldBe 1
   }
@@ -184,6 +196,50 @@ class EventsBySliceBacktrackingSpec
       val env9 = result.expectNext()
       env9.persistenceId shouldBe pid1
       env9.sequenceNr shouldBe 4L
+    }
+
+    "mark FilteredPayload as filtered in backtracking results" in {
+      val entityType = nextEntityType()
+      val pid = nextPid(entityType)
+      val slice = query.sliceForPersistenceId(pid)
+      val sinkProbe = TestSink[EventEnvelope[String]]()(system.classicSystem)
+
+      // don't let behind-current-time be a reason for not finding events
+      val startTime = InstantFactory.now().minusSeconds(10 * 60)
+
+      val filteredSerializer = SerializationExtension(system).findSerializerFor(FilteredPayload)
+      writeSerializedEvent(slice, pid, 1L, startTime, filteredSerializer.identifier,
+        filteredSerializer.toBinary(FilteredPayload))
+      writeEvent(slice, pid, 2L, startTime.plusMillis(1), "e-2")
+
+      val result: TestSubscriber.Probe[EventEnvelope[String]] =
+        query
+          .eventsBySlices[String](entityType, slice, slice, NoOffset)
+          .runWith(sinkProbe)
+          .request(100)
+
+      val env1 = result.expectNext()
+      env1.sequenceNr shouldBe 1L
+      env1.source shouldBe EnvelopeOrigin.SourceQuery
+      env1.filtered shouldBe true
+      env1.eventOption shouldBe None
+
+      val env2 = result.expectNext()
+      env2.sequenceNr shouldBe 2L
+      env2.filtered shouldBe false
+      env2.eventOption shouldBe Some("e-2")
+
+      val env3 = result.expectNext()
+      env3.sequenceNr shouldBe 1L
+      env3.source shouldBe EnvelopeOrigin.SourceBacktracking
+      env3.filtered shouldBe true
+
+      val env4 = result.expectNext()
+      env4.sequenceNr shouldBe 2L
+      env4.source shouldBe EnvelopeOrigin.SourceBacktracking
+      env4.filtered shouldBe false
+
+      result.cancel()
     }
 
     "emit from backtracking after first normal query" in {
