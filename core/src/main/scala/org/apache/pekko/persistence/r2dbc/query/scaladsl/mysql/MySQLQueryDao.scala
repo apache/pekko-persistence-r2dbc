@@ -53,7 +53,7 @@ private[r2dbc] class MySQLQueryDao(
 
   override protected def selectColumns(backtracking: Boolean): String =
     if (backtracking)
-      s"SELECT slice, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, tags, event_ser_id "
+      s"SELECT slice, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, tags, event_ser_id, event_ser_manifest "
     else
       s"SELECT slice, persistence_id, seq_nr, db_timestamp, $statementTimestampSql AS read_db_timestamp, tags, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload "
 

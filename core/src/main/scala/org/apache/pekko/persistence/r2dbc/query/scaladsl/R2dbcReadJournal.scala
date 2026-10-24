@@ -51,6 +51,7 @@ import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
+import pekko.serialization.Serializers
 import pekko.stream.OverflowStrategy
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
@@ -89,7 +90,13 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
 
   private val queryDao = QueryDao.fromConfig(settings, config)
 
-  private val filteredPayloadSerId = serialization.findSerializerFor(FilteredPayload).identifier
+  private val filteredPayloadSerializer = serialization.findSerializerFor(FilteredPayload)
+  private val filteredPayloadSerId = filteredPayloadSerializer.identifier
+  // the FilteredPayload serializer is shared with other payload wrappers, so the manifest must be checked too
+  private val filteredPayloadManifest = Serializers.manifestFor(filteredPayloadSerializer, FilteredPayload)
+
+  private def isFiltered(row: SerializedJournalRow): Boolean =
+    row.serId == filteredPayloadSerId && row.serManifest == filteredPayloadManifest
 
   private def deserializePayload[Event](row: SerializedJournalRow): Option[Event] =
     row.payload.map(payload => serialization.deserialize(payload, row.serId, row.serManifest).get.asInstanceOf[Event])
@@ -99,7 +106,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       val event = deserializePayload[Any](row)
       val metadata = row.metadata.map(meta => serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
       val source = if (event.isDefined) EnvelopeOrigin.SourceQuery else EnvelopeOrigin.SourceBacktracking
-      val filtered = row.serId == filteredPayloadSerId
+      val filtered = isFiltered(row)
 
       new EventEnvelope(
         offset,
@@ -423,7 +430,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
     val offset = TimestampOffset(row.dbTimestamp, row.readDbTimestamp, Map(row.persistenceId -> row.seqNr))
     val metadata = row.metadata.map(meta => serialization.deserialize(meta.payload, meta.serId, meta.serManifest).get)
     val source = if (event.isDefined) EnvelopeOrigin.SourceQuery else EnvelopeOrigin.SourceBacktracking
-    val filtered = row.serId == filteredPayloadSerId
+    val filtered = isFiltered(row)
 
     new EventEnvelope(
       offset,
