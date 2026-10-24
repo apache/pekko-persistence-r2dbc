@@ -20,6 +20,7 @@ To enable `JSONB` payloads you need the following.
 1. Serialize the event, snapshot and durable state payloads as JSON bytes.
 
 For the serialization you can use:
+
 * @extref:[Pekko Serialization with Jackson](pekko:serialization-jackson.html) with JSON format.
   * Make sure to disable @extref:[compression](pekko:serialization-jackson.html#compression) with `pekko.serialization.jackson.jackson-json.compression.algorithm = off`
 * Plain strings in JSON format.
