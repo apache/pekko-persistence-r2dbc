@@ -55,8 +55,8 @@ object DurableStateStoreChangeHandlerSpec {
 
   // MySQL uses ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
   private val insertSql: String =
-    if (dialect == "mysql") "insert into changes_test (pid, rev, value) values (?, ?, ?)"
-    else sql"insert into changes_test (pid, rev, value) values (?, ?, ?)"
+    if (dialect == "mysql") "insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
+    else sql"insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
 
   class Handler(system: ActorSystem[?]) extends ChangeHandler[String] {
     private implicit val ec: ExecutionContext = system.executionContext
@@ -107,7 +107,7 @@ class DurableStateStoreChangeHandlerSpec
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll create changes_test")(
         _.createStatement(
-          s"create table if not exists $anotherTable (pid varchar(256), rev bigint, value varchar(256))")),
+          s"create table if not exists $anotherTable (pid varchar(256), rev bigint, the_value varchar(256))")),
       20.seconds)
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $anotherTable")),
@@ -136,7 +136,7 @@ class DurableStateStoreChangeHandlerSpec
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
 
-      exists(s"pid = '$persistenceId' and rev = 1 and value = '$value'") should be(true)
+      exists(s"pid = '$persistenceId' and rev = 1 and the_value = '$value'") should be(true)
     }
 
     "be invoked for updates" in {
@@ -150,7 +150,7 @@ class DurableStateStoreChangeHandlerSpec
       store.upsertObject(persistenceId, 2L, updatedValue, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(updatedValue), 2L))
 
-      exists(s"pid = '$persistenceId' and rev = 2 and value = '$updatedValue'") should be(true)
+      exists(s"pid = '$persistenceId' and rev = 2 and the_value = '$updatedValue'") should be(true)
     }
 
     "be invoked for deletes" in {
@@ -163,7 +163,7 @@ class DurableStateStoreChangeHandlerSpec
       store.deleteObject(persistenceId, 2L).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 2L))
 
-      exists(s"pid = '$persistenceId' and rev = 2 and value is null") should be(true)
+      exists(s"pid = '$persistenceId' and rev = 2 and the_value is null") should be(true)
     }
 
     "be invoked for hard deletes" in {
@@ -177,7 +177,7 @@ class DurableStateStoreChangeHandlerSpec
       store.deleteObject(persistenceId, 0L).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
 
-      exists(s"pid = '$persistenceId' and rev = 0 and value is null") should be(true)
+      exists(s"pid = '$persistenceId' and rev = 0 and the_value is null") should be(true)
     }
 
     "use same transaction" in {
@@ -204,7 +204,7 @@ class DurableStateStoreChangeHandlerSpec
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
 
-      exists(s"pid = '$persistenceId' and rev = 1 and value = '$value'") should be(true)
+      exists(s"pid = '$persistenceId' and rev = 1 and the_value = '$value'") should be(true)
     }
 
   }

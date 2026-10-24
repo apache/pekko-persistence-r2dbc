@@ -79,6 +79,41 @@ Yugabyte:
 docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t < ddl-scripts/create_tables_yugabyte.sql
 ```
 
+<a id="h2"></a>
+### H2
+
+[H2](https://h2database.com) runs in the same JVM process as the application, as an in-memory database or with a
+database file. It is useful for tests and small applications that run on a single node. A database file can't be
+shared by several JVMs.
+
+The H2 database and its R2DBC driver are not included as dependencies of the plugin, add them to your build:
+
+@@dependency [Maven,sbt,Gradle] {
+  group1=com.h2database
+  artifact1=h2
+  version1=$h2.version$
+  group2=io.r2dbc
+  artifact2=r2dbc-h2
+  version2=$r2dbc-h2.version$
+}
+
+Enable it with:
+
+@@snip [application.conf](/docs/src/test/resources/application-h2.conf) { #connection-settings }
+
+The tables and indexes are created automatically when the database is first connected to, so no schema scripts are
+needed. Additional DDL or DML, for example for the columns of
+@ref:[additional columns](durable-state-store.md#storing-query-representation), can be included with `additional-init`:
+
+@@snip [H2AdditionalInitForSchemaSpec.scala](/core/src/test/scala/org/apache/pekko/persistence/r2dbc/internal/H2AdditionalInitForSchemaSpec.scala) { #additionalColumn }
+
+The `h2` settings in the reference configuration:
+
+@@snip [reference.conf](/core/src/main/resources/reference.conf) { #connection-settings-h2 }
+
+The H2 dialect stores events, snapshots and durable state in `BYTEA` columns, the `JSONB` payload column type is not
+supported. The `connection-factory-options-customizer` is not supported with H2.
+
 ### Dropping the schema
 
 Postgres:

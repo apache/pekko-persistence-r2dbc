@@ -24,6 +24,7 @@ import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.internal.h2.H2Utils
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.typed.PersistenceId
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -71,6 +72,8 @@ class PersistTagsSpec
               val tags =
                 if (dialect == "mysql") {
                   MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
+                } else if (dialect == "h2") {
+                  H2Utils.tagsFromDb(row, "tags")
                 } else {
                   row.get("tags", classOf[Array[String]]) match {
                     case null      => Set.empty[String]

@@ -59,6 +59,20 @@ object TestConfig {
             use-app-timestamp = on
           }
           """)
+      case "h2" =>
+        ConfigFactory.parseString("""
+          pekko.persistence.r2dbc {
+            connection-factory {
+              driver = "h2"
+              h2 {
+                protocol = "mem"
+                database = "pekko-r2dbc-test"
+              }
+            }
+            db-timestamp-monotonic-increasing = on
+            use-app-timestamp = on
+          }
+          """)
     }
 
     dialectConfig.withFallback(ConfigFactory.parseString("""

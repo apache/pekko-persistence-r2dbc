@@ -32,6 +32,7 @@ import pekko.actor.typed.ExtensionId
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
+import pekko.persistence.r2dbc.internal.h2.H2Connections
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
@@ -99,10 +100,17 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         configPath,
         _ => {
           val fullConfig = config.withFallback(system.settings.config)
-          val settings =
-            new ConnectionFactorySettings(fullConfig.getConfig(configPath))
-          val customizer = createConnectionFactoryOptionsCustomizer(settings)
-          createConnectionPoolFactory(settings, customizer, fullConfig)
+          val connectionFactoryConfig = fullConfig.getConfig(configPath)
+          val settings = new ConnectionFactorySettings(connectionFactoryConfig)
+          val connectionFactory =
+            if (settings.driver == "h2") {
+              require(
+                settings.connectionFactoryOptionsCustomizer.isEmpty,
+                "connection-factory-options-customizer is not supported with the h2 driver")
+              H2Connections.create(connectionFactoryConfig.getConfig("h2"))
+            } else
+              createConnectionFactory(settings, createConnectionFactoryOptionsCustomizer(settings), fullConfig)
+          createConnectionPoolFactory(settings, connectionFactory)
         })
       .asInstanceOf[ConnectionFactory]
   }
@@ -181,9 +189,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,
-      customizer: ConnectionFactoryOptionsCustomizer,
-      config: Config): ConnectionPool = {
-    val connectionFactory = createConnectionFactory(settings, customizer, config)
+      connectionFactory: ConnectionFactory): ConnectionPool = {
 
     val evictionInterval = {
       import settings.maxIdleTime

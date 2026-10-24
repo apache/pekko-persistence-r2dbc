@@ -34,6 +34,8 @@ import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
+import pekko.persistence.r2dbc.journal.h2.H2JournalDao
+import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.typed.PersistenceId
 import com.typesafe.config.Config
 import io.r2dbc.spi.Connection
@@ -86,15 +88,17 @@ private[r2dbc] object JournalDao {
   )(implicit system: ActorSystem[?], ec: ExecutionContext): JournalDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val closeCallsExceeding = {
-      val fullConfig = config.withFallback(system.settings.config)
-      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
-    }
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new JournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
         new MySQLJournalDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.H2 =>
+        new H2JournalDao(settings, connectionFactory, closeCallsExceeding)(
+          H2Connections.executionContext(system, connectionFactoryConfig),
+          system)
     }
   }
 }

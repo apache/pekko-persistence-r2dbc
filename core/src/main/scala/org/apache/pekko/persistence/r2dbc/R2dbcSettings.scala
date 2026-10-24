@@ -43,15 +43,19 @@ object Dialect {
   /** @since 1.1.0 */
   case object MySQL extends Dialect
 
+  /** @since 2.0.0 */
+  case object H2 extends Dialect
+
   /** @since 1.1.0 */
   def fromString(value: String): Dialect = {
     toRootLowerCase(value) match {
       case "yugabyte" => Dialect.Yugabyte
       case "postgres" => Dialect.Postgres
       case "mysql"    => Dialect.MySQL
+      case "h2"       => Dialect.H2
       case other      =>
         throw new IllegalArgumentException(
-          s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres, mysql].")
+          s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres, mysql, h2].")
     }
   }
 }

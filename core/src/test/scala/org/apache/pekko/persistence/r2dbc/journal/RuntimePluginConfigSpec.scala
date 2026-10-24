@@ -76,6 +76,8 @@ object RuntimePluginConfigSpec {
               $configKey = {
                 connection-factory {
                   database = "$database"
+                  # only used by the h2 driver
+                  h2.database = "$database"
                 }
 
                 journal.$configKey.connection-factory = $${$configKey.connection-factory}
@@ -133,6 +135,8 @@ object RuntimePluginConfigSpec {
               $configKey = {
                 connection-factory {
                   database = "$database"
+                  # only used by the h2 driver
+                  h2.database = "$database"
                 }
 
                 state.$configKey.connection-factory = $${$configKey.connection-factory}

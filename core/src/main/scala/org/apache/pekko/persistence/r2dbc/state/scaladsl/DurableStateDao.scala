@@ -51,6 +51,8 @@ import pekko.persistence.r2dbc.state.ChangeHandlerException
 import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
+import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
+import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
@@ -94,15 +96,17 @@ import org.slf4j.LoggerFactory
   )(implicit system: ActorSystem[?], ec: ExecutionContext): DurableStateDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val closeCallsExceeding = {
-      val fullConfig = config.withFallback(system.settings.config)
-      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
-    }
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.H2 =>
+        new H2DurableStateDao(settings, connectionFactory, closeCallsExceeding)(
+          H2Connections.executionContext(system, connectionFactoryConfig),
+          system)
     }
   }
 }
