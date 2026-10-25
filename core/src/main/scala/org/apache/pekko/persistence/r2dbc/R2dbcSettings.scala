@@ -215,7 +215,10 @@ final class QuerySettings(val config: Config) extends ConnectionSettings with Us
             "table" -> snapshotsTable,
             "payload-column-type" -> config.getString("snapshot-payload-column-type"),
             "start-from-snapshot.enabled" -> startFromSnapshotEnabled,
-            "journal-table" -> journalTable).asJava)
+            "journal-table" -> journalTable,
+            // with H2, the query creates the snapshot table, like the journal table, but the additional-init
+            // belongs to the snapshot plugin
+            "h2.additional-init" -> "").asJava)
         .withFallback(config))
 }
 

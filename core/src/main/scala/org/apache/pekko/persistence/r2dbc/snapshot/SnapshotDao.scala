@@ -101,9 +101,13 @@ private[r2dbc] object SnapshotDao {
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,
           connectionFactoryConfig,
-          _ =>
+          createSliceIndexes =>
             H2Connections.schemaDdl(settings.schema) ++
-            H2Connections.snapshotTableDdl(settings.snapshotsTableWithSchema) ++
+            // the slice index is only used by the queries that use snapshots as starting points, and an existing
+            // table may not have the db_timestamp column when start-from-snapshot is disabled
+            H2Connections.snapshotTableDdl(
+              settings.snapshotsTableWithSchema,
+              createSliceIndexes && settings.startFromSnapshotEnabled) ++
             H2Connections.additionalInit(settings.config))
         new H2SnapshotDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),

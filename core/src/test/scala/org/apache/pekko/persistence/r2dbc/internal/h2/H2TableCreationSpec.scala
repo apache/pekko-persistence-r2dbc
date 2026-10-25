@@ -92,6 +92,9 @@ class H2TableCreationSpec
       .futureValue
   }
 
+  private def snapshotRow(persistenceId: String, dbTimestamp: Instant = Instant.EPOCH, tags: Set[String] = Set.empty) =
+    SerializedSnapshotRow(1, "Entity", persistenceId, 1L, dbTimestamp, 0L, Array[Byte](1), 1, "", tags, None)
+
   private def stateRow(persistenceId: String) =
     SerializedStateRow(persistenceId, 1L, Instant.EPOCH, Instant.EPOCH, Some(Array[Byte](1)), 1, "", Set.empty)
 
@@ -108,8 +111,22 @@ class H2TableCreationSpec
       val path = "h2-tables-snapshot"
       val config = pluginConfig(path, "pekko.persistence.r2dbc.snapshot", """table = "other_snapshot"""")
       val dao = SnapshotDao.fromConfig(SnapshotSettings(config), config)(system, system.executionContext)
-      dao.store(SerializedSnapshotRow("Entity|p-1", 1L, 0L, Array[Byte](1), 1, "", None)).futureValue
+      dao.store(snapshotRow("Entity|p-1")).futureValue
       dao.load("Entity|p-1", SnapshotSelectionCriteria.Latest).futureValue.map(_.seqNr) shouldBe Some(1L)
+    }
+
+    "create the snapshot table with the start-from-snapshot columns and slice index" in {
+      val path = "h2-tables-snapshot-start-from-snapshot"
+      val config = pluginConfig(path, "pekko.persistence.r2dbc.snapshot", "start-from-snapshot.enabled = on")
+      val dao = SnapshotDao.fromConfig(SnapshotSettings(config), config)(system, system.executionContext)
+      val timestamp = InstantFactory.now()
+      dao.store(snapshotRow("Entity|p-1", timestamp, Set("tag-a", "tag-b"))).futureValue
+      // the upsert replaces the existing row
+      dao.store(snapshotRow("Entity|p-1", timestamp, Set("tag-a"))).futureValue
+      val loaded = dao.load("Entity|p-1", SnapshotSelectionCriteria.Latest).futureValue.get
+      loaded.dbTimestamp shouldBe timestamp
+      loaded.tags shouldBe Set("tag-a")
+      indexes(path, config, "SNAPSHOT") should contain("SNAPSHOT_SLICE_IDX")
     }
 
     "create the durable state table and the custom tables of the plugin" in {
@@ -145,7 +162,7 @@ class H2TableCreationSpec
       val path = "h2-tables-snapshot-init"
       val config = pluginConfig(path, "pekko.persistence.r2dbc.snapshot", addColumn("snapshot", "col1"))
       val dao = SnapshotDao.fromConfig(SnapshotSettings(config), config)(system, system.executionContext)
-      dao.store(SerializedSnapshotRow("Entity|p-1", 1L, 0L, Array[Byte](1), 1, "", None)).futureValue
+      dao.store(snapshotRow("Entity|p-1")).futureValue
       columns(path, config, "SNAPSHOT") should contain("COL1")
     }
 
@@ -180,6 +197,13 @@ class H2TableCreationSpec
 
   private def addColumn(table: String, column: String): String =
     s"""h2.additional-init = "ALTER TABLE $table ADD COLUMN IF NOT EXISTS $column VARCHAR(256)""""
+
+  private def indexes(path: String, config: Config, table: String): Seq[String] =
+    executor(path, config)
+      .select("select indexes")(
+        _.createStatement(s"SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME = '$table'"),
+        _.get(0, classOf[String]))
+      .futureValue
 
   private def columns(path: String, config: Config, table: String): Seq[String] =
     executor(path, config)

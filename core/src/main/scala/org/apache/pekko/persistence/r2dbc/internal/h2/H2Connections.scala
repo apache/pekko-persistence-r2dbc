@@ -142,22 +142,24 @@ private[r2dbc] object H2Connections {
         PRIMARY KEY(persistence_id, seq_nr)
       )""" +: sliceIndex(tableWithSchema, "seq_nr", createSliceIndexes)
 
-  def snapshotTableDdl(tableWithSchema: String): Seq[String] =
-    Seq(s"""CREATE TABLE IF NOT EXISTS $tableWithSchema (
+  def snapshotTableDdl(tableWithSchema: String, createSliceIndexes: Boolean): Seq[String] =
+    s"""CREATE TABLE IF NOT EXISTS $tableWithSchema (
         slice INT NOT NULL,
         entity_type VARCHAR(255) NOT NULL,
         persistence_id VARCHAR(255) NOT NULL,
         seq_nr BIGINT NOT NULL,
+        db_timestamp timestamp with time zone,
         write_timestamp BIGINT NOT NULL,
         ser_id INTEGER NOT NULL,
         ser_manifest VARCHAR(255) NOT NULL,
         snapshot BYTEA NOT NULL,
+        tags TEXT ARRAY,
         meta_ser_id INTEGER,
         meta_ser_manifest VARCHAR(255),
         meta_payload BYTEA,
 
         PRIMARY KEY(persistence_id)
-      )""")
+      )""" +: snapshotSliceIndex(tableWithSchema, createSliceIndexes)
 
   def durableStateTableDdl(tableWithSchema: String, createSliceIndexes: Boolean): Seq[String] =
     s"""CREATE TABLE IF NOT EXISTS $tableWithSchema (
@@ -180,6 +182,14 @@ private[r2dbc] object H2Connections {
       Seq(
         s"CREATE INDEX IF NOT EXISTS ${tableWithSchema}_slice_idx " +
         s"ON $tableWithSchema(slice, entity_type, db_timestamp, $sequenceColumn)")
+    else Seq.empty
+
+  // only used by the queries that use snapshots as starting points
+  private def snapshotSliceIndex(tableWithSchema: String, createSliceIndexes: Boolean): Seq[String] =
+    if (createSliceIndexes)
+      Seq(
+        s"CREATE INDEX IF NOT EXISTS ${tableWithSchema}_slice_idx " +
+        s"ON $tableWithSchema(slice, entity_type, db_timestamp)")
     else Seq.empty
 
   /**

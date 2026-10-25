@@ -51,7 +51,8 @@ UPDATE snapshot s SET db_timestamp = e.db_timestamp, tags = e.tags
 CREATE INDEX IF NOT EXISTS snapshot_slice_idx ON snapshot(slice, entity_type, db_timestamp);
 ```
 
-The new schema in `ddl-scripts/create_tables_*.sql` already includes the columns and the index.
+The new schema in `ddl-scripts/create_tables_*.sql` already includes the columns and the index. With H2, the plugin
+creates the snapshot table with the columns, and creates the index when the feature is enabled.
 
 The feature must be enabled with configuration:
 

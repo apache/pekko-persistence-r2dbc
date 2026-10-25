@@ -37,8 +37,9 @@ object TestDbLifecycle {
       if (s.dialect == Dialect.H2) {
         val tableDdl = s match {
           case j: JournalSettings  => H2Connections.journalTableDdl(j.journalTableWithSchema, createSliceIndexes = false)
-          case s: SnapshotSettings => H2Connections.snapshotTableDdl(s.snapshotsTableWithSchema)
-          case s: StateSettings    =>
+          case s: SnapshotSettings =>
+            H2Connections.snapshotTableDdl(s.snapshotsTableWithSchema, createSliceIndexes = false)
+          case s: StateSettings =>
             H2Connections.durableStateTableDdl(s.durableStateTableWithSchema, createSliceIndexes = false)
           case _ => Nil
         }
