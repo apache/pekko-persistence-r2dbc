@@ -41,11 +41,14 @@ jobs:
             pull_request)
               # HEAD is the merge commit, HEAD^1 the base branch; a failing diff fails the step
               changes=$(git diff HEAD^1 HEAD -- project/Dependencies.scala)
-              if grep -qE '^[+-] *val Scala3(Lts|Next) = ' <<< "$changes"; then
-                versions="[$published,$testOnly]"
-              else
-                versions="[$published]"
-              fi ;;
+              versions="[$published"
+              # add only the test-only versions whose line the PR changes
+              for alias in scala3Lts scala3Next; do
+                if grep -qE "^[+-] *val ${alias^} = " <<< "$changes"; then
+                  versions="$versions,\"$alias\""
+                fi
+              done
+              versions="$versions]" ;;
             *)
               versions="[$published]" ;;
           esac
