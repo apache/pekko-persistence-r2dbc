@@ -24,9 +24,8 @@ import scala.concurrent.duration.FiniteDuration
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.persistence.r2dbc.DbTimestampMonotonicIncreasing
 import pekko.persistence.r2dbc.JournalSettings
-import pekko.persistence.r2dbc.UseAppTimestamp
+import pekko.persistence.r2dbc.internal.SettingsTypes
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import io.r2dbc.spi.ConnectionFactory
@@ -97,7 +96,7 @@ private[r2dbc] object MySQLJournalDao {
     result.toSet
   }
 
-  def settingRequirements(settings: UseAppTimestamp with DbTimestampMonotonicIncreasing): Unit = {
+  def settingRequirements(settings: SettingsTypes.MySQLRequiredSettings): Unit = {
     // Application timestamps are used because MySQL does not have transaction_timestamp like Postgres. In future releases
     // they could be tried to be emulated, but the benefits are questionable - no matter where the timestamps are generated,
     // risk of clock skews remains.

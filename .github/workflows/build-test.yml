@@ -8,12 +8,34 @@ on:
     tags-ignore: [ v.* ]
 
 jobs:
+  scala-versions:
+    name: Read Scala versions
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # every `val Scala... = "x.y.z"` in Dependencies.scala becomes a matrix entry
+      - name: Read Scala versions from project/Dependencies.scala
+        id: versions
+        run: |-
+          versions=$(sed -n 's/^ *val Scala[0-9A-Za-z]* = "\([^"]*\)".*/\1/p' project/Dependencies.scala | jq -R . | jq -cs .)
+          echo "Scala versions: $versions"
+          if [ "$(echo "$versions" | jq length)" -eq 0 ]; then
+            echo "::error::No Scala versions found in project/Dependencies.scala"
+            exit 1
+          fi
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
+
   compile:
     name: Test and compile
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17, 21 ]
     steps:
       - name: Checkout
@@ -42,10 +64,11 @@ jobs:
 
   test-postgres:
     name: Run test with Postgres
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -99,10 +122,11 @@ jobs:
 
   test-postgres-jsonb:
     name: Run test with Postgres (JSONB)
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -153,10 +177,11 @@ jobs:
 
   test-yugabyte:
     name: Run tests with Yugabyte
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -210,10 +235,11 @@ jobs:
 
   test-mysql:
     name: Run tests with MySQL
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17, 21 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
