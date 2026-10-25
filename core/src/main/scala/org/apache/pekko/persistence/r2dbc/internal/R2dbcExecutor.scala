@@ -298,7 +298,13 @@ class R2dbcExecutor(
         system.scheduler.scheduleOnce(timeout, () => closeAfterTimeout(connection))
       }
 
-      val transactionBegun = connection.beginTransaction().asFutureDone()
+      val transactionBegun =
+        try connection.beginTransaction().asFutureDone()
+        catch {
+          case NonFatal(exc) =>
+            // thrown synchronously instead of a failed Publisher, must still release the connection
+            Future.failed(exc)
+        }
 
       transactionBegun.failed.foreach { exc =>
         log.debug("{} - Begin transaction failed: {}", logPrefix: Any, exc.toString: Any)
@@ -351,7 +357,13 @@ class R2dbcExecutor(
         system.scheduler.scheduleOnce(timeout, () => closeAfterTimeout(connection))
       }
 
-      val autoCommitSet = connection.setAutoCommit(true).asFutureDone()
+      val autoCommitSet =
+        try connection.setAutoCommit(true).asFutureDone()
+        catch {
+          case NonFatal(exc) =>
+            // thrown synchronously instead of a failed Publisher, must still release the connection
+            Future.failed(exc)
+        }
 
       autoCommitSet.failed.foreach { exc =>
         log.debug("{} - Setting auto-commit failed: {}", logPrefix: Any, exc.toString: Any)
@@ -425,8 +437,11 @@ class R2dbcExecutor(
     }
   }
 
-  private def ignoreConnectionClosedException: Catcher[Future[Done]] = { case _: IllegalStateException =>
-    // throw by PooledConnection assertNotClosed, if connection closed after timeout
+  private def ignoreConnectionClosedException: Catcher[Future[Done]] = { case exc: IllegalStateException =>
+    // thrown by PooledConnection assertNotClosed if the pooled connection has already been closed (released).
+    // Note that closeAfterTimeout closes the unwrapped connection, which doesn't put the PooledConnection in
+    // that state.
+    log.debug("Ignoring exception from already closed connection: {}", exc.toString)
     Future.successful(Done)
   }
 }

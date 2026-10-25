@@ -62,7 +62,10 @@ object R2dbcExecutorConnectionReleaseSpec {
    */
   final class FakeConnection(
       beginTransactionFailure: Option[Throwable] = None,
+      beginTransactionThrows: Option[RuntimeException] = None,
+      beginTransactionNever: Boolean = false,
       setAutoCommitFailure: Option[Throwable] = None,
+      setAutoCommitThrows: Option[RuntimeException] = None,
       closeThrows: Boolean = false,
       rows: immutable.IndexedSeq[String] = Vector.empty)
       extends Connection {
@@ -83,9 +86,16 @@ object R2dbcExecutorConnectionReleaseSpec {
       else Mono.empty[Void]()
     }
 
-    override def beginTransaction(): Publisher[Void] = emptyOrFailed(beginTransactionFailure)
+    override def beginTransaction(): Publisher[Void] = {
+      beginTransactionThrows.foreach(exc => throw exc)
+      if (beginTransactionNever) Mono.never[Void]()
+      else emptyOrFailed(beginTransactionFailure)
+    }
 
-    override def setAutoCommit(autoCommit: Boolean): Publisher[Void] = emptyOrFailed(setAutoCommitFailure)
+    override def setAutoCommit(autoCommit: Boolean): Publisher[Void] = {
+      setAutoCommitThrows.foreach(exc => throw exc)
+      emptyOrFailed(setAutoCommitFailure)
+    }
 
     override def commitTransaction(): Publisher[Void] = Mono.empty[Void]()
 
@@ -189,7 +199,48 @@ class R2dbcExecutorConnectionReleaseSpec extends ScalaTestWithActorTestKit with 
       }
     }
 
-    "return the selected rows when the connection was already closed by the timeout task" in {
+    "close the connection when beginTransaction throws" in {
+      val failure = new IllegalStateException("thrown from beginTransaction")
+      val connection = new FakeConnection(beginTransactionThrows = Some(failure))
+
+      executorFor(connection)
+        .withConnection("test") { _ => fail("the function should not be called when beginTransaction throws") }
+        .failed
+        .futureValue shouldBe failure
+
+      eventually {
+        connection.closeCount shouldBe 1
+      }
+    }
+
+    "close the connection when setAutoCommit throws" in {
+      val failure = new IllegalStateException("thrown from setAutoCommit")
+      val connection = new FakeConnection(setAutoCommitThrows = Some(failure))
+
+      executorFor(connection)
+        .withAutoCommitConnection("test") { _ => fail("the function should not be called when setAutoCommit throws") }
+        .failed
+        .futureValue shouldBe failure
+
+      eventually {
+        connection.closeCount shouldBe 1
+      }
+    }
+
+    "close the connection after timeout when beginTransaction never completes" in {
+      val connection = new FakeConnection(beginTransactionNever = true)
+      // FakeConnection isn't Wrapped, so closeAfterTimeout closes it directly
+      val executor = new R2dbcExecutor(new FakeConnectionFactory(connection), log, logDbCallsExceeding = -1.millis,
+        closeCallsExceeding = Some(100.millis))
+
+      executor.withConnection("test") { _ => fail("the function should not be called when beginTransaction hangs") }
+
+      eventually {
+        connection.closeCount should be >= 1
+      }
+    }
+
+    "return the selected rows when close throws IllegalStateException" in {
       val connection = new FakeConnection(closeThrows = true, rows = Vector("a", "b"))
 
       executorFor(connection)
