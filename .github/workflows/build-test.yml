@@ -267,12 +267,20 @@ jobs:
 
   test-h2:
     name: Run tests with H2
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.OS || 'ubuntu-latest' }}
     strategy:
       matrix:
         SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
         JAVA_VERSION: [ 17, 21 ]
+        include:
+          # H2 needs no database container, and the coarse Windows clock catches timestamp ordering issues
+          - OS: windows-2025
+            SCALA_VERSION: 2.13
+            JAVA_VERSION: 17
     if: github.repository == 'apache/pekko-persistence-r2dbc'
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

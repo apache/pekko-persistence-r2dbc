@@ -104,7 +104,8 @@ Enable it with:
 Each plugin creates its tables and indexes when it is first used, with the schema and table names of its own
 configuration, so no schema scripts are needed. This includes the tables of `state.custom-table` and plugins with a
 @ref:[runtime plugin configuration](config.md#plugin-configuration-at-runtime). The tables are not created when the
-connection is configured with a `url`.
+connection is configured with a `url`. Since a table is created on the first use of its plugin, tools that read the
+tables directly before that, rather than through the plugins, have to create them first.
 
 Additional DDL or DML for the tables of a plugin, for example for the columns of
 @ref:[additional columns](durable-state-store.md#storing-query-representation), can be added with `h2.additional-init`

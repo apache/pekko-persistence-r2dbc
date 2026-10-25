@@ -9,6 +9,9 @@ idempotent result. Full rolling update when switching database or Persistence pl
 you can migrate most of the data while the system is online and then have a short full shutdown while
 migrating the remaining data that was written after the previous online migration.
 
+The migration tool writes with `ON CONFLICT`, so it only supports PostgreSQL and Yugabyte as target databases, not
+MySQL or H2.
+
 ## Dependencies
 
 @@dependency [Maven,sbt,Gradle] {
