@@ -38,11 +38,13 @@ object H2AdditionalInitForSchemaSpec {
            "CustomEntity" = ["${classOf[DurableStateStoreAdditionalColumnSpec.Column1].getName}"]
          }
       }
-      // #additionalColumn
       pekko.persistence.r2dbc.connection-factory.h2 {
         protocol = "mem"
         database = "h2-additional-init-test-db"
-        additional-init = "alter table durable_state add if not exists col1 varchar(256)"
+      }
+      // #additionalColumn
+      pekko.persistence.r2dbc.state {
+        h2-additional-ddl = "alter table durable_state add if not exists col1 varchar(256)"
       }
       // #additionalColumn
       """)
