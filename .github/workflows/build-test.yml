@@ -267,9 +267,10 @@ jobs:
 
   test-h2:
     name: Run tests with H2
-    runs-on: ${{ matrix.OS || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.OS }}
     strategy:
       matrix:
+        OS: [ ubuntu-latest ]
         SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
         JAVA_VERSION: [ 17, 21 ]
         include:
