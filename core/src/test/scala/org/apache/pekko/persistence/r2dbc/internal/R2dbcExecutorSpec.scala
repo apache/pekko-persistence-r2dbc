@@ -18,6 +18,7 @@ import scala.concurrent.duration._
 
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.ConnectionFactorySettings
@@ -31,6 +32,7 @@ import io.r2dbc.spi.R2dbcNonTransientResourceException
 import io.r2dbc.spi.Wrapped
 import org.scalatest.{ Outcome, Pending }
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.slf4j.LoggerFactory
 
 object R2dbcExecutorSpec {
   val config: Config = ConfigFactory
@@ -81,6 +83,43 @@ class R2dbcExecutorSpec
   }
 
   "R2dbcExecutor" should {
+
+    "not log db calls when log-db-calls-exceeding is disabled" in {
+      val executor = new R2dbcExecutor(
+        connectionFactoryProvider,
+        LoggerFactory.getLogger(getClass),
+        logDbCallsExceeding = -1.millis,
+        closeCallsExceeding)(typedSystem.executionContext, typedSystem)
+
+      LoggingTestKit.info("getConnection took").withOccurrences(0).expect {
+        LoggingTestKit.info("Selected").withOccurrences(0).expect {
+          LoggingTestKit.info("DB call completed").withOccurrences(0).expect {
+            executor
+              .select("test")(
+                _.createStatement(s"select col from $table"),
+                row => Row(row.get("col", classOf[String])))
+              .futureValue
+            executor.updateOne("test")(_.createStatement(s"delete from $table where col = 'x'")).futureValue
+          }
+        }
+      }
+    }
+
+    "log db calls when log-db-calls-exceeding is zero" in {
+      val executor = new R2dbcExecutor(
+        connectionFactoryProvider,
+        LoggerFactory.getLogger(getClass),
+        logDbCallsExceeding = Duration.Zero,
+        closeCallsExceeding)(typedSystem.executionContext, typedSystem)
+
+      LoggingTestKit.info("Selected").expect {
+        executor
+          .select("test")(
+            _.createStatement(s"select col from $table"),
+            row => Row(row.get("col", classOf[String])))
+          .futureValue
+      }
+    }
 
     "close connection when no response from update" in {
       @volatile var c1: Connection = null
