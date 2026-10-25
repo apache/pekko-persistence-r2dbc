@@ -21,8 +21,10 @@ object CommonSettings extends AutoPlugin {
   override def requires = JvmPlugin && ApacheSonatypePlugin && DynVerPlugin
 
   override lazy val projectSettings = Seq(
-    crossScalaVersions := Seq(Dependencies.Scala213, Dependencies.Scala3, Dependencies.Scala3Next),
+    crossScalaVersions := Seq(Dependencies.Scala213, Dependencies.Scala3) ++ Dependencies.Scala3TestOnly,
     scalaVersion := Dependencies.Scala213,
+    // all Scala 3 versions share the _3 suffix, so only the Scala3 build may be published
+    publish / skip := (publish / skip).value || Dependencies.Scala3TestOnly.contains(scalaVersion.value),
     crossVersion := CrossVersion.binary,
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),

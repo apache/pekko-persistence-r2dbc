@@ -35,12 +35,12 @@ jobs:
       - name: Enable jvm-opts
         run: cp .jvmopts-ci .jvmopts
 
-      - name: Compile code
-        run: sbt +compile
+      - name: Compile code (published Scala versions)
+        run: sbt scala213 compile scala3 compile
 
-      - name: Report MiMa Binary Issues
+      - name: Report MiMa Binary Issues (published Scala versions)
         run: |-
-          sbt +mimaReportBinaryIssues
+          sbt scala213 mimaReportBinaryIssues scala3 mimaReportBinaryIssues
 
       - name: Check correct MiMa filter directories
         run: |

@@ -23,6 +23,11 @@ ThisBuild / javafmt / excludeFilter := new SimpleFileFilter(f =>
 
 addCommandAlias("checkCodeStyle", "scalafmtCheckAll; scalafmtSbtCheck; javafmtCheckAll; +headerCheckAll")
 addCommandAlias("applyCodeStyle", "+headerCreateAll; scalafmtAll; scalafmtSbt; javafmtAll")
+// Scala version switches used by the CI matrix in build-test.yml
+addCommandAlias("scala213", s"++${Dependencies.Scala213}")
+addCommandAlias("scala3", s"++${Dependencies.Scala3}")
+addCommandAlias("scala3Lts", s"++${Dependencies.Scala3Lts}")
+addCommandAlias("scala3Next", s"++${Dependencies.Scala3Next}")
 
 GlobalScope / parallelExecution := false
 Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
@@ -63,8 +68,8 @@ lazy val core = (project in file("core"))
     name := "pekko-persistence-r2dbc",
     libraryDependencies ++= Dependencies.core,
     mimaPreviousArtifacts := {
-      // no MiMa check for the next Scala 3 version, there are no released artifacts built with it
-      if (scalaVersion.value == Dependencies.Scala3Next)
+      // no MiMa check for the test-only Scala 3 versions, there are no released artifacts built with them
+      if (Dependencies.Scala3TestOnly.contains(scalaVersion.value))
         Set.empty
       else
         mimaPreviousArtifacts.value

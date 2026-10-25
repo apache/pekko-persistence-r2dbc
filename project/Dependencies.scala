@@ -14,9 +14,13 @@
 import sbt._
 
 object Dependencies {
+  // the CI matrix in build-test.yml switches to these through the command aliases in build.sbt
   val Scala213 = "2.13.18"
   val Scala3 = "3.3.8"
-  val Scala3Next = "3.9.0"
+  val Scala3Lts = "3.9.0"
+  val Scala3Next = "3.10.0"
+  // only tested, artifacts are published with Scala213 and Scala3
+  val Scala3TestOnly = Seq(Scala3Lts, Scala3Next)
   val PekkoVersion = PekkoCoreDependency.version
   val PekkoVersionInDocs = PekkoCoreDependency.default.link
   val PekkoPersistenceJdbcVersion = PekkoPersistenceJdbcDependency.version
