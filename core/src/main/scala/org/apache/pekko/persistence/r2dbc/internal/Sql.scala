@@ -33,7 +33,7 @@ object Sql {
   private[r2dbc] implicit class DialectOps(dialect: Dialect) {
     def replaceParameters(sql: String): String = {
       dialect match {
-        case Dialect.Postgres | Dialect.Yugabyte =>
+        case Dialect.Postgres | Dialect.Yugabyte | Dialect.H2 =>
           fillInParameterNumbers(sql)
         case Dialect.MySQL =>
           sql

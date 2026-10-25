@@ -29,11 +29,18 @@ import org.scalatest.wordspec.AnyWordSpecLike
 class ConnectionFactoryOptionsCustomizerSpec extends ScalaTestWithActorTestKit(config) with AnyWordSpecLike {
   "ConnectionFactoryProvider" should {
     "instantiate and apply a custom ConnectionFactoryOptionsCustomizer when connection-factory-options-customizer settings is set" in {
-      val probe = TestProbe[CustomizerCalled.type]()
-      system.eventStream.tell(EventStream.Subscribe(probe.ref))
+      if (system.settings.config.getString("pekko.persistence.r2dbc.connection-factory.driver") == "h2") {
+        // the H2 connection factory is not created from ConnectionFactoryOptions
+        intercept[IllegalArgumentException] {
+          ConnectionFactoryProvider(system).connectionFactoryFor("pekko.persistence.r2dbc.connection-factory")
+        }.getMessage should include("not supported with the h2 driver")
+      } else {
+        val probe = TestProbe[CustomizerCalled.type]()
+        system.eventStream.tell(EventStream.Subscribe(probe.ref))
 
-      ConnectionFactoryProvider(system).connectionFactoryFor("pekko.persistence.r2dbc.connection-factory")
-      probe.expectMessage(CustomizerCalled)
+        ConnectionFactoryProvider(system).connectionFactoryFor("pekko.persistence.r2dbc.connection-factory")
+        probe.expectMessage(CustomizerCalled)
+      }
     }
   }
 }

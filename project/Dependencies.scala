@@ -22,6 +22,9 @@ object Dependencies {
   val PekkoPersistenceJdbcVersion = PekkoPersistenceJdbcDependency.version
   val PekkoPersistenceR2dbcVersionInDocs = "current"
   val PekkoProjectionVersionInDocs = "current"
+  val R2dbcH2Version = "1.1.0.RELEASE"
+  // the H2 version that r2dbc-h2 is built against
+  val H2Version = "2.4.240"
 
   object Compile {
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
@@ -33,6 +36,8 @@ object Dependencies {
     val r2dbcPool = "io.r2dbc" % "r2dbc-pool" % "1.0.2.RELEASE"
     val r2dbcPostgres = "org.postgresql" % "r2dbc-postgresql" % "1.1.3.RELEASE"
     val r2dbcMysql = "io.asyncer" % "r2dbc-mysql" % "1.4.3"
+    val r2dbcH2 = "io.r2dbc" % "r2dbc-h2" % R2dbcH2Version // ApacheV2
+    val h2 = "com.h2database" % "h2" % H2Version // EPL 1.0 or MPL 2.0
   }
 
   object TestDeps {
@@ -69,6 +74,8 @@ object Dependencies {
     r2dbcPool,
     r2dbcPostgres % "provided,test",
     r2dbcMysql % "provided,test",
+    r2dbcH2 % "provided,test",
+    h2 % "provided,test",
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoStreamTyped,

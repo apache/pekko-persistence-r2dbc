@@ -40,6 +40,8 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.query.scaladsl.mysql.MySQLQueryDao
+import pekko.persistence.r2dbc.query.scaladsl.h2.H2QueryDao
+import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
@@ -62,15 +64,24 @@ object QueryDao {
   )(implicit system: ActorSystem[?], ec: ExecutionContext): QueryDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val closeCallsExceeding = {
-      val fullConfig = config.withFallback(system.settings.config)
-      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
-    }
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new QueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
         new MySQLQueryDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.H2 =>
+        // the query may be used without the journal plugin in the same process
+        val tablesConnectionFactory = H2Connections.creatingTables(
+          connectionFactory,
+          connectionFactoryConfig,
+          createSliceIndexes =>
+            H2Connections.schemaDdl(settings.schema) ++
+            H2Connections.journalTableDdl(settings.journalTableWithSchema, createSliceIndexes))
+        new H2QueryDao(settings, tablesConnectionFactory, closeCallsExceeding)(
+          H2Connections.executionContext(system, connectionFactoryConfig),
+          system)
     }
   }
 }

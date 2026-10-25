@@ -51,6 +51,8 @@ import pekko.persistence.r2dbc.state.ChangeHandlerException
 import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
+import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
+import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
@@ -94,15 +96,28 @@ import org.slf4j.LoggerFactory
   )(implicit system: ActorSystem[?], ec: ExecutionContext): DurableStateDao = {
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val closeCallsExceeding = {
-      val fullConfig = config.withFallback(system.settings.config)
-      ConnectionFactorySettings.closeCallsExceeding(fullConfig.getConfig(settings.useConnectionFactory))
-    }
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.H2 =>
+        val tables =
+          (settings.durableStateTableWithSchema +:
+          settings.durableStateTableByEntityTypeWithSchema.values.toSeq).distinct
+        val tablesConnectionFactory = H2Connections.creatingTables(
+          connectionFactory,
+          connectionFactoryConfig,
+          createSliceIndexes =>
+            H2Connections.schemaDdl(settings.schema) ++
+            tables.flatMap(H2Connections.durableStateTableDdl(_, createSliceIndexes)) ++
+            // after the tables, since it can change them, for example to add additional columns
+            H2Connections.additionalInit(settings.config))
+        new H2DurableStateDao(settings, tablesConnectionFactory, closeCallsExceeding)(
+          H2Connections.executionContext(system, connectionFactoryConfig),
+          system)
     }
   }
 }
@@ -122,7 +137,8 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   import DurableStateDao._
 
   implicit protected val dialect: Dialect = settings.dialect
-  protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
+  // evaluated for each insert and update statement
+  protected def transactionTimestampSql: String = "transaction_timestamp()"
 
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor =

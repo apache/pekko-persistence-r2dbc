@@ -79,6 +79,48 @@ Yugabyte:
 docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t < ddl-scripts/create_tables_yugabyte.sql
 ```
 
+<a id="h2"></a>
+### H2
+
+[H2](https://h2database.com) runs in the same JVM process as the application, as an in-memory database or with a
+database file. It is useful for tests and small applications that run on a single node. A database file can't be
+shared by several JVMs.
+
+The H2 database and its R2DBC driver are not included as dependencies of the plugin, add them to your build:
+
+@@dependency [Maven,sbt,Gradle] {
+  group1=com.h2database
+  artifact1=h2
+  version1=$h2.version$
+  group2=io.r2dbc
+  artifact2=r2dbc-h2
+  version2=$r2dbc-h2.version$
+}
+
+Enable it with:
+
+@@snip [application.conf](/docs/src/test/resources/application-h2.conf) { #connection-settings }
+
+Each plugin creates its tables and indexes when it is first used, with the schema and table names of its own
+configuration, so no schema scripts are needed. This includes the tables of `state.custom-table` and plugins with a
+@ref:[runtime plugin configuration](config.md#plugin-configuration-at-runtime). The tables are not created when the
+connection is configured with a `url`. Since a table is created on the first use of its plugin, tools that read the
+tables directly before that, rather than through the plugins, have to create them first.
+
+Additional DDL or DML for the tables of a plugin, for example for the columns of
+@ref:[additional columns](durable-state-store.md#storing-query-representation), can be added with `h2.additional-init`
+in the configuration of the `journal`, `snapshot` or `state` plugin. It runs once when the plugin starts, after the
+plugin has created its tables, and must be idempotent since a file database keeps the tables:
+
+@@snip [H2AdditionalInitForSchemaSpec.scala](/core/src/test/scala/org/apache/pekko/persistence/r2dbc/internal/H2AdditionalInitForSchemaSpec.scala) { #additionalColumn }
+
+The `h2` settings in the reference configuration:
+
+@@snip [reference.conf](/core/src/main/resources/reference.conf) { #connection-settings-h2 }
+
+The H2 dialect stores events, snapshots and durable state in `BYTEA` columns, the `JSONB` payload column type is not
+supported. The `connection-factory-options-customizer` is not supported with H2.
+
 ### Dropping the schema
 
 Postgres:

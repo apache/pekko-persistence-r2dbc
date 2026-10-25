@@ -14,6 +14,12 @@ Yugabyte:
 MySQL:
 : @@snip [application.conf](/docs/src/test/resources/application-mysql.conf) { #connection-settings }
 
+H2:
+: @@snip [application.conf](/docs/src/test/resources/application-h2.conf) { #connection-settings }
+
+For H2 the connection is configured in the `h2` section of the connection factory configuration, see
+@ref:[H2](getting-started.md#h2).
+
 ## Reference configuration 
 
 The following configuration can be overridden in your `application.conf`:

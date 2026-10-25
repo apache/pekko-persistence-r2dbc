@@ -265,6 +265,54 @@ jobs:
       - name: test
         run: sbt -Dpekko.persistence.r2dbc.dialect=mysql ++${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
 
+  test-h2:
+    name: Run tests with H2
+    runs-on: ${{ matrix.OS }}
+    strategy:
+      matrix:
+        OS: [ ubuntu-latest ]
+        SCALA_VERSION: [ 2.13, 3.3, 3.9 ]
+        JAVA_VERSION: [ 17, 21 ]
+        include:
+          # H2 needs no database container, and the coarse Windows clock catches timestamp ordering issues
+          - OS: windows-2025
+            SCALA_VERSION: 2.13
+            JAVA_VERSION: 17
+    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout GitHub merge
+        if: github.event.pull_request
+        run: |-
+          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
+          git checkout scratch
+
+      - name: Setup Java ${{ matrix.JAVA_VERSION }}
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.JAVA_VERSION }}
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@057d08c2f9a2c4e7a4d33df3aae657b7db88b8cc # v8.2.0
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: test
+        run: sbt -Dpekko.persistence.r2dbc.dialect=h2 ++${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
+
   test-docs:
     name: Docs
     runs-on: ubuntu-latest

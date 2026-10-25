@@ -47,6 +47,7 @@ import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.TestConfig
+import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
@@ -76,6 +77,8 @@ object RuntimePluginConfigSpec {
               $configKey = {
                 connection-factory {
                   database = "$database"
+                  # only used by the h2 driver
+                  h2.database = "$database"
                 }
 
                 journal.$configKey.connection-factory = $${$configKey.connection-factory}
@@ -133,6 +136,8 @@ object RuntimePluginConfigSpec {
               $configKey = {
                 connection-factory {
                   database = "$database"
+                  # only used by the h2 driver
+                  h2.database = "$database"
                 }
 
                 state.$configKey.connection-factory = $${$configKey.connection-factory}
@@ -203,6 +208,8 @@ class RuntimePluginConfigSpec
           LoggerFactory.getLogger(getClass),
           journalSettings.logDbCallsExceeding)(system.executionContext, system)
 
+      TestDbLifecycle.createH2Tables(r2dbcExecutor, journalSettings, snapshotSettings)
+
       Await.result(
         r2dbcExecutor.updateOne("beforeAll delete")(
           _.createStatement(s"delete from ${journalSettings.journalTableWithSchema}")),
@@ -229,6 +236,8 @@ class RuntimePluginConfigSpec
           connectionFactoryProvider,
           LoggerFactory.getLogger(getClass),
           stateSettings.logDbCallsExceeding)(system.executionContext, system)
+
+      TestDbLifecycle.createH2Tables(r2dbcExecutor, stateSettings)
 
       Await.result(
         r2dbcExecutor.updateOne("beforeAll delete")(
