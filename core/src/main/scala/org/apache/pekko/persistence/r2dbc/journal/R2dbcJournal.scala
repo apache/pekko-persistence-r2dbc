@@ -31,6 +31,7 @@ import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PubSub
@@ -105,9 +106,12 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   override def asyncWriteMessages(messages: Seq[AtomicWrite]): Future[Seq[Try[Unit]]] = {
     def atomicWrite(atomicWrite: AtomicWrite): Future[Instant] = {
-      // strictly increasing, so that the events of consecutive writes don't get the same timestamp from a coarse clock
+      // H2 runs in the same process and its queries are bounded by app time, so consecutive writes must not get
+      // the same timestamp from a coarse clock
       val timestamp =
-        if (journalSettings.useAppTimestamp) InstantFactory.nowStrictlyIncreasing() else JournalDao.EmptyDbTimestamp
+        if (!journalSettings.useAppTimestamp) JournalDao.EmptyDbTimestamp
+        else if (journalSettings.dialect == Dialect.H2) InstantFactory.nowStrictlyIncreasing()
+        else InstantFactory.now()
       val serialized: Try[Seq[SerializedJournalRow]] = Try {
         atomicWrite.payload.map { pr =>
           val (event, tags) = pr.payload match {
