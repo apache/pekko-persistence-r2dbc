@@ -69,10 +69,10 @@ final class R2dbcSession(val connection: Connection)(implicit ec: ExecutionConte
       .map(results => results.map(java.lang.Long.valueOf).asJava)
       .asJava
 
-  def selectOne[A](statement: Statement)(mapRow: Row => A): CompletionStage[Optional[A]] =
-    R2dbcExecutor.selectOneInTx(statement, mapRow).map(_.toJava)(ExecutionContext.parasitic).asJava
+  def selectOne[A](statement: Statement)(mapRow: JFunction[Row, A]): CompletionStage[Optional[A]] =
+    R2dbcExecutor.selectOneInTx(statement, mapRow(_)).map(_.toJava)(ExecutionContext.parasitic).asJava
 
-  def select[A](statement: Statement)(mapRow: Row => A): CompletionStage[java.util.List[A]] =
-    R2dbcExecutor.selectInTx(statement, mapRow).map(_.asJava).asJava
+  def select[A](statement: Statement)(mapRow: JFunction[Row, A]): CompletionStage[java.util.List[A]] =
+    R2dbcExecutor.selectInTx(statement, mapRow(_)).map(_.asJava).asJava
 
 }
