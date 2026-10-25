@@ -24,7 +24,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      # 2.13 and 3.3 (published) run on every change, 3.9 LTS and 3.10 Next run nightly
+      # Test and compile: 2.13 and 3.3 (published) on every change, 3.9 LTS and 3.10 Next nightly
       # and on pull requests that change their versions in project/Dependencies.scala
       - name: Select Scala versions
         id: select
@@ -90,13 +90,13 @@ jobs:
 
   test-postgres:
     name: Run test with Postgres
-    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
+        SCALA_VERSION: [ scala213, scala3 ]
         JAVA_VERSION: [ 17 ]
-    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    # integration tests only run for the published Scala versions
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -148,13 +148,13 @@ jobs:
 
   test-postgres-jsonb:
     name: Run test with Postgres (JSONB)
-    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
+        SCALA_VERSION: [ scala213, scala3 ]
         JAVA_VERSION: [ 17 ]
-    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    # integration tests only run for the published Scala versions
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -203,13 +203,13 @@ jobs:
 
   test-yugabyte:
     name: Run tests with Yugabyte
-    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
+        SCALA_VERSION: [ scala213, scala3 ]
         JAVA_VERSION: [ 17 ]
-    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    # integration tests only run for the published Scala versions
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -261,13 +261,13 @@ jobs:
 
   test-mysql:
     name: Run tests with MySQL
-    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
+        SCALA_VERSION: [ scala213, scala3 ]
         JAVA_VERSION: [ 17, 21 ]
-    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    # integration tests only run for the published Scala versions
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -320,7 +320,7 @@ jobs:
   test-docs:
     name: Docs
     runs-on: ubuntu-latest
-    if: github.repository == 'apache/pekko-persistence-r2dbc'
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
