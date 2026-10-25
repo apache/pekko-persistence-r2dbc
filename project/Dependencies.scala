@@ -14,7 +14,7 @@
 import sbt._
 
 object Dependencies {
-  // every `val Scala... = "x.y.z"` below is also a Scala version in the build-test.yml CI matrix
+  // the CI matrix in build-test.yml switches to these through the command aliases in build.sbt
   val Scala213 = "2.13.18"
   val Scala3 = "3.3.8"
   val Scala3Lts = "3.9.0"

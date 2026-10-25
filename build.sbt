@@ -23,6 +23,11 @@ ThisBuild / javafmt / excludeFilter := new SimpleFileFilter(f =>
 
 addCommandAlias("checkCodeStyle", "scalafmtCheckAll; scalafmtSbtCheck; javafmtCheckAll; +headerCheckAll")
 addCommandAlias("applyCodeStyle", "+headerCreateAll; scalafmtAll; scalafmtSbt; javafmtAll")
+// Scala version switches used by the CI matrix in build-test.yml
+addCommandAlias("scala213", s"++${Dependencies.Scala213}")
+addCommandAlias("scala3", s"++${Dependencies.Scala3}")
+addCommandAlias("scala3Lts", s"++${Dependencies.Scala3Lts}")
+addCommandAlias("scala3Next", s"++${Dependencies.Scala3Next}")
 
 GlobalScope / parallelExecution := false
 Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
