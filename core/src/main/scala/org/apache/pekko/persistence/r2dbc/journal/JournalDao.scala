@@ -96,7 +96,13 @@ private[r2dbc] object JournalDao {
       case Dialect.MySQL =>
         new MySQLJournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
-        new H2JournalDao(settings, connectionFactory, closeCallsExceeding)(
+        val tablesConnectionFactory = H2Connections.creatingTables(
+          connectionFactory,
+          connectionFactoryConfig,
+          createSliceIndexes =>
+            H2Connections.schemaDdl(settings.schema) ++
+            H2Connections.journalTableDdl(settings.journalTableWithSchema, createSliceIndexes))
+        new H2JournalDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)
     }

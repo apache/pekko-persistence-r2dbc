@@ -101,11 +101,20 @@ Enable it with:
 
 @@snip [application.conf](/docs/src/test/resources/application-h2.conf) { #connection-settings }
 
-The tables and indexes are created automatically when the database is first connected to, so no schema scripts are
-needed. Additional DDL or DML, for example for the columns of
-@ref:[additional columns](durable-state-store.md#storing-query-representation), can be included with `additional-init`:
+Each plugin creates its tables and indexes when it is first used, with the schema and table names of its own
+configuration, so no schema scripts are needed. This includes the tables of `state.custom-table` and plugins with a
+@ref:[runtime plugin configuration](config.md#plugin-configuration-at-runtime). The tables are not created when the
+connection is configured with a `url`.
+
+DDL for the durable state tables, for example for the columns of
+@ref:[additional columns](durable-state-store.md#storing-query-representation), can be added with
+`state.h2-additional-ddl`, which runs after the tables have been created:
 
 @@snip [H2AdditionalInitForSchemaSpec.scala](/core/src/test/scala/org/apache/pekko/persistence/r2dbc/internal/H2AdditionalInitForSchemaSpec.scala) { #additionalColumn }
+
+Other DDL or DML, for example for the tables of other libraries, can be added with `additional-init` in the `h2`
+settings of the connection factory. It runs whenever a connection is opened, before the plugins have created their
+tables.
 
 The `h2` settings in the reference configuration:
 

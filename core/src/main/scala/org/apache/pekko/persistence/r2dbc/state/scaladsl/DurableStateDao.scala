@@ -104,7 +104,19 @@ import org.slf4j.LoggerFactory
       case Dialect.MySQL =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
-        new H2DurableStateDao(settings, connectionFactory, closeCallsExceeding)(
+        val tables =
+          (settings.durableStateTableWithSchema +:
+          settings.durableStateTableByEntityTypeWithSchema.values.toSeq).distinct
+        // after the tables, since it can change them, for example to add additional columns
+        val additionalDdl = settings.config.getString("h2-additional-ddl")
+        val tablesConnectionFactory = H2Connections.creatingTables(
+          connectionFactory,
+          connectionFactoryConfig,
+          createSliceIndexes =>
+            H2Connections.schemaDdl(settings.schema) ++
+            tables.flatMap(H2Connections.durableStateTableDdl(_, createSliceIndexes)) ++
+            Seq(additionalDdl).filter(_.trim.nonEmpty))
+        new H2DurableStateDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)
     }

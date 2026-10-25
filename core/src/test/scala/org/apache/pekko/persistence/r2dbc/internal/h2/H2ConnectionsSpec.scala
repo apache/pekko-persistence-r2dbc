@@ -76,24 +76,6 @@ class H2ConnectionsSpec extends ScalaTestWithActorTestKit(TestConfig.config) wit
         .futureValue shouldBe Some("HIGH")
     }
 
-    "create the tables with the configured schema and table names" in {
-      val path = "h2-custom-tables"
-      val config = h2Config(
-        path,
-        """
-          schema = "custom_schema"
-          journal-table = "custom_journal"
-          snapshot-table = "custom_snapshot"
-          state-table = "custom_state"
-          """)
-      executor(path, config)
-        .select("select tables")(
-          _.createStatement(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'CUSTOM_SCHEMA' ORDER BY TABLE_NAME"),
-          _.get(0, classOf[String]))
-        .futureValue shouldBe Vector("CUSTOM_JOURNAL", "CUSTOM_SNAPSHOT", "CUSTOM_STATE")
-    }
-
     "reject an unknown protocol" in {
       val config = h2Config("h2-unknown-protocol", """protocol = "tcp"""").getConfig("h2-unknown-protocol.h2")
       intercept[IllegalArgumentException] {

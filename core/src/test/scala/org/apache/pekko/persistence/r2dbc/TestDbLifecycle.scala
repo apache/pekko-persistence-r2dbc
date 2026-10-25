@@ -20,11 +20,34 @@ import pekko.actor.typed.ActorSystem
 import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.h2.H2Connections
 import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite
 import org.slf4j.LoggerFactory
+
+object TestDbLifecycle {
+
+  /**
+   * The H2 plugins create their tables when they are first used, which can be after a test harness deletes from them.
+   */
+  def createH2Tables(r2dbcExecutor: R2dbcExecutor, settings: ConnectionSettings*): Unit =
+    settings.foreach { s =>
+      if (s.dialect == Dialect.H2) {
+        val tableDdl = s match {
+          case j: JournalSettings  => H2Connections.journalTableDdl(j.journalTableWithSchema, createSliceIndexes = false)
+          case s: SnapshotSettings => H2Connections.snapshotTableDdl(s.snapshotsTableWithSchema)
+          case s: StateSettings    =>
+            H2Connections.durableStateTableDdl(s.durableStateTableWithSchema, createSliceIndexes = false)
+          case _ => Nil
+        }
+        (H2Connections.schemaDdl(s.schema) ++ tableDdl).foreach { statement =>
+          Await.result(r2dbcExecutor.executeDdl("create H2 table")(_.createStatement(statement)), 10.seconds)
+        }
+      }
+    }
+}
 
 trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
 
@@ -62,6 +85,7 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
   lazy val persistenceExt: Persistence = Persistence(typedSystem)
 
   override protected def beforeAll(): Unit = {
+    TestDbLifecycle.createH2Tables(r2dbcExecutor, journalSettings, snapshotSettings, stateSettings)
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(
         _.createStatement(s"delete from ${journalSettings.journalTableWithSchema}")),

@@ -44,7 +44,8 @@ class H2TableCreationSpec
     with LogCapturing {
 
   // plugin settings at the root, using an H2 connection factory with its own in-memory database at `path`
-  private def pluginConfig(path: String, pluginPath: String, pluginOverrides: String, h2Overrides: String = ""): Config = {
+  private def pluginConfig(path: String, pluginPath: String, pluginOverrides: String, h2Overrides: String = "")
+      : Config = {
     val fullConfig = ConfigFactory.load(
       ConfigFactory
         .parseString(s"""
@@ -127,7 +128,7 @@ class H2TableCreationSpec
       val dao = DurableStateDao.fromConfig(StateSettings(config), config)(system, system.executionContext)
       dao.upsertState(stateRow("Entity|p-1"), "s").futureValue
       dao.upsertState(stateRow("CustomEntity|p-1"), "s").futureValue
-      tables(path, config, "PUBLIC") should contain allOf ("OTHER_STATE", "CUSTOM_STATE")
+      (tables(path, config, "PUBLIC") should contain).allOf("OTHER_STATE", "CUSTOM_STATE")
     }
 
     "create the schema of the plugin" in {

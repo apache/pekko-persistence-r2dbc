@@ -71,7 +71,13 @@ private[r2dbc] object SnapshotDao {
       case Dialect.MySQL =>
         new MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
-        new H2SnapshotDao(settings, connectionFactory, closeCallsExceeding)(
+        val tablesConnectionFactory = H2Connections.creatingTables(
+          connectionFactory,
+          connectionFactoryConfig,
+          _ =>
+            H2Connections.schemaDdl(settings.schema) ++
+            H2Connections.snapshotTableDdl(settings.snapshotsTableWithSchema))
+        new H2SnapshotDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)
     }

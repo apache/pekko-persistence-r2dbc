@@ -72,7 +72,14 @@ object QueryDao {
       case Dialect.MySQL =>
         new MySQLQueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
-        new H2QueryDao(settings, connectionFactory, closeCallsExceeding)(
+        // the query may be used without the journal plugin in the same process
+        val tablesConnectionFactory = H2Connections.creatingTables(
+          connectionFactory,
+          connectionFactoryConfig,
+          createSliceIndexes =>
+            H2Connections.schemaDdl(settings.schema) ++
+            H2Connections.journalTableDdl(settings.journalTableWithSchema, createSliceIndexes))
+        new H2QueryDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)
     }

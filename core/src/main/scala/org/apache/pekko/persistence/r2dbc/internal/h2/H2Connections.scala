@@ -26,13 +26,20 @@ import com.typesafe.config.Config
 import io.r2dbc.h2.H2ConnectionConfiguration
 import io.r2dbc.h2.H2ConnectionFactory
 import io.r2dbc.h2.H2ConnectionOption
+import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryMetadata
+import io.r2dbc.spi.Result
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 
 /**
  * INTERNAL API
  *
- * Creates the H2 connection factory from the `h2` section of the connection factory config. Only used when the
- * connection factory `driver` is `h2`, so that the optional H2 dependencies are not loaded otherwise.
+ * Creates the H2 connection factory from the `h2` section of the connection factory config, and the DDL of the plugin
+ * tables. Only used when the connection factory `driver` is `h2`, so that the optional H2 dependencies are not loaded
+ * otherwise.
  */
 @InternalApi
 private[r2dbc] object H2Connections {
@@ -56,12 +63,12 @@ private[r2dbc] object H2Connections {
           throw new IllegalArgumentException(s"Unknown H2 protocol [$unknown], supported protocols are [file, mem].")
       }
 
-      val createSliceIndexes = config.getBoolean("create-slice-indexes")
-      builder
-        // create schema on first connect
-        .property(H2ConnectionOption.INIT, dbSchema(config, createSliceIndexes, config.getString("additional-init")))
-        // don't auto close connections
-        .property(H2ConnectionOption.DB_CLOSE_DELAY, "-1")
+      // the plugin tables are created by the DAOs, see creatingTables
+      val additionalInit = config.getString("additional-init")
+      if (additionalInit.trim.nonEmpty)
+        builder.property(H2ConnectionOption.INIT, additionalInit)
+      // don't auto close connections
+      builder.property(H2ConnectionOption.DB_CLOSE_DELAY, "-1")
 
       // workaround for https://github.com/akka/akka-projection/issues/992
       builder.option("OPTIMIZE_REUSE_RESULTS=FALSE")
@@ -90,26 +97,24 @@ private[r2dbc] object H2Connections {
     system.dispatchers.lookup(
       DispatcherSelector.fromConfig(connectionFactoryConfig.getString("h2.use-dispatcher")))
 
-  private def dbSchema(config: Config, createSliceIndexes: Boolean, additionalInit: String): String = {
-    val schema = Option(config.getString("schema")).filter(_.trim.nonEmpty)
-    def withSchema(table: String): String = schema.map(_ + ".").getOrElse("") + table
-    val journalTableWithSchema = withSchema(config.getString("journal-table"))
-    val snapshotTableWithSchema = withSchema(config.getString("snapshot-table"))
-    val durableStateTableWithSchema = withSchema(config.getString("state-table"))
+  /**
+   * Creates the schema, tables and indexes of a plugin before the first connection is handed out, so each DAO creates
+   * the tables of its own plugin settings. Not when the connection is configured with a `url`.
+   */
+  def creatingTables(
+      connectionFactory: ConnectionFactory,
+      connectionFactoryConfig: Config,
+      ddl: Boolean => Seq[String]): ConnectionFactory = {
+    val config = connectionFactoryConfig.getConfig("h2")
+    if (config.getString("url").nonEmpty) connectionFactory
+    else new TableCreatingConnectionFactory(connectionFactory, ddl(config.getBoolean("create-slice-indexes")))
+  }
 
-    val sliceIndexes =
-      if (createSliceIndexes)
-        Seq(
-          s"CREATE INDEX IF NOT EXISTS ${journalTableWithSchema}_slice_idx " +
-          s"ON $journalTableWithSchema(slice, entity_type, db_timestamp, seq_nr)",
-          s"CREATE INDEX IF NOT EXISTS ${durableStateTableWithSchema}_slice_idx " +
-          s"ON $durableStateTableWithSchema(slice, entity_type, db_timestamp, revision)")
-      else Seq.empty[String]
+  def schemaDdl(schema: Option[String]): Seq[String] =
+    schema.map(s => s"CREATE SCHEMA IF NOT EXISTS $s").toSeq
 
-    val schemaCreation = schema.map(s => s"CREATE SCHEMA IF NOT EXISTS $s").toSeq
-
-    (schemaCreation ++ Seq(
-      s"""CREATE TABLE IF NOT EXISTS $journalTableWithSchema (
+  def journalTableDdl(tableWithSchema: String, createSliceIndexes: Boolean): Seq[String] =
+    s"""CREATE TABLE IF NOT EXISTS $tableWithSchema (
         slice INT NOT NULL,
         entity_type VARCHAR(255) NOT NULL,
         persistence_id VARCHAR(255) NOT NULL,
@@ -130,8 +135,10 @@ private[r2dbc] object H2Connections {
         meta_payload BYTEA,
 
         PRIMARY KEY(persistence_id, seq_nr)
-      )""",
-      s"""CREATE TABLE IF NOT EXISTS $snapshotTableWithSchema (
+      )""" +: sliceIndex(tableWithSchema, "seq_nr", createSliceIndexes)
+
+  def snapshotTableDdl(tableWithSchema: String): Seq[String] =
+    Seq(s"""CREATE TABLE IF NOT EXISTS $tableWithSchema (
         slice INT NOT NULL,
         entity_type VARCHAR(255) NOT NULL,
         persistence_id VARCHAR(255) NOT NULL,
@@ -145,8 +152,10 @@ private[r2dbc] object H2Connections {
         meta_payload BYTEA,
 
         PRIMARY KEY(persistence_id)
-      )""",
-      s"""CREATE TABLE IF NOT EXISTS $durableStateTableWithSchema (
+      )""")
+
+  def durableStateTableDdl(tableWithSchema: String, createSliceIndexes: Boolean): Seq[String] =
+    s"""CREATE TABLE IF NOT EXISTS $tableWithSchema (
         slice INT NOT NULL,
         entity_type VARCHAR(255) NOT NULL,
         persistence_id VARCHAR(255) NOT NULL,
@@ -159,7 +168,40 @@ private[r2dbc] object H2Connections {
         tags TEXT ARRAY,
 
         PRIMARY KEY(persistence_id, revision)
-      )""") ++ sliceIndexes ++ (if (additionalInit.trim.nonEmpty) Seq(additionalInit) else Seq.empty[String]))
-      .mkString(";") // r2dbc h2 driver replaces with '\;' as needed for INIT
+      )""" +: sliceIndex(tableWithSchema, "revision", createSliceIndexes)
+
+  private def sliceIndex(tableWithSchema: String, sequenceColumn: String, createSliceIndexes: Boolean): Seq[String] =
+    if (createSliceIndexes)
+      Seq(
+        s"CREATE INDEX IF NOT EXISTS ${tableWithSchema}_slice_idx " +
+        s"ON $tableWithSchema(slice, entity_type, db_timestamp, $sequenceColumn)")
+    else Seq.empty
+
+  /**
+   * Runs `ddl` once, on a connection of its own, before handing out the first connection. A failure is returned to
+   * every later `create()`.
+   */
+  private final class TableCreatingConnectionFactory(underlying: ConnectionFactory, ddl: Seq[String])
+      extends ConnectionFactory {
+
+    private val tablesCreated: Mono[Void] =
+      Mono
+        .usingWhen[Void, Connection](
+          Mono.from[Connection](underlying.create()),
+          (connection: Connection) =>
+            Flux
+              .fromIterable(ddl.asJava)
+              .concatMap((statement: String) =>
+                Flux
+                  .from[Result](connection.createStatement(statement).execute())
+                  .concatMap((result: Result) => result.getRowsUpdated))
+              .`then`(),
+          (connection: Connection) => connection.close())
+        .cache()
+
+    override def create(): Publisher[? <: Connection] =
+      tablesCreated.`then`(Mono.from[Connection](underlying.create()))
+
+    override def getMetadata: ConnectionFactoryMetadata = underlying.getMetadata
   }
 }
