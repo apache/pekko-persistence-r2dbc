@@ -6,14 +6,59 @@ on:
     branches:
       - main
     tags-ignore: [ v.* ]
+  schedule:
+    # Scala 3 LTS and Next are tested nightly
+    - cron: "0 2 * * *"
+  workflow_dispatch:
 
 jobs:
+  scala-versions:
+    name: Select Scala versions
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.select.outputs.versions }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      # 2.13 and 3.3 (published) run on every change, 3.9 LTS and 3.10 Next run nightly
+      # and on pull requests that change their versions in project/Dependencies.scala
+      - name: Select Scala versions
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |-
+          published='"scala213","scala3"'
+          testOnly='"scala3Lts","scala3Next"'
+          case "$EVENT_NAME" in
+            schedule)
+              versions="[$testOnly]" ;;
+            workflow_dispatch)
+              versions="[$published,$testOnly]" ;;
+            pull_request)
+              # HEAD is the merge commit, HEAD^1 the base branch; a failing diff fails the step
+              changes=$(git diff HEAD^1 HEAD -- project/Dependencies.scala)
+              if grep -qE '^[+-] *val Scala3(Lts|Next) = ' <<< "$changes"; then
+                versions="[$published,$testOnly]"
+              else
+                versions="[$published]"
+              fi ;;
+            *)
+              versions="[$published]" ;;
+          esac
+          echo "Scala versions: $versions"
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
+
   compile:
     name: Test and compile
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ scala213, scala3, scala3Lts, scala3Next ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17, 21 ]
     steps:
       - name: Checkout
@@ -42,10 +87,11 @@ jobs:
 
   test-postgres:
     name: Run test with Postgres
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ scala213, scala3, scala3Lts, scala3Next ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -99,10 +145,11 @@ jobs:
 
   test-postgres-jsonb:
     name: Run test with Postgres (JSONB)
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ scala213, scala3, scala3Lts, scala3Next ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -153,10 +200,11 @@ jobs:
 
   test-yugabyte:
     name: Run tests with Yugabyte
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ scala213, scala3, scala3Lts, scala3Next ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
@@ -210,10 +258,11 @@ jobs:
 
   test-mysql:
     name: Run tests with MySQL
+    needs: scala-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        SCALA_VERSION: [ scala213, scala3, scala3Lts, scala3Next ]
+        SCALA_VERSION: ${{ fromJson(needs.scala-versions.outputs.versions) }}
         JAVA_VERSION: [ 17, 21 ]
     if: github.repository == 'apache/pekko-persistence-r2dbc'
     steps:
