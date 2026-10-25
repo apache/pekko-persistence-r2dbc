@@ -47,7 +47,7 @@ private[r2dbc] class MySQLDurableStateDao(
     extends DurableStateDao(settings, connectionFactory, closeCallsExceeding) {
   MySQLJournalDao.settingRequirements(settings)
 
-  override lazy val transactionTimestampSql: String = "NOW(6)"
+  override protected def transactionTimestampSql: String = "NOW(6)"
 
   override protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
     if (tags.isEmpty) stmt.bindNull(index, classOf[String])

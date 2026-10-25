@@ -126,7 +126,8 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
   import DurableStateDao._
 
   implicit protected val dialect: Dialect = settings.dialect
-  protected lazy val transactionTimestampSql: String = "transaction_timestamp()"
+  // evaluated for each insert and update statement
+  protected def transactionTimestampSql: String = "transaction_timestamp()"
 
   private val persistenceExt = Persistence(system)
   private val r2dbcExecutor =

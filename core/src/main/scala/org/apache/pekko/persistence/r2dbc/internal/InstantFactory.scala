@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.pekko.annotation.InternalApi
 
@@ -29,5 +30,17 @@ import org.apache.pekko.annotation.InternalApi
    */
   def now(): Instant =
     Instant.now().truncatedTo(ChronoUnit.MICROS)
+
+  private val lastMicros = new AtomicLong(0L)
+
+  /**
+   * Like [[now]], but later than any instant previously returned by this method in this JVM, by at least one
+   * microsecond. The wall clock can return the same value for a while, about 0.5 ms on Windows.
+   */
+  def nowStrictlyIncreasing(): Instant = {
+    val nowMicros = ChronoUnit.MICROS.between(Instant.EPOCH, now())
+    val next = lastMicros.updateAndGet(prev => math.max(prev + 1, nowMicros))
+    Instant.EPOCH.plus(next, ChronoUnit.MICROS)
+  }
 
 }

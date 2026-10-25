@@ -42,7 +42,11 @@ private[r2dbc] class H2DurableStateDao(
   // always app timestamp (db is same process) monotonic increasing
   H2Utils.settingRequirements(settings)
 
-  override lazy val transactionTimestampSql: String = "CURRENT_TIMESTAMP"
+  // Not CURRENT_TIMESTAMP: H2 reads the JVM clock, which can return the same value for a while (about 0.5 ms on
+  // Windows), and rounds it to microseconds. A write could then get a timestamp that isn't before a later
+  // currentDbTimestamp(), and the by slice queries would miss it.
+  override protected def transactionTimestampSql: String =
+    H2Utils.timestampLiteral(InstantFactory.nowStrictlyIncreasing())
 
   override def selectBucketsSql(minSlice: Int, maxSlice: Int): String =
     sql"""
@@ -86,5 +90,5 @@ private[r2dbc] class H2DurableStateDao(
   }
 
   // the database runs in the same process, app timestamp is db timestamp
-  override def currentDbTimestamp(): Future[Instant] = Future.successful(InstantFactory.now())
+  override def currentDbTimestamp(): Future[Instant] = Future.successful(InstantFactory.nowStrictlyIncreasing())
 }

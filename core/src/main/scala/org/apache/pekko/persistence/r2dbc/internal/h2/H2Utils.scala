@@ -13,6 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.internal.h2
 
+import java.time.Instant
+
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.DbTimestampMonotonicIncreasing
@@ -34,6 +36,12 @@ private[r2dbc] object H2Utils {
       case other             => throw new IllegalStateException(s"Unexpected tags column type [${other.getClass}]")
     }
   }
+
+  /**
+   * SQL literal for a `TIMESTAMP WITH TIME ZONE` value.
+   */
+  def timestampLiteral(instant: Instant): String =
+    s"TIMESTAMP WITH TIME ZONE '$instant'"
 
   /**
    * The database runs in the same process, so the application timestamp is the database timestamp.

@@ -14,7 +14,6 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
@@ -67,12 +66,7 @@ private[r2dbc] object R2dbcBatchJournal {
   private val generationCounter = new java.util.concurrent.atomic.AtomicLong(0L)
   private[r2dbc] def nextGeneration(): Long = generationCounter.incrementAndGet()
 
-  private val lastTimestampMicros = new java.util.concurrent.atomic.AtomicLong(0L)
-  private[r2dbc] def nextTimestamp(): Instant = {
-    val nowMicros = ChronoUnit.MICROS.between(Instant.EPOCH, InstantFactory.now())
-    val next = lastTimestampMicros.updateAndGet(prev => math.max(prev + 1, nowMicros))
-    Instant.EPOCH.plus(next, ChronoUnit.MICROS)
-  }
+  private[r2dbc] def nextTimestamp(): Instant = InstantFactory.nowStrictlyIncreasing()
 }
 
 /**

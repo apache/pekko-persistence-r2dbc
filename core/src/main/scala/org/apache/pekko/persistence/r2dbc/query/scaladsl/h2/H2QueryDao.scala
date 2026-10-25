@@ -85,6 +85,7 @@ private[r2dbc] class H2QueryDao(
       GROUP BY bucket ORDER BY bucket LIMIT ?
       """
 
-  // the database runs in the same process, app timestamp is db timestamp
-  override def currentDbTimestamp(): Future[Instant] = Future.successful(InstantFactory.now())
+  // the database runs in the same process, app timestamp is db timestamp, and later than the timestamps of
+  // all completed writes
+  override def currentDbTimestamp(): Future[Instant] = Future.successful(InstantFactory.nowStrictlyIncreasing())
 }
