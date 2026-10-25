@@ -13,6 +13,7 @@
 
 package org.apache.pekko.persistence.r2dbc.internal.h2
 
+import java.time.Duration
 import java.util.Locale
 
 import scala.concurrent.ExecutionContext
@@ -182,8 +183,8 @@ private[r2dbc] object H2Connections {
     else Seq.empty
 
   /**
-   * Runs `ddl` once, on a connection of its own, before handing out the first connection. A failure is returned to
-   * every later `create()`.
+   * Runs `ddl` once, on a connection of its own, before handing out the first connection. A failure is not cached,
+   * so the next `create()` runs `ddl` again, for example after a transient lock on a file database.
    */
   private final class TableCreatingConnectionFactory(underlying: ConnectionFactory, ddl: Seq[String])
       extends ConnectionFactory {
@@ -201,7 +202,10 @@ private[r2dbc] object H2Connections {
                   .concatMap((result: Result) => result.getRowsUpdated))
               .`then`(),
           (connection: Connection) => connection.close())
-        .cache()
+        .cache(
+          (_: Void) => Duration.ofMillis(Long.MaxValue),
+          (_: Throwable) => Duration.ZERO,
+          () => Duration.ofMillis(Long.MaxValue))
 
     override def create(): Publisher[? <: Connection] =
       tablesCreated.`then`(Mono.from[Connection](underlying.create()))
