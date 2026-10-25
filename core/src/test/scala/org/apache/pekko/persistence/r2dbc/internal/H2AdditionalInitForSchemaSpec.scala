@@ -44,7 +44,7 @@ object H2AdditionalInitForSchemaSpec {
       }
       // #additionalColumn
       pekko.persistence.r2dbc.state {
-        h2-additional-ddl = "alter table durable_state add if not exists col1 varchar(256)"
+        h2.additional-init = "alter table durable_state add if not exists col1 varchar(256)"
       }
       // #additionalColumn
       """)

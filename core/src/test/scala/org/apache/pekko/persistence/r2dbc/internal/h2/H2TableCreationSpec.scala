@@ -44,18 +44,14 @@ class H2TableCreationSpec
     with LogCapturing {
 
   // plugin settings at the root, using an H2 connection factory with its own in-memory database at `path`
-  private def pluginConfig(path: String, pluginPath: String, pluginOverrides: String, h2Overrides: String = "")
-      : Config = {
+  private def pluginConfig(path: String, pluginPath: String, pluginOverrides: String): Config = {
     val fullConfig = ConfigFactory.load(
       ConfigFactory
         .parseString(s"""
           $path = $${pekko.persistence.r2dbc.connection-factory}
           $path {
             driver = "h2"
-            h2 {
-              database = "$path"
-              $h2Overrides
-            }
+            h2.database = "$path"
           }
           """)
         .withFallback(TestConfig.unresolvedConfig))
@@ -138,30 +134,57 @@ class H2TableCreationSpec
       tables(path, config, "OTHER_SCHEMA") shouldBe Seq("EVENT_JOURNAL")
     }
 
-    "run h2-additional-ddl after creating the durable state tables" in {
-      val path = "h2-tables-state-ddl"
-      val config = pluginConfig(
-        path,
-        "pekko.persistence.r2dbc.state",
-        """h2-additional-ddl = "ALTER TABLE durable_state ADD COLUMN IF NOT EXISTS col1 VARCHAR(256)"""")
-      val dao = DurableStateDao.fromConfig(StateSettings(config), config)(system, system.executionContext)
-      dao.upsertState(stateRow("Entity|p-1"), "s").futureValue
-      executor(path, config)
-        .select("select columns")(
-          _.createStatement(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'DURABLE_STATE' AND COLUMN_NAME = 'COL1'"),
-          _.get(0, classOf[String]))
-        .futureValue shouldBe Seq("COL1")
+    "run h2.additional-init of the journal plugin after creating its table" in {
+      val path = "h2-tables-journal-init"
+      val config = pluginConfig(path, "pekko.persistence.r2dbc.journal", addColumn("event_journal", "col1"))
+      writeEvent(config)
+      columns(path, config, "EVENT_JOURNAL") should contain("COL1")
     }
 
-    "run additional-init of the connection factory when connecting" in {
-      val path = "h2-tables-additional-init"
-      val config = pluginConfig(
-        path,
-        "pekko.persistence.r2dbc.journal",
-        "",
-        """additional-init = "CREATE TABLE IF NOT EXISTS other_library (id INT)"""")
-      tables(path, config, "PUBLIC") should contain("OTHER_LIBRARY")
+    "run h2.additional-init of the snapshot plugin after creating its table" in {
+      val path = "h2-tables-snapshot-init"
+      val config = pluginConfig(path, "pekko.persistence.r2dbc.snapshot", addColumn("snapshot", "col1"))
+      val dao = SnapshotDao.fromConfig(SnapshotSettings(config), config)(system, system.executionContext)
+      dao.store(SerializedSnapshotRow("Entity|p-1", 1L, 0L, Array[Byte](1), 1, "", None)).futureValue
+      columns(path, config, "SNAPSHOT") should contain("COL1")
+    }
+
+    "run h2.additional-init of the durable state plugin after creating its tables" in {
+      val path = "h2-tables-state-init"
+      val config = pluginConfig(path, "pekko.persistence.r2dbc.state", addColumn("durable_state", "col1"))
+      val dao = DurableStateDao.fromConfig(StateSettings(config), config)(system, system.executionContext)
+      dao.upsertState(stateRow("Entity|p-1"), "s").futureValue
+      columns(path, config, "DURABLE_STATE") should contain("COL1")
+    }
+
+    "run the h2.additional-init of each plugin that uses the connection factory" in {
+      val path = "h2-tables-two-plugins-init"
+      def writeState(table: String, column: String): Config = {
+        val config = pluginConfig(
+          path,
+          "pekko.persistence.r2dbc.state",
+          s"""
+            table = "$table"
+            ${addColumn(table, column)}
+            """)
+        val dao = DurableStateDao.fromConfig(StateSettings(config), config)(system, system.executionContext)
+        dao.upsertState(stateRow("Entity|p-1"), "s").futureValue
+        config
+      }
+      writeState("state_a", "col_a")
+      val config = writeState("state_b", "col_b")
+      columns(path, config, "STATE_A") should (contain("COL_A") and not contain "COL_B")
+      columns(path, config, "STATE_B") should (contain("COL_B") and not contain "COL_A")
     }
   }
+
+  private def addColumn(table: String, column: String): String =
+    s"""h2.additional-init = "ALTER TABLE $table ADD COLUMN IF NOT EXISTS $column VARCHAR(256)""""
+
+  private def columns(path: String, config: Config, table: String): Seq[String] =
+    executor(path, config)
+      .select("select columns")(
+        _.createStatement(s"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '$table'"),
+        _.get(0, classOf[String]))
+      .futureValue
 }

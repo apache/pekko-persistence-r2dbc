@@ -76,7 +76,8 @@ private[r2dbc] object SnapshotDao {
           connectionFactoryConfig,
           _ =>
             H2Connections.schemaDdl(settings.schema) ++
-            H2Connections.snapshotTableDdl(settings.snapshotsTableWithSchema))
+            H2Connections.snapshotTableDdl(settings.snapshotsTableWithSchema) ++
+            H2Connections.additionalInit(settings.config))
         new H2SnapshotDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)

@@ -107,15 +107,14 @@ import org.slf4j.LoggerFactory
         val tables =
           (settings.durableStateTableWithSchema +:
           settings.durableStateTableByEntityTypeWithSchema.values.toSeq).distinct
-        // after the tables, since it can change them, for example to add additional columns
-        val additionalDdl = settings.config.getString("h2-additional-ddl")
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,
           connectionFactoryConfig,
           createSliceIndexes =>
             H2Connections.schemaDdl(settings.schema) ++
             tables.flatMap(H2Connections.durableStateTableDdl(_, createSliceIndexes)) ++
-            Seq(additionalDdl).filter(_.trim.nonEmpty))
+            // after the tables, since it can change them, for example to add additional columns
+            H2Connections.additionalInit(settings.config))
         new H2DurableStateDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)

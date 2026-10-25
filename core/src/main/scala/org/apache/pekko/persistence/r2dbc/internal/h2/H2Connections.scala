@@ -63,10 +63,8 @@ private[r2dbc] object H2Connections {
           throw new IllegalArgumentException(s"Unknown H2 protocol [$unknown], supported protocols are [file, mem].")
       }
 
-      // the plugin tables are created by the DAOs, see creatingTables
-      val additionalInit = config.getString("additional-init")
-      if (additionalInit.trim.nonEmpty)
-        builder.property(H2ConnectionOption.INIT, additionalInit)
+      // no INIT, the plugins create their tables and run their h2.additional-init, see creatingTables
+
       // don't auto close connections
       builder.property(H2ConnectionOption.DB_CLOSE_DELAY, "-1")
 
@@ -109,6 +107,12 @@ private[r2dbc] object H2Connections {
     if (config.getString("url").nonEmpty) connectionFactory
     else new TableCreatingConnectionFactory(connectionFactory, ddl(config.getBoolean("create-slice-indexes")))
   }
+
+  /**
+   * The `h2.additional-init` of a plugin, run after the tables of the plugin have been created.
+   */
+  def additionalInit(pluginConfig: Config): Seq[String] =
+    Seq(pluginConfig.getString("h2.additional-init")).filter(_.trim.nonEmpty)
 
   def schemaDdl(schema: Option[String]): Seq[String] =
     schema.map(s => s"CREATE SCHEMA IF NOT EXISTS $s").toSeq

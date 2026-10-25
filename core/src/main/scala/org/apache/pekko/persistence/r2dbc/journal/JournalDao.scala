@@ -101,7 +101,8 @@ private[r2dbc] object JournalDao {
           connectionFactoryConfig,
           createSliceIndexes =>
             H2Connections.schemaDdl(settings.schema) ++
-            H2Connections.journalTableDdl(settings.journalTableWithSchema, createSliceIndexes))
+            H2Connections.journalTableDdl(settings.journalTableWithSchema, createSliceIndexes) ++
+            H2Connections.additionalInit(settings.config))
         new H2JournalDao(settings, tablesConnectionFactory, closeCallsExceeding)(
           H2Connections.executionContext(system, connectionFactoryConfig),
           system)

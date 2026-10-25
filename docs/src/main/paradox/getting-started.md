@@ -106,15 +106,12 @@ configuration, so no schema scripts are needed. This includes the tables of `sta
 @ref:[runtime plugin configuration](config.md#plugin-configuration-at-runtime). The tables are not created when the
 connection is configured with a `url`.
 
-DDL for the durable state tables, for example for the columns of
-@ref:[additional columns](durable-state-store.md#storing-query-representation), can be added with
-`state.h2-additional-ddl`, which runs after the tables have been created:
+Additional DDL or DML for the tables of a plugin, for example for the columns of
+@ref:[additional columns](durable-state-store.md#storing-query-representation), can be added with `h2.additional-init`
+in the configuration of the `journal`, `snapshot` or `state` plugin. It runs once when the plugin starts, after the
+plugin has created its tables, and must be idempotent since a file database keeps the tables:
 
 @@snip [H2AdditionalInitForSchemaSpec.scala](/core/src/test/scala/org/apache/pekko/persistence/r2dbc/internal/H2AdditionalInitForSchemaSpec.scala) { #additionalColumn }
-
-Other DDL or DML, for example for the tables of other libraries, can be added with `additional-init` in the `h2`
-settings of the connection factory. It runs whenever a connection is opened, before the plugins have created their
-tables.
 
 The `h2` settings in the reference configuration:
 
