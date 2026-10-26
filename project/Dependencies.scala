@@ -28,7 +28,7 @@ object Dependencies {
   val PekkoProjectionVersionInDocs = "current"
   val R2dbcH2Version = "1.1.0.RELEASE"
   // the H2 version that r2dbc-h2 is built against
-  val H2Version = "2.4.240"
+  val H2Version = "2.5.252"
 
   object Compile {
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion
