@@ -91,6 +91,8 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
    * snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
    *
    * After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+   * The events are still read from the given offset, because entities that have no snapshot can have events before
+   * the snapshots, but the events before the snapshots are not emitted.
    *
    * To use `currentEventsBySlicesStartingFromSnapshots` you must enable configuration
    * `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` and follow the instructions in the migration guide.
@@ -114,6 +116,8 @@ final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
    * snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
    *
    * After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+   * The events are still read from the given offset, because entities that have no snapshot can have events before
+   * the snapshots, but the events before the snapshots are not emitted.
    *
    * To use `eventsBySlicesStartingFromSnapshots` you must enable configuration
    * `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` and follow the instructions in the migration guide.

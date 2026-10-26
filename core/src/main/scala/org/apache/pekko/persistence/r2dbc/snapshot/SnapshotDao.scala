@@ -409,13 +409,25 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
    * when start-from-snapshot is enabled.
    */
   def eventTimestampAndTags(persistenceId: String, seqNr: Long): Future[Option[(Instant, Set[String])]] =
-    r2dbcExecutor.selectOne("select event timestamp and tags")(
-      connection =>
-        connection
-          .createStatement(selectEventTimestampAndTagsSql)
-          .bind(0, persistenceId)
-          .bind(1, seqNr),
-      row => row.get("db_timestamp", classOf[Instant]) -> tagsFromRow(row))
+    r2dbcExecutor
+      .selectOne("select event timestamp and tags")(
+        connection =>
+          connection
+            .createStatement(selectEventTimestampAndTagsSql)
+            .bind(0, persistenceId)
+            .bind(1, seqNr),
+        row => row.get("db_timestamp", classOf[Instant]) -> tagsFromRow(row))
+      .map { result =>
+        if (result.isEmpty)
+          log.warn(
+            "Event [{}] with seqNr [{}] not found in [{}], the snapshot is stored with the write timestamp and " +
+            "without tags. Check that snapshot.journal-table and the schema match the journal when " +
+            "start-from-snapshot is enabled.",
+            persistenceId,
+            seqNr: java.lang.Long,
+            journalTable)
+        result
+      }(ExecutionContext.parasitic)
 
   /**
    * This is used from `BySliceQuery`, i.e. only if start-from-snapshot is enabled

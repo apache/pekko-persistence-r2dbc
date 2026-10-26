@@ -26,6 +26,9 @@ pekko.projection.r2dbc.offset-store {
 
 ## Snapshots as starting points for queries
 
+The queries that use snapshots as starting points are new in Apache Pekko Persistence R2DBC 2.0.0, which requires
+Apache Pekko 2.0.0. The query interfaces they implement are defined in Pekko Persistence Query 2.0.0.
+
 These changes are only needed if you use the @ref:[queries that use snapshots as starting points](query.md#eventsbyslicesstartingfromsnapshots):
 `eventsBySlicesStartingFromSnapshots`, `currentEventsBySlicesStartingFromSnapshots`,
 `eventsByPersistenceIdStartingFromSnapshot` and `currentEventsByPersistenceIdStartingFromSnapshot`.
@@ -46,10 +49,14 @@ ALTER TABLE snapshot ADD COLUMN IF NOT EXISTS tags TEXT ARRAY;
 
 UPDATE snapshot s SET db_timestamp = e.db_timestamp, tags = e.tags
   FROM event_journal e
-  WHERE s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr;
+  WHERE s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr AND e.deleted = false;
 
 CREATE INDEX IF NOT EXISTS snapshot_slice_idx ON snapshot(slice, entity_type, db_timestamp);
 ```
+
+The update only uses events that are not marked as deleted, like the snapshot plugin does. For a large `snapshot`
+table you may want to run the update in batches, for example by restricting it to a range of `slice` values per
+statement, to avoid one long running transaction.
 
 The new schema in `ddl-scripts/create_tables_*.sql` already includes the columns and the index. With H2, the plugin
 creates the snapshot table with the columns, and creates the index when the feature is enabled.

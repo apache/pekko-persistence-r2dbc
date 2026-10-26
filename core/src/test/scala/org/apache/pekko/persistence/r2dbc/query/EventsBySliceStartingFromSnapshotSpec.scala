@@ -236,6 +236,25 @@ class EventsBySliceStartingFromSnapshotSpec
         assertFinished(result)
       }
 
+      "include older events of entities without a snapshot for NoOffset" in new Setup {
+        val persisterWithoutSnapshot = spawn(TestActors.Persister(PersistenceId.ofUniqueId(nextPid(entityType))))
+        persisterWithoutSnapshot ! PersistWithAck("c-1", probe.ref)
+        probe.expectMessage(Done)
+        persister ! PersistWithAck("e-1-snap", probe.ref)
+        snapshotAckProbe.expectMessage(1L)
+        probe.expectMessage(Done)
+
+        val result: TestSubscriber.Probe[EventEnvelope[String]] =
+          doQuery(entityType, 0, persistenceExt.numberOfSlices - 1, NoOffset)
+            .runWith(sinkProbe)
+            .request(10)
+
+        result.expectNext().event shouldBe expectedSnapshotEvent(1)
+        // c-1 is before the timestamp of the only snapshot
+        result.expectNext().event shouldBe "c-1"
+        assertFinished(result)
+      }
+
     }
   }
 

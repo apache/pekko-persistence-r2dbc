@@ -33,7 +33,6 @@ import pekko.persistence.Persistence
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
-import pekko.persistence.query.TimestampOffset.toTimestampOffset
 import pekko.persistence.query.scaladsl._
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.query.typed.scaladsl.{
@@ -192,7 +191,7 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       minSlice: Int,
       maxSlice: Int,
       offset: Offset): Source[EventEnvelope[Event], NotUsed] = {
-    bySlice
+    bySlice[Event]
       .currentBySlices("currentEventsBySlices", entityType, minSlice, maxSlice, offset)
   }
 
@@ -246,6 +245,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
    * snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
    *
    * After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+   * The events are still read from the given offset, because entities that have no snapshot can have events before
+   * the snapshots, but the events before the snapshots are not emitted.
    *
    * To use `currentEventsBySlicesStartingFromSnapshots` you must enable configuration
    * `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` and follow the instructions in the migration guide.
@@ -257,7 +258,6 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       offset: Offset,
       transformSnapshot: Snapshot => Event): Source[EventEnvelope[Event], NotUsed] = {
     checkStartFromSnapshotEnabled("currentEventsBySlicesStartingFromSnapshots")
-    val timestampOffset = toTimestampOffset(offset)
 
     val snapshotSource =
       snapshotsBySlice[Snapshot, Event](transformSnapshot)
@@ -267,20 +267,19 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       new StartingFromSnapshotStage[Event](
         snapshotSource,
         { snapshotOffsets =>
-          val initOffset = initOffsetAfterSnapshots(timestampOffset, offset, snapshotOffsets)
-
           log.debug(
-            "currentEventsBySlicesStartingFromSnapshots initOffset [{}] with [{}] snapshots",
-            initOffset,
+            "currentEventsBySlicesStartingFromSnapshots offset [{}] with [{}] snapshots",
+            offset,
             snapshotOffsets.size)
 
-          bySlice.currentBySlices(
+          // the events are read from the given offset, see filterEventsBeforeSnapshots
+          bySlice[Event].currentBySlices(
             "currentEventsBySlices",
             entityType,
             minSlice,
             maxSlice,
-            initOffset,
-            filterEventsBeforeSnapshots(snapshotOffsets, backtrackingEnabled = false))
+            offset,
+            filterEventsBeforeSnapshots[Event](snapshotOffsets, backtrackingEnabled = false))
         }))
   }
 
@@ -293,6 +292,8 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
    * snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
    *
    * After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+   * The events are still read from the given offset, because entities that have no snapshot can have events before
+   * the snapshots, but the events before the snapshots are not emitted.
    *
    * To use `eventsBySlicesStartingFromSnapshots` you must enable configuration
    * `pekko.persistence.r2dbc.query.start-from-snapshot.enabled` and follow the instructions in the migration guide.
@@ -304,7 +305,6 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       offset: Offset,
       transformSnapshot: Snapshot => Event): Source[EventEnvelope[Event], NotUsed] = {
     checkStartFromSnapshotEnabled("eventsBySlicesStartingFromSnapshots")
-    val timestampOffset = toTimestampOffset(offset)
 
     val snapshotSource =
       snapshotsBySlice[Snapshot, Event](transformSnapshot)
@@ -314,21 +314,20 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
       new StartingFromSnapshotStage[Event](
         snapshotSource,
         { snapshotOffsets =>
-          val initOffset = initOffsetAfterSnapshots(timestampOffset, offset, snapshotOffsets)
-
           log.debug(
-            "eventsBySlicesStartingFromSnapshots initOffset [{}] with [{}] snapshots",
-            initOffset,
+            "eventsBySlicesStartingFromSnapshots offset [{}] with [{}] snapshots",
+            offset,
             snapshotOffsets.size)
 
+          // the events are read from the given offset, see filterEventsBeforeSnapshots
           val dbSource =
             bySlice[Event].liveBySlices(
               "eventsBySlices",
               entityType,
               minSlice,
               maxSlice,
-              initOffset,
-              filterEventsBeforeSnapshots(snapshotOffsets, settings.backtrackingEnabled))
+              offset,
+              filterEventsBeforeSnapshots[Event](snapshotOffsets, settings.backtrackingEnabled))
 
           if (settings.journalPublishEvents) {
             // Note that events via PubSub are not filtered by snapshotOffsets. It's unlikely that
@@ -343,43 +342,33 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
         }))
   }
 
-  private def initOffsetAfterSnapshots(
-      timestampOffset: TimestampOffset,
-      offset: Offset,
-      snapshotOffsets: Map[String, (Long, Instant)]): Offset =
-    if (timestampOffset == TimestampOffset.Zero && snapshotOffsets.nonEmpty) {
-      val minTimestamp = snapshotOffsets.valuesIterator.minBy { case (_, timestamp) => timestamp }._2
-      TimestampOffset(minTimestamp, Map.empty)
-    } else {
-      // don't adjust because then there is a risk that there was no found snapshot for a persistenceId
-      // but there can still be events between the given `offset` parameter and the min timestamp of the
-      // snapshots and those would then be missed
-      offset
-    }
-
   /**
-   * Stateful filter function that decides if (persistenceId, seqNr, source) should be emitted by
+   * Stateful filter function that decides if an event envelope should be emitted by
    * `eventsBySlicesStartingFromSnapshots` and `currentEventsBySlicesStartingFromSnapshots`.
+   *
+   * The events are read from the given offset, not from the min timestamp of the snapshots (as in the original Akka
+   * implementation). Entities without a snapshot, or with a snapshot that was not found by the snapshot query, can have
+   * events before that timestamp and those would otherwise be missed.
    */
-  private def filterEventsBeforeSnapshots(
+  private def filterEventsBeforeSnapshots[Event](
       snapshotOffsets: Map[String, (Long, Instant)],
-      backtrackingEnabled: Boolean): (String, Long, String) => Boolean = {
+      backtrackingEnabled: Boolean): EventEnvelope[Event] => Boolean = {
     var _snapshotOffsets = snapshotOffsets
-    (persistenceId, seqNr, source) => {
+    env => {
       if (_snapshotOffsets.isEmpty)
         true
       else
-        _snapshotOffsets.get(persistenceId) match {
+        _snapshotOffsets.get(env.persistenceId) match {
           case None                     => true
           case Some((snapshotSeqNr, _)) =>
             // release memory by removing from the _snapshotOffsets Map
-            if (seqNr == snapshotSeqNr &&
-              ((backtrackingEnabled && source == EnvelopeOrigin.SourceBacktracking) ||
-              (!backtrackingEnabled && source == EnvelopeOrigin.SourceQuery))) {
-              _snapshotOffsets -= persistenceId
+            if (env.sequenceNr == snapshotSeqNr &&
+              ((backtrackingEnabled && env.source == EnvelopeOrigin.SourceBacktracking) ||
+              (!backtrackingEnabled && env.source == EnvelopeOrigin.SourceQuery))) {
+              _snapshotOffsets -= env.persistenceId
             }
 
-            seqNr > snapshotSeqNr
+            env.sequenceNr > snapshotSeqNr
         }
     }
   }

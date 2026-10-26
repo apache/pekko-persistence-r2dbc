@@ -125,6 +125,15 @@ First it loads all snapshots with timestamps greater than or equal to the offset
 snapshot per persistenceId. The snapshots are transformed to events with the given `transformSnapshot` function.
 
 After emitting the snapshot events the ordinary events with sequence numbers after the snapshots are emitted.
+The events are still read from the given offset, because entities that have no snapshot can have events with
+timestamps before the snapshots, but the events before the snapshots are not emitted. The benefit is that the
+consumer doesn't have to process the events before the snapshots, not that fewer events are read from the database.
+
+The snapshot events are emitted before the ordinary events, and those can have earlier timestamps than the snapshots.
+The offsets of the emitted envelopes are therefore not increasing. A consumer that stores the offsets, and that is
+restarted before it has processed all the events after the snapshots, may resume from an offset after events that
+it hasn't seen yet. Run the query until it has caught up, for example with `currentEventsBySlicesStartingFromSnapshots`,
+before relying on the stored offsets.
 
 Example of `currentEventsBySlicesStartingFromSnapshots`:
 

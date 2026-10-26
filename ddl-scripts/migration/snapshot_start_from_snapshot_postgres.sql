@@ -8,6 +8,6 @@ ALTER TABLE snapshot ADD COLUMN IF NOT EXISTS tags TEXT ARRAY;
 -- populate the new columns from the corresponding events
 UPDATE snapshot s SET db_timestamp = e.db_timestamp, tags = e.tags
   FROM event_journal e
-  WHERE s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr;
+  WHERE s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr AND e.deleted = false;
 
 CREATE INDEX IF NOT EXISTS snapshot_slice_idx ON snapshot(slice, entity_type, db_timestamp);
