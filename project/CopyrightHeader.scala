@@ -23,7 +23,7 @@ trait CopyrightHeader extends AutoPlugin {
     Seq(Compile, Test).flatMap { config =>
       inConfig(config)(
         Seq(
-          headerLicense := Some(HeaderLicense.Custom(apacheHeader)),
+          headerLicense := Some(HeaderLicense.Custom(apacheStandardHeader)),
           headerMappings := headerMappings.value ++ Map(
             HeaderFileType.scala -> cStyleComment,
             HeaderFileType.java -> cStyleComment,
@@ -45,7 +45,7 @@ trait CopyrightHeader extends AutoPlugin {
       })
 
   // Only prepended to files that already carry a Lightbend copyright, i.e. code derived
-  // from Akka. New files get apacheStandardHeader instead.
+  // from Akka. New files get apacheStandardHeader, the configured headerLicense.
   def apacheHeader: String =
     """Licensed to the Apache Software Foundation (ASF) under one or more
       |license agreements; and to You under the Apache License, version 2.0:
@@ -81,13 +81,12 @@ trait CopyrightHeader extends AutoPlugin {
         case Some(currentText) if isValidCopyrightAnnotated(currentText) =>
           currentText
         case Some(currentText) if isLightbendCopyrighted(currentText) =>
-          HeaderCommentStyle.cStyleBlockComment.commentCreator(text, existingText) + NewLine * 2 + currentText
+          // deliberately use apacheHeader and ignore the input text; this file is derived from Akka
+          HeaderCommentStyle.cStyleBlockComment.commentCreator(apacheHeader, existingText) + NewLine * 2 + currentText
         case Some(currentText) =>
           throw new IllegalStateException(s"Unable to detect copyright for header:[$currentText]")
         case None =>
-          // deliberately use apacheStandardHeader and ignore the input text; a file with no
-          // existing header holds new code, so it must not claim to be derived from Akka
-          HeaderCommentStyle.cStyleBlockComment.commentCreator(apacheStandardHeader, existingText)
+          HeaderCommentStyle.cStyleBlockComment.commentCreator(text, existingText)
       }
       formatted.trim
     }
