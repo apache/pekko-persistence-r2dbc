@@ -134,12 +134,14 @@ import org.slf4j.LoggerFactory
       val offset = TimestampOffset(timestamp, timestamp, Map(pid -> pr.sequenceNr))
 
       val (eventOption, tags, filtered) = pr.payload match {
+        case Tagged(FilteredPayload, tags) =>
+          (None, tags, true)
         case Tagged(payload, tags) =>
-          (Some(payload), tags, false)
+          (Option(payload), tags, false)
         case FilteredPayload =>
           (None, Set.empty[String], true)
         case other =>
-          (Some(other), Set.empty[String], false)
+          (Option(other), Set.empty[String], false)
       }
 
       val envelope = new EventEnvelope(

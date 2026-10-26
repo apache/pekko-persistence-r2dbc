@@ -29,6 +29,7 @@ import pekko.actor.typed.internal.pubsub.TopicImpl
 import pekko.persistence.FilteredPayload
 import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
+import pekko.persistence.journal.Tagged
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
 import pekko.persistence.query.TimestampOffset
@@ -227,6 +228,27 @@ class EventsBySlicePubSubSpec
       envelope.source shouldBe EnvelopeOrigin.SourcePubSub
       envelope.filtered shouldBe true
       envelope.eventOption shouldBe empty
+      result.cancel()
+    }
+
+    "turn tagged FilteredPayload to filtered events with no payload" in new Setup {
+      val result: TestSubscriber.Probe[EventEnvelope[String]] =
+        query.eventsBySlices[String](setupEntityType, slice, slice, NoOffset).runWith(sinkProbe).request(10)
+
+      // make sure subscription completed
+      val topicStatsProbe = createTestProbe[TopicImpl.TopicStats]()
+      eventually {
+        PubSub(typedSystem).eventTopic[String](setupEntityType, slice) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
+        topicStatsProbe.receiveMessage().localSubscriberCount shouldBe 1
+      }
+
+      PubSub(typedSystem).publish(PersistentRepr(Tagged(FilteredPayload, Set("t1")), 1L, persistenceId), Instant.now())
+
+      val envelope = result.expectNext()
+      envelope.persistenceId shouldBe persistenceId
+      envelope.filtered shouldBe true
+      envelope.eventOption shouldBe empty
+      envelope.tags shouldBe Set("t1")
       result.cancel()
     }
 
