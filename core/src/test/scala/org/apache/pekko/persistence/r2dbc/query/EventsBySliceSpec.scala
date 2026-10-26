@@ -22,6 +22,7 @@ import pekko.NotUsed
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.FilteredPayload
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.Offset
 import pekko.persistence.query.PersistenceQuery
@@ -235,6 +236,29 @@ class EventsBySliceSpec
         query.loadEnvelope[String](persistenceId, 1L).futureValue.event shouldBe "e-1"
         intercept[NoSuchElementException] {
           Await.result(query.loadEnvelope[String](persistenceId, 4L), patience.timeout)
+        }
+      }
+
+      "mark FilteredPayload as filtered with no payload when reading it" in new Setup {
+        persister ! PersistWithAck(FilteredPayload, probe.ref)
+        probe.expectMessage(10.seconds, Done)
+
+        {
+          val result: TestSubscriber.Probe[EventEnvelope[String]] =
+            doQuery(entityType, slice, slice, NoOffset)
+              .runWith(sinkProbe)
+
+          result.request(1)
+          val envelope = result.expectNext()
+          envelope.filtered shouldBe true
+          envelope.eventOption shouldBe empty
+          result.cancel()
+        }
+
+        {
+          val envelope = query.loadEnvelope[String](persistenceId, 1L).futureValue
+          envelope.filtered shouldBe true
+          envelope.eventOption shouldBe empty
         }
       }
 

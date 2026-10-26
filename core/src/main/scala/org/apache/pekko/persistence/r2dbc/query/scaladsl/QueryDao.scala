@@ -109,7 +109,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
 
   protected def selectColumns(backtracking: Boolean): String =
     if (backtracking)
-      "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, tags "
+      "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, tags, event_ser_id, event_ser_manifest "
     else
       "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, tags, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload "
 
@@ -232,8 +232,8 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             payload = None, // lazy loaded for backtracking
-            serId = 0,
-            serManifest = "",
+            serId = row.get[Integer]("event_ser_id", classOf[Integer]),
+            serManifest = row.get("event_ser_manifest", classOf[String]),
             writerUuid = "", // not need in this query
             tags = Set.empty, // tags not fetched in backtracking
             metadata = None)
