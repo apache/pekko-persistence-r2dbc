@@ -136,7 +136,7 @@ class R2dbcExecutor(
 
   // Long.MinValue when disabled, so that `durationMicros >= logDbCallsExceedingMicros` is never true
   private def durationInMicros(startTime: Long): Long =
-    if (logDbCallsExceedingEnabled) (nanoTime() - startTime) / 1000 else Long.MinValue
+    if (logDbCallsExceedingEnabled) (System.nanoTime() - startTime) / 1000 else Long.MinValue
 
   private def getConnection(logPrefix: String): Future[Connection] = {
     val startTime = nanoTime()

@@ -112,12 +112,17 @@ class R2dbcExecutorSpec
         logDbCallsExceeding = Duration.Zero,
         closeCallsExceeding)(typedSystem.executionContext, typedSystem)
 
-      LoggingTestKit.info("Selected").expect {
-        executor
-          .select("test")(
-            _.createStatement(s"select col from $table"),
-            row => Row(row.get("col", classOf[String])))
-          .futureValue
+      LoggingTestKit.info("getConnection took").withOccurrences(2).expect {
+        LoggingTestKit.info("Selected").expect {
+          executor
+            .select("test")(
+              _.createStatement(s"select col from $table"),
+              row => Row(row.get("col", classOf[String])))
+            .futureValue
+        }
+        LoggingTestKit.info("DB call completed").expect {
+          executor.updateOne("test")(_.createStatement(s"delete from $table where col = 'x'")).futureValue
+        }
       }
     }
 
