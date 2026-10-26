@@ -17,8 +17,7 @@ import java.time.Instant
 
 import org.apache.pekko
 import pekko.annotation.InternalApi
-import pekko.persistence.r2dbc.DbTimestampMonotonicIncreasing
-import pekko.persistence.r2dbc.UseAppTimestamp
+import pekko.persistence.r2dbc.internal.SettingsTypes
 import io.r2dbc.spi.Row
 
 /**
@@ -46,7 +45,7 @@ private[r2dbc] object H2Utils {
   /**
    * The database runs in the same process, so the application timestamp is the database timestamp.
    */
-  def settingRequirements(settings: UseAppTimestamp with DbTimestampMonotonicIncreasing): Unit = {
+  def settingRequirements(settings: SettingsTypes.AppTimestampSettings): Unit = {
     require(settings.useAppTimestamp, "use-app-timestamp config must be on for H2 support")
     require(
       settings.dbTimestampMonotonicIncreasing,

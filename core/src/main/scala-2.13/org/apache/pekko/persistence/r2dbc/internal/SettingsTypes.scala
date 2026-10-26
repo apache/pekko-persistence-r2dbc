@@ -23,5 +23,5 @@ import pekko.persistence.r2dbc.UseAppTimestamp
  */
 @InternalApi private[r2dbc] object SettingsTypes {
   type BySliceQueryAllSettings = BySliceQuerySettings with RefreshInterval with BufferSize
-  type MySQLRequiredSettings = UseAppTimestamp with DbTimestampMonotonicIncreasing
+  type AppTimestampSettings = UseAppTimestamp with DbTimestampMonotonicIncreasing
 }

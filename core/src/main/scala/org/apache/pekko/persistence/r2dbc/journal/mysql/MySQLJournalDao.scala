@@ -96,7 +96,7 @@ private[r2dbc] object MySQLJournalDao {
     result.toSet
   }
 
-  def settingRequirements(settings: SettingsTypes.MySQLRequiredSettings): Unit = {
+  def settingRequirements(settings: SettingsTypes.AppTimestampSettings): Unit = {
     // Application timestamps are used because MySQL does not have transaction_timestamp like Postgres. In future releases
     // they could be tried to be emulated, but the benefits are questionable - no matter where the timestamps are generated,
     // risk of clock skews remains.
