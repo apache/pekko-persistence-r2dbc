@@ -26,6 +26,7 @@ import pekko.actor.typed.Extension
 import pekko.actor.typed.ExtensionId
 import pekko.actor.typed.pubsub.Topic
 import pekko.annotation.InternalApi
+import pekko.persistence.FilteredPayload
 import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.Tagged
@@ -132,23 +133,27 @@ import org.slf4j.LoggerFactory
 
       val offset = TimestampOffset(timestamp, timestamp, Map(pid -> pr.sequenceNr))
 
-      val (eventPayload, tags) = pr.payload match {
+      val (eventOption, tags, filtered) = pr.payload match {
+        case Tagged(FilteredPayload, tags) =>
+          (None, tags, true)
         case Tagged(payload, tags) =>
-          (payload, tags)
+          (Option(payload), tags, false)
+        case FilteredPayload =>
+          (None, Set.empty[String], true)
         case other =>
-          (other, Set.empty[String])
+          (Option(other), Set.empty[String], false)
       }
 
       val envelope = new EventEnvelope(
         offset,
         pid,
         pr.sequenceNr,
-        Option(eventPayload),
+        eventOption,
         timestamp.toEpochMilli,
         pr.metadata,
         entityType,
         slice,
-        filtered = false,
+        filtered,
         source = EnvelopeOrigin.SourcePubSub,
         tags)
       eventTopic(entityType, slice) ! Topic.Publish(envelope)
