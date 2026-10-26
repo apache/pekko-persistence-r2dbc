@@ -26,11 +26,9 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko
 import pekko.Done
-import pekko.actor.ExtendedActorSystem
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorRef
-import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.Behavior
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.persistence.JournalProtocol.RecoverySuccess
@@ -51,11 +49,12 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
+import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
-import pekko.persistence.typed.scaladsl.Effect
 import pekko.persistence.typed.scaladsl.EventSourcedBehavior
 import pekko.persistence.typed.scaladsl.RetentionCriteria
+import pekko.persistence.typed.state.scaladsl.DurableStateBehavior
 import pekko.stream.scaladsl.Sink
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Inside
@@ -66,6 +65,7 @@ object RuntimePluginConfigSpec {
 
   trait EventSourced {
     import EventSourced._
+    import pekko.persistence.typed.scaladsl.Effect
 
     def configKey: String
     def database: String
@@ -122,7 +122,9 @@ object RuntimePluginConfigSpec {
   }
 
   trait DurableState {
-    def typedSystem: ActorSystem[?]
+    import DurableState._
+    import pekko.persistence.typed.state.scaladsl.Effect
+
     def configKey: String
     def database: String
 
@@ -148,11 +150,28 @@ object RuntimePluginConfigSpec {
             .withFallback(TestConfig.unresolvedConfig)
         )
 
-    val store = new R2dbcDurableStateStore[String](
-      typedSystem.toClassic.asInstanceOf[ExtendedActorSystem],
-      config.getConfig(s"$configKey.state"),
-      ""
-    )
+    def apply(persistenceId: String): Behavior[Command] =
+      DurableStateBehavior[Command, String](
+        PersistenceId.ofUniqueId(persistenceId),
+        "",
+        (state, cmd) =>
+          cmd match {
+            case Save(text, replyTo) =>
+              Effect.persist(Seq(state, text).filter(_.nonEmpty).mkString("|")).thenRun(_ => replyTo ! Done)
+            case ShowMeWhatYouGot(replyTo) =>
+              replyTo ! state
+              Effect.none
+            case Stop =>
+              Effect.stop()
+          })
+        .withDurableStateStorePluginId(s"$configKey.state")
+        .withDurableStateStorePluginConfig(Some(config))
+  }
+  object DurableState {
+    sealed trait Command
+    case class Save(text: String, replyTo: ActorRef[Done]) extends Command
+    case class ShowMeWhatYouGot(replyTo: ActorRef[String]) extends Command
+    case object Stop extends Command
   }
 }
 
@@ -174,12 +193,10 @@ class RuntimePluginConfigSpec
   }
 
   private lazy val state1 = new DurableState {
-    override def typedSystem: ActorSystem[?] = system
     override def configKey: String = "plugin1"
     override def database: String = "database1"
   }
   private lazy val state2 = new DurableState {
-    override def typedSystem: ActorSystem[?] = system
     override def configKey: String = "plugin2"
     override def database: String = "database2"
   }
@@ -308,12 +325,22 @@ class RuntimePluginConfigSpec
     }
 
     "work for durable state plugin" in {
-      // persist data on both plugins
-      state1.store.upsertObject("id1", 1, "j1m1", "").futureValue
-      state2.store.upsertObject("id1", 1, "j2m1", "").futureValue
+      val probe = createTestProbe[Any]()
+
+      {
+        // one actor in each store with same id
+        val s1 = spawn(state1("id1"))
+        val s2 = spawn(state2("id1"))
+        s1 ! DurableState.Save("j1m1", probe.ref)
+        probe.receiveMessage()
+        s2 ! DurableState.Save("j2m1", probe.ref)
+        probe.receiveMessage()
+      }
 
       def assertState(state: DurableState, expectedState: String) = {
-        inside(state.store.getObject("id1").futureValue) {
+        val store = DurableStateStoreRegistry(system)
+          .durableStateStoreFor[R2dbcDurableStateStore[String]](s"${state.configKey}.state", state.config)
+        inside(store.getObject("id1").futureValue) {
           case GetObjectResult(Some(value), revision) =>
             value shouldBe expectedState
             revision shouldBe 1
