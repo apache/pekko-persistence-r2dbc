@@ -38,7 +38,9 @@ import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+import pekko.persistence.serialization.MessageFormats
 import pekko.persistence.typed.PersistenceId
+import pekko.protobufv3.internal.ByteString
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.testkit.TestSubscriber
@@ -257,7 +259,15 @@ class EventsBySliceBacktrackingSpec
       val startTime = InstantFactory.now().minusSeconds(10 * 60)
 
       val filteredSerializer = SerializationExtension(system).findSerializerFor(FilteredPayload)
-      writeSerializedEvent(slice, pid, 1L, startTime, filteredSerializer.identifier, "S", Array.emptyByteArray)
+      // a valid SerializedEvent payload, since in M5 the serializer parses it for manifest "S"
+      val stringSerializer = SerializationExtension(system).findSerializerFor("e-1")
+      val bytes = MessageFormats.PersistentPayload
+        .newBuilder()
+        .setSerializerId(stringSerializer.identifier)
+        .setPayload(ByteString.copyFrom(stringSerializer.toBinary("e-1")))
+        .build()
+        .toByteArray
+      writeSerializedEvent(slice, pid, 1L, startTime, filteredSerializer.identifier, "S", bytes)
 
       val result: TestSubscriber.Probe[EventEnvelope[Any]] =
         query
