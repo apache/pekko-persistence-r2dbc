@@ -70,7 +70,7 @@ class PersistTagsSpec
             connection => connection.createStatement(s"select * from ${settings.journalTableWithSchema}"),
             row => {
               val tags =
-                if (dialect == "mysql") {
+                if (dialect == "mysql" || dialect == "mariadb") {
                   MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
                 } else if (dialect == "h2") {
                   H2Utils.tagsFromDb(row, "tags")

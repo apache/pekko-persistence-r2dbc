@@ -33,6 +33,7 @@ import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOption
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
@@ -185,7 +186,15 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
     }
 
-    ConnectionFactories.get(customizer(builder, config).build())
+    if (MariaDBConnections.isMariaDB(builder.build())) {
+      // Instants are bound and read as UTC LocalDateTime, see MariaDBConnections
+      builder.option(MariaDBConnections.TimezoneOption, "UTC")
+    }
+
+    val options = customizer(builder, config).build()
+    val connectionFactory = ConnectionFactories.get(options)
+    if (MariaDBConnections.isMariaDB(options)) MariaDBConnections.wrap(connectionFactory)
+    else connectionFactory
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,

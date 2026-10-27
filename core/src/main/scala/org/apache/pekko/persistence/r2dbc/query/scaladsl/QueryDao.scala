@@ -69,7 +69,7 @@ object QueryDao {
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new QueryDao(settings, connectionFactory, closeCallsExceeding)
-      case Dialect.MySQL =>
+      case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLQueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         // the query may be used without the journal plugin in the same process

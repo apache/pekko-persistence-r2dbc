@@ -96,8 +96,8 @@ class EventsByPersistenceIdGapSpec
    */
   private def hardDeleteSeqNrs(pid: String, seqNrs: Long*): Unit = {
     val table = journalSettings.journalTableWithSchema
-    val sql = if (EventsByPersistenceIdGapSpec.dialect == "mysql") {
-      // MySQL R2DBC uses ? as parameter markers, so we can use the same SQL for
+    val sql = if (Set("mysql", "mariadb").contains(EventsByPersistenceIdGapSpec.dialect)) {
+      // MySQL and MariaDB R2DBC use ? as parameter markers, so we can use the same SQL for
       // any number of seqNrs.
       val inList = seqNrs.map(_ => "?").mkString(", ")
       s"DELETE FROM $table WHERE persistence_id = ? AND seq_nr IN ($inList)"

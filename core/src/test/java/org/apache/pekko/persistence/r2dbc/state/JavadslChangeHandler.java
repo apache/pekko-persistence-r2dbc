@@ -29,8 +29,8 @@ public class JavadslChangeHandler implements ChangeHandler<String> {
 
   public JavadslChangeHandler(ActorSystem<?> system) {
     String dialect = system.settings().config().getString("pekko.persistence.r2dbc.dialect");
-    // MySQL uses ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
-    if ("mysql".equals(dialect)) {
+    // MySQL and MariaDB use ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
+    if ("mysql".equals(dialect) || "mariadb".equals(dialect)) {
       this.insertSql = "insert into changes_test (pid, rev, the_value) values (?, ?, ?)";
     } else {
       this.insertSql = "insert into changes_test (pid, rev, the_value) values ($1, $2, $3)";

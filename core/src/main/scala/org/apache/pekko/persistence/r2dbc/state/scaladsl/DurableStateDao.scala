@@ -101,7 +101,7 @@ import org.slf4j.LoggerFactory
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
-      case Dialect.MySQL =>
+      case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tables =

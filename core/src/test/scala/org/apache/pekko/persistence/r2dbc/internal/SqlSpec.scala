@@ -13,6 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
+import org.apache.pekko
+import pekko.persistence.r2dbc.Dialect
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,6 +39,13 @@ class SqlSpec extends AnyWordSpec with TestSuite with Matchers {
     "replace bind parameters after standard string interpolation" in {
       val where = "where a = ? and b = ?"
       sql"select * from foo $where" shouldBe "select * from foo where a = $1 and b = $2"
+    }
+
+    "keep ? bind parameters for the MySQL and MariaDB dialects" in {
+      val sql = "select * from foo where a = ? and b = ?"
+      Sql.DialectOps(Dialect.MariaDB).replaceParameters(sql) shouldBe sql
+      Sql.DialectOps(Dialect.MySQL).replaceParameters(sql) shouldBe sql
+      Sql.DialectOps(Dialect.Postgres).replaceParameters(sql) shouldBe "select * from foo where a = $1 and b = $2"
     }
 
     "trim line breaks" in {

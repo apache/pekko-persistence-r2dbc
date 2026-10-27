@@ -53,9 +53,9 @@ object DurableStateStoreChangeHandlerSpec {
 
   val dialect: String = config.getString("pekko.persistence.r2dbc.dialect")
 
-  // MySQL uses ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
+  // MySQL and MariaDB use ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
   private val insertSql: String =
-    if (dialect == "mysql") "insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
+    if (dialect == "mysql" || dialect == "mariadb") "insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
     else sql"insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
 
   class Handler(system: ActorSystem[?]) extends ChangeHandler[String] {

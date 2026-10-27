@@ -10,7 +10,7 @@ you can migrate most of the data while the system is online and then have a shor
 migrating the remaining data that was written after the previous online migration.
 
 The migration tool writes with `ON CONFLICT`, so it only supports PostgreSQL and Yugabyte as target databases, not
-MySQL or H2.
+MySQL, MariaDB or H2.
 
 ## Dependencies
 

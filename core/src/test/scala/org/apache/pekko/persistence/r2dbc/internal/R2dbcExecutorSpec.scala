@@ -56,7 +56,8 @@ class R2dbcExecutorSpec
     with LogCapturing {
 
   override def withFixture(test: NoArgTest): Outcome =
-    if (R2dbcExecutorSpec.dialect == "mysql" || R2dbcExecutorSpec.dialect == "h2") {
+    if (R2dbcExecutorSpec.dialect == "mysql" || R2dbcExecutorSpec.dialect == "mariadb" ||
+      R2dbcExecutorSpec.dialect == "h2") {
       Pending // uses pg_sleep which is Postgres-specific
     } else {
       super.withFixture(test)

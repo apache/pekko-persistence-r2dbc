@@ -42,6 +42,17 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
       connectionFactorySettings.urlOption should not be defined
     }
 
+    "parse the mariadb dialect" in {
+      Dialect.fromString("mariadb") shouldBe Dialect.MariaDB
+      Dialect.fromString("MariaDB") shouldBe Dialect.MariaDB
+      // unresolved and without system properties, the dialect system property of the test run would override it
+      val config = ConfigFactory
+        .parseString("pekko.persistence.r2dbc.dialect=mariadb")
+        .withFallback(ConfigFactory.defaultReferenceUnresolved())
+        .resolve()
+      JournalSettings(config.getConfig("pekko.persistence.r2dbc.journal")).dialect shouldBe Dialect.MariaDB
+    }
+
     "support connection settings build from url" in {
       val config =
         ConfigFactory

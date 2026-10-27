@@ -79,6 +79,47 @@ Yugabyte:
 docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t < ddl-scripts/create_tables_yugabyte.sql
 ```
 
+### MariaDB
+
+MariaDB 10.11 or later is supported.
+
+The MariaDB R2DBC driver is not included as a dependency of the plugin, add it to your build:
+
+@@dependency [Maven,sbt,Gradle] {
+  group=org.mariadb
+  artifact=r2dbc-mariadb
+  version=$r2dbc-mariadb.version$
+}
+
+Enable it with:
+
+@@snip [application.conf](/docs/src/test/resources/application-mariadb.conf) { #connection-settings }
+
+The MariaDB dialect requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, since MariaDB has no
+transaction timestamp like Postgres.
+
+The driver doesn't support `java.time.Instant`, so the plugin binds and reads timestamps as `LocalDateTime` in UTC, and
+sets the `timezone` option of the driver to `UTC` so that the database session uses the UTC time zone. Don't override
+the `timezone` option, for example in the connection `url` or with a `connection-factory-options-customizer`.
+
+A database for local testing can be run in Docker:
+
+@@snip [docker-compose.yml](/docker/docker-compose-mariadb.yml)
+
+```
+docker compose -f docker/docker-compose-mariadb.yml up --wait
+```
+
+MariaDB uses the same tables and indexes as MySQL:
+
+@@snip [create_tables.sql](/ddl-scripts/create_tables_mysql.sql)
+
+The ddl script can be run in Docker with:
+
+```
+docker exec -i docker-mariadb-db-1 mariadb --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
+```
+
 <a id="h2"></a>
 ### H2
 

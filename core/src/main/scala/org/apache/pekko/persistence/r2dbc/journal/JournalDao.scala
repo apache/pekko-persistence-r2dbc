@@ -93,7 +93,7 @@ private[r2dbc] object JournalDao {
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>
         new JournalDao(settings, connectionFactory, closeCallsExceeding)
-      case Dialect.MySQL =>
+      case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLJournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tablesConnectionFactory = H2Connections.creatingTables(

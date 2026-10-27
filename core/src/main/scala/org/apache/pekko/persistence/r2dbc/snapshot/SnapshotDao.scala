@@ -30,6 +30,7 @@ import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.snapshot.mariadb.MariaDBSnapshotDao
 import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
 import pekko.persistence.r2dbc.snapshot.h2.H2SnapshotDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
@@ -70,6 +71,8 @@ private[r2dbc] object SnapshotDao {
         new SnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL =>
         new MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.MariaDB =>
+        new MariaDBSnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,
