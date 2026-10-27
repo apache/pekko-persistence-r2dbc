@@ -70,8 +70,8 @@ class EventsBySliceStartingFromSnapshotSmallBufferSpec
   private val numberOfEvents = 33
   private val snapshotSeqNr = 30
 
-  private def expectedSnapshotEvent(prefix: String, seqNr: Long): String =
-    (1L to seqNr).map(i => s"$prefix-$i").mkString("|") + "-snap"
+  private def expectedSnapshotEvent(prefix: String, seqNr: Long): String = (1L to seqNr).map(i =>
+    s"$prefix-$i").mkString("|") + "-snap"
 
   // more than buffer-size events before the snapshot of entity B, all filtered by the snapshot
   private def setup(): String = {
