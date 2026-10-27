@@ -20,9 +20,10 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class SqlSpec extends AnyWordSpec with TestSuite with Matchers {
-  import Sql.Interpolation
 
   "SQL string interpolation" should {
+    import Sql.Interpolation
+
     "replace ? bind parameters with numbered $ (avoiding escaped ones)" in {
       sql"select * from bar where a = ? and qa = 'Question?? Answer!'" shouldBe
       "select * from bar where a = $1 and qa = 'Question? Answer!'"
@@ -55,6 +56,39 @@ class SqlSpec extends AnyWordSpec with TestSuite with Matchers {
           a = ? and
           b = ?
         """ shouldBe "select * from foo where a = $1 and b = $2"
+    }
+  }
+
+  "SQL string interpolation for Oracle" should {
+    import Sql.DialectInterpolation
+    implicit val dialect: Dialect = Dialect.Oracle
+
+    "keep ? bind parameters" in {
+      sql"select * from bar where a = ? and b = ?" shouldBe "select * from bar where a = ? and b = ?"
+    }
+
+    "replace a trailing LIMIT with FETCH FIRST" in {
+      sql"""
+        select * from bar where a = ?
+        order by b
+        LIMIT ?
+        """ shouldBe "select * from bar where a = ? order by b FETCH FIRST ? ROWS ONLY"
+      sql"select * from bar order by b limit 1" shouldBe "select * from bar order by b FETCH FIRST 1 ROWS ONLY"
+    }
+
+    "not replace LIMIT that isn't at the end" in {
+      sql"select limit_col from bar where a = ?" shouldBe "select limit_col from bar where a = ?"
+      sql"select * from bar where note = 'LIMIT ?' and a = ?" shouldBe
+      "select * from bar where note = 'LIMIT ?' and a = ?"
+    }
+  }
+
+  "SQL string interpolation for Postgres" should {
+    import Sql.DialectInterpolation
+    implicit val dialect: Dialect = Dialect.Postgres
+
+    "keep LIMIT" in {
+      sql"select * from bar order by b LIMIT ?" shouldBe "select * from bar order by b LIMIT $1"
     }
   }
 

@@ -40,6 +40,7 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.query.scaladsl.mysql.MySQLQueryDao
+import pekko.persistence.r2dbc.query.scaladsl.oracle.OracleQueryDao
 import pekko.persistence.r2dbc.query.scaladsl.h2.H2QueryDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
@@ -73,6 +74,8 @@ object QueryDao {
         new QueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLQueryDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleQueryDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         // the query may be used without the journal plugin in the same process
         val tablesConnectionFactory = H2Connections.creatingTables(
