@@ -61,6 +61,7 @@ import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
+import pekko.persistence.r2dbc.state.scaladsl.oracle.OracleDurableStateDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 
@@ -112,6 +113,8 @@ import com.typesafe.config.Config
         new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleDurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tables =
           (settings.durableStateTableWithSchema +:

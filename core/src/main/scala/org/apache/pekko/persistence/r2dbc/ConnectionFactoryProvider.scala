@@ -45,6 +45,7 @@ import pekko.persistence.r2dbc.internal.ConnectionAdapter
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
+import pekko.persistence.r2dbc.internal.oracle.OracleConnections
 
 import org.slf4j.LoggerFactory
 
@@ -259,6 +260,8 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
     if (MariaDBConnections.isMariaDB(options))
       // Instants are bound and read as UTC LocalDateTime, which requires the UTC session time zone
       (ConnectionFactories.get(MariaDBConnections.requireUtcTimezone(options)), Some(MariaDBConnections))
+    else if (OracleConnections.isOracle(options))
+      (ConnectionFactories.get(options), Some(OracleConnections))
     else
       (ConnectionFactories.get(options), None)
   }

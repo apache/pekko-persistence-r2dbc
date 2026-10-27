@@ -101,7 +101,7 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
   /** Read the tags column of a journal row into a set, honoring the per-dialect storage format. */
   protected def readTags(row: Row): Set[String] =
     journalSettings.dialect match {
-      case Dialect.MySQL | Dialect.MariaDB =>
+      case Dialect.MySQL | Dialect.MariaDB | Dialect.Oracle =>
         MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
       case Dialect.H2 =>
         H2Utils.tagsFromDb(row, "tags")

@@ -46,6 +46,7 @@ import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import pekko.persistence.r2dbc.snapshot.h2.H2SnapshotDao
 import pekko.persistence.r2dbc.snapshot.mariadb.MariaDBSnapshotDao
 import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
+import pekko.persistence.r2dbc.snapshot.oracle.OracleSnapshotDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 
@@ -100,6 +101,8 @@ private[r2dbc] object SnapshotDao {
         new MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MariaDB =>
         new MariaDBSnapshotDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleSnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,

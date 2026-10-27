@@ -375,6 +375,61 @@ jobs:
       - name: test
         run: sbt -Dpekko.persistence.r2dbc.dialect=mariadb ${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
 
+  test-oracle:
+    name: Run tests with Oracle
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        SCALA_VERSION: [ scala213, scala3 ]
+        JAVA_VERSION: [ 17, 21 ]
+    # integration tests only run for the published Scala versions
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout GitHub merge
+        if: github.event.pull_request
+        run: |-
+          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
+          git checkout scratch
+
+      - name: Setup Java ${{ matrix.JAVA_VERSION }}
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.JAVA_VERSION }}
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@057d08c2f9a2c4e7a4d33df3aae657b7db88b8cc # v8.2.0
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Start DB
+        run: |-
+          # the healthcheck of the image waits until the database is open
+          docker compose -f docker/docker-compose-oracle.yml up -d --wait
+          (echo "WHENEVER SQLERROR EXIT SQL.SQLCODE"; cat ddl-scripts/create_tables_oracle.sql) | \
+            docker exec -i docker-oracle-db-1 sqlplus -s pekko/pekko@//localhost/FREEPDB1
+          # Oracle has a schema per user, so the tests use users instead of databases for database1 and database2
+          for user in database1 database2; do
+            printf 'WHENEVER SQLERROR EXIT SQL.SQLCODE\nCREATE USER %s IDENTIFIED BY %s QUOTA UNLIMITED ON users;\nGRANT CREATE SESSION, CREATE TABLE TO %s;\n' \
+                "$user" "$user" "$user" | \
+              docker exec -i docker-oracle-db-1 sqlplus -s system/oracle@//localhost/FREEPDB1
+            (echo "WHENEVER SQLERROR EXIT SQL.SQLCODE"; cat ddl-scripts/create_tables_oracle.sql) | \
+              docker exec -i docker-oracle-db-1 sqlplus -s "$user/$user@//localhost/FREEPDB1"
+          done
+
+      - name: test
+        run: sbt -Dpekko.persistence.r2dbc.dialect=oracle ${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
+
   test-h2:
     name: Run tests with H2
     runs-on: ${{ matrix.OS }}

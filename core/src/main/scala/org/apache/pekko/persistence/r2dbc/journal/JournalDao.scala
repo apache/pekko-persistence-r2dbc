@@ -43,6 +43,7 @@ import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import pekko.persistence.r2dbc.journal.h2.H2JournalDao
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
+import pekko.persistence.r2dbc.journal.oracle.OracleJournalDao
 import pekko.persistence.typed.PersistenceId
 
 import org.slf4j.Logger
@@ -104,6 +105,8 @@ private[r2dbc] object JournalDao {
         new JournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLJournalDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleJournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,
