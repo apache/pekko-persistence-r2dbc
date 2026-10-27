@@ -56,8 +56,9 @@ class R2dbcExecutorSpec
 
   override def withFixture(test: NoArgTest): Outcome =
     TestConfig.dialect match {
-      case Dialect.Postgres | Dialect.Yugabyte          => super.withFixture(test)
-      case Dialect.MySQL | Dialect.MariaDB | Dialect.H2 => Pending // uses pg_sleep which is Postgres-specific
+      case Dialect.Postgres | Dialect.Yugabyte => super.withFixture(test)
+      // uses pg_sleep which is Postgres-specific
+      case Dialect.MySQL | Dialect.MariaDB | Dialect.Oracle | Dialect.H2 => Pending
     }
 
   override def typedSystem: ActorSystem[?] = system
@@ -71,7 +72,11 @@ class R2dbcExecutorSpec
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
+    // the tests are pending for Oracle, which has no text column type
+    if (TestConfig.dialect != Dialect.Oracle) createTable()
+  }
 
+  private def createTable(): Unit = {
     Await.result(
       r2dbcExecutor.executeDdl(s"beforeAll create table $table")(
         _.createStatement(s"create table if not exists $table (col text)")),

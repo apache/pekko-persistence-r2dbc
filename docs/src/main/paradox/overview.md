@@ -9,6 +9,8 @@ It is specifically designed to work well for distributed SQL databases.
 
 [MariaDB](https://mariadb.org) 10.11 or later is supported, see @ref:[MariaDB](getting-started.md#mariadb).
 
+[Oracle Database](https://www.oracle.com/database/) 23ai or later is supported, see @ref:[Oracle](getting-started.md#oracle).
+
 [H2](https://h2database.com) is supported as an in-process database, for example for tests or small single-node
 applications, see @ref:[H2](getting-started.md#h2).
 

@@ -35,6 +35,7 @@ import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
+import pekko.persistence.r2dbc.journal.oracle.OracleJournalDao
 import pekko.persistence.r2dbc.journal.h2.H2JournalDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
@@ -101,6 +102,8 @@ private[r2dbc] object JournalDao {
         new JournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLJournalDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleJournalDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,

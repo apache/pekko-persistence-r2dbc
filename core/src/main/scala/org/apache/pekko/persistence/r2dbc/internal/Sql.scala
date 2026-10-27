@@ -37,6 +37,8 @@ object Sql {
           fillInParameterNumbers(sql)
         case Dialect.MySQL | Dialect.MariaDB =>
           sql
+        case Dialect.Oracle =>
+          replaceLimit(sql)
       }
     }
   }
@@ -92,6 +94,14 @@ object Sql {
       sb.toString
     }
   }
+
+  private val TrailingLimit = """(?i)\bLIMIT\s+(\?|\d+)$""".r
+
+  /**
+   * Oracle doesn't support `LIMIT`, so a trailing `LIMIT ?` or `LIMIT n` is replaced with `FETCH FIRST ? ROWS ONLY`.
+   */
+  private def replaceLimit(sql: String): String =
+    TrailingLimit.replaceFirstIn(sql, "FETCH FIRST $1 ROWS ONLY")
 
   private def trimLineBreaks(sql: String): String = {
     if (sql.indexOf('\n') == -1) {
