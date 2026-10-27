@@ -23,8 +23,9 @@ services:
       - 3306:3306
     environment:
       MARIADB_ROOT_PASSWORD: root
-      # a non-UTC server time zone, so that tests verify that the plugin uses UTC sessions
-      TZ: Asia/Tokyo
+      # a server time zone with daylight saving time, so that tests verify that the plugin uses UTC sessions, see
+      # MariaDBTimeZoneSpec and DbTimestampDstSpec
+      TZ: America/New_York
     healthcheck:
       test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
       interval: 1s
