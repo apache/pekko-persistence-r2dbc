@@ -37,8 +37,6 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.query.scaladsl.QueryDao
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Outcome
-import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
 
 object DbTimestampDstSpec {
@@ -66,10 +64,6 @@ class DbTimestampDstSpec
   override def typedSystem: ActorSystem[?] = system
 
   override implicit def patienceConfig: PatienceConfig = PatienceConfig(10.seconds)
-
-  override def withFixture(test: NoArgTest): Outcome =
-    if (TestConfig.dialect == Dialect.MySQL) Pending // https://github.com/apache/pekko-persistence-r2dbc/issues/533
-    else super.withFixture(test)
 
   // MySQL and MariaDB convert TIMESTAMP values with the session time zone
   private val serverTimeZoneMatters = TestConfig.dialect match {

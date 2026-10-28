@@ -198,9 +198,12 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
     }
 
     if (settings.driver == "mysql") {
-      // Either `connectionTimeZone = SERVER` or `forceConnectionTimeZoneToSession = true` need to be set for timezones to work correctly,
-      // likely caused by bug in https://github.com/asyncer-io/r2dbc-mysql/pull/240.
-      builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
+      // Instants are converted with the connection time zone, which must be the session time zone for timestamps to be
+      // stored correctly, see https://github.com/asyncer-io/r2dbc-mysql/pull/240. UTC has no ambiguous local times when
+      // daylight saving time ends, and the server time zone may not be resolvable by the driver (e.g. `EDT`), see
+      // https://github.com/apache/pekko-persistence-r2dbc/issues/533.
+      builder.option(Option.valueOf("connectionTimeZone"), "UTC")
+      builder.option(Option.valueOf("forceConnectionTimeZoneToSession"), java.lang.Boolean.TRUE)
     }
 
     val options = customizer(builder, config).build()
