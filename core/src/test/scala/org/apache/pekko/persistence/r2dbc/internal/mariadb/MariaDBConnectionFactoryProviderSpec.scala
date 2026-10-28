@@ -18,13 +18,17 @@
 package org.apache.pekko.persistence.r2dbc.internal.mariadb
 
 import org.apache.pekko
+import pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import io.r2dbc.pool.ConnectionPool
+import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Wrapped
 import org.scalatest.wordspec.AnyWordSpecLike
 
 object MariaDBConnectionFactoryProviderSpec {
@@ -62,6 +66,16 @@ class MariaDBConnectionFactoryProviderSpec
   "ConnectionFactoryProvider with the MariaDB driver" should {
     "create the connection factory with the UTC session time zone" in {
       ConnectionFactoryProvider(system).connectionFactoryFor("mariadb-default") should not be null
+    }
+
+    "dispose the wrapped connection pool at shutdown" in {
+      val testKit = ActorTestKit(MariaDBConnectionFactoryProviderSpec.config)
+      val connectionFactory = ConnectionFactoryProvider(testKit.system).connectionFactoryFor("mariadb-default")
+      val pool = connectionFactory.asInstanceOf[Wrapped[ConnectionFactory]].unwrap()
+      pool shouldBe a[ConnectionPool]
+      pool.asInstanceOf[ConnectionPool].isDisposed shouldBe false
+      testKit.shutdownTestKit()
+      pool.asInstanceOf[ConnectionPool].isDisposed shouldBe true
     }
 
     "fail if a connection-factory-options-customizer sets another session time zone" in {

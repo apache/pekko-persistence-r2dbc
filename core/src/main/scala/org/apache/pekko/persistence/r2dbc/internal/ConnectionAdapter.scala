@@ -39,6 +39,7 @@ import io.r2dbc.spi.RowMetadata
 import io.r2dbc.spi.Statement
 import io.r2dbc.spi.TransactionDefinition
 import io.r2dbc.spi.ValidationDepth
+import io.r2dbc.spi.Wrapped
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -99,8 +100,11 @@ private[r2dbc] object ConnectionAdapter {
       if (localDateTime == null) null else localDateTime.toInstant(ZoneOffset.UTC)
   }
 
-  private final class AdaptedConnectionFactory(underlying: ConnectionFactory, adapter: ConnectionAdapter)
-      extends ConnectionFactory {
+  // Wrapped, like the connection pool, so that the wrapped connection factory can be disposed
+  private[internal] final class AdaptedConnectionFactory(underlying: ConnectionFactory, adapter: ConnectionAdapter)
+      extends ConnectionFactory
+      with Wrapped[ConnectionFactory] {
+    override def unwrap(): ConnectionFactory = underlying
     override def create(): Publisher[? <: Connection] =
       Mono.from[Connection](underlying.create()).map[Connection]((connection: Connection) =>
         new AdaptedConnection(connection, adapter))
@@ -108,7 +112,16 @@ private[r2dbc] object ConnectionAdapter {
     override def getMetadata: ConnectionFactoryMetadata = underlying.getMetadata
   }
 
-  private final class AdaptedConnection(underlying: Connection, adapter: ConnectionAdapter) extends Connection {
+  private[internal] final class AdaptedConnection(underlying: Connection, adapter: ConnectionAdapter)
+      extends Connection
+      with Wrapped[Connection] {
+    // The underlying connection is the pooled connection, which unwraps to the driver connection. Unwrapping to the
+    // driver connection directly behaves the same as the pooled connections of the other databases.
+    override def unwrap(): Connection =
+      underlying match {
+        case wrapped: Wrapped[Connection] @unchecked => wrapped.unwrap()
+        case connection                              => connection
+      }
     override def beginTransaction(): Publisher[Void] = underlying.beginTransaction()
     override def beginTransaction(definition: TransactionDefinition): Publisher[Void] =
       underlying.beginTransaction(definition)

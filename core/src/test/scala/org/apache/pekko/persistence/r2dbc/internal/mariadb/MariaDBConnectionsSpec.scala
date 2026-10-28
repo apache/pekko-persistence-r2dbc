@@ -17,6 +17,8 @@
 
 package org.apache.pekko.persistence.r2dbc.internal.mariadb
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
 import java.time.Instant
 import java.time.LocalDateTime
 
@@ -28,11 +30,14 @@ import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.internal.ConnectionAdapter
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
 import io.r2dbc.spi.Result
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.RowMetadata
 import io.r2dbc.spi.Statement
+import io.r2dbc.spi.Wrapped
 import org.reactivestreams.Publisher
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
@@ -97,6 +102,32 @@ class MariaDBConnectionsSpec extends AnyWordSpec with TestSuite with Matchers {
     "read null timestamp as null Instant" in {
       val row = new ConnectionAdapter.AdaptedRow(new LocalDateTimeRow(null), MariaDBConnections)
       row.get("ts", classOf[Instant]) shouldBe null
+    }
+
+    "unwrap to the driver connection" in {
+      val driverConnection = stubConnection(unwrapTo = None)
+      val pooledConnection = stubConnection(unwrapTo = Some(driverConnection))
+
+      // the adapter wraps the pooled connection, which unwraps to the driver connection
+      val adapted: Connection = new ConnectionAdapter.AdaptedConnection(pooledConnection, MariaDBConnections)
+      adapted.asInstanceOf[Wrapped[Connection]].unwrap() shouldBe theSameInstanceAs(driverConnection)
+
+      // and a connection that isn't wrapped is the driver connection
+      val notPooled: Connection = new ConnectionAdapter.AdaptedConnection(driverConnection, MariaDBConnections)
+      notPooled.asInstanceOf[Wrapped[Connection]].unwrap() shouldBe theSameInstanceAs(driverConnection)
+    }
+
+    "unwrap the connection factory to the wrapped connection factory" in {
+      val connectionFactory = java.lang.reflect.Proxy
+        .newProxyInstance(
+          getClass.getClassLoader,
+          Array[Class[?]](classOf[ConnectionFactory]),
+          new InvocationHandler {
+            override def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef = null
+          })
+        .asInstanceOf[ConnectionFactory]
+      MariaDBConnections.wrap(connectionFactory).asInstanceOf[Wrapped[ConnectionFactory]].unwrap() shouldBe
+      theSameInstanceAs(connectionFactory)
     }
 
     "detect the MariaDB driver" in {
@@ -189,6 +220,24 @@ class MariaDBConnectionsSpec extends AnyWordSpec with TestSuite with Matchers {
           connectionFactoryConfig("url = \"r2dbc:pool:mariadb://localhost:3306/db\""))
       }.getMessage should include("The mariadb dialect requires the MariaDB driver")
     }
+  }
+
+  // a connection that is Wrapped and unwraps to the given connection, like the pooled connections of r2dbc-pool
+  private def stubConnection(unwrapTo: Option[Connection]): Connection = {
+    val interfaces = unwrapTo match {
+      case Some(_) => Array[Class[?]](classOf[Connection], classOf[Wrapped[?]])
+      case None    => Array[Class[?]](classOf[Connection])
+    }
+    java.lang.reflect.Proxy
+      .newProxyInstance(
+        getClass.getClassLoader,
+        interfaces,
+        new InvocationHandler {
+          override def invoke(proxy: Any, method: Method, args: Array[AnyRef]): AnyRef =
+            if (method.getName == "unwrap" && method.getParameterCount == 0) unwrapTo.orNull
+            else null
+        })
+      .asInstanceOf[Connection]
   }
 
   private def withTimezone(timezone: String): ConnectionFactoryOptions =
