@@ -53,6 +53,7 @@ import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import com.typesafe.config.Config
@@ -94,9 +95,10 @@ import org.slf4j.LoggerFactory
       settings: StateSettings,
       config: Config
   )(implicit system: ActorSystem[?], ec: ExecutionContext): DurableStateDao = {
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    MariaDBConnections.requireMatchingDialect(settings.dialect, connectionFactoryConfig)
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
     val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>

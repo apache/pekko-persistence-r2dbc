@@ -36,6 +36,7 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.journal.h2.H2JournalDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import pekko.persistence.typed.PersistenceId
 import com.typesafe.config.Config
 import io.r2dbc.spi.Connection
@@ -86,9 +87,10 @@ private[r2dbc] object JournalDao {
       settings: JournalSettings,
       config: Config
   )(implicit system: ActorSystem[?], ec: ExecutionContext): JournalDao = {
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    MariaDBConnections.requireMatchingDialect(settings.dialect, connectionFactoryConfig)
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
     val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>

@@ -21,6 +21,7 @@ import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.TestActors.Persister
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -40,8 +41,6 @@ class PersistTagsSpec
   private val settings = JournalSettings(system.settings.config.getConfig("pekko.persistence.r2dbc.journal"))
 
   case class Row(pid: String, seqNr: Long, tags: Set[String])
-
-  private lazy val dialect = system.settings.config.getString("pekko.persistence.r2dbc.journal.dialect")
 
   "Persist tags" should {
     "be the same for events stored in same transaction" in {
@@ -70,15 +69,16 @@ class PersistTagsSpec
             connection => connection.createStatement(s"select * from ${settings.journalTableWithSchema}"),
             row => {
               val tags =
-                if (dialect == "mysql" || dialect == "mariadb") {
-                  MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
-                } else if (dialect == "h2") {
-                  H2Utils.tagsFromDb(row, "tags")
-                } else {
-                  row.get("tags", classOf[Array[String]]) match {
-                    case null      => Set.empty[String]
-                    case tagsArray => tagsArray.toSet
-                  }
+                settings.dialect match {
+                  case Dialect.MySQL | Dialect.MariaDB =>
+                    MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
+                  case Dialect.H2 =>
+                    H2Utils.tagsFromDb(row, "tags")
+                  case Dialect.Postgres | Dialect.Yugabyte =>
+                    row.get("tags", classOf[Array[String]]) match {
+                      case null      => Set.empty[String]
+                      case tagsArray => tagsArray.toSet
+                    }
                 }
               Row(
                 pid = row.get("persistence_id", classOf[String]),

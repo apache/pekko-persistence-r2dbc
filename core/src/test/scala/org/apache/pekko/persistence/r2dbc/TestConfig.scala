@@ -13,6 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc
 
+import org.apache.pekko
+import pekko.persistence.r2dbc.internal.Sql
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
@@ -107,6 +109,12 @@ object TestConfig {
   }
 
   lazy val config: Config = ConfigFactory.load(unresolvedConfig)
+
+  /** The dialect of the test run. */
+  lazy val dialect: Dialect = Dialect.fromString(config.getString("pekko.persistence.r2dbc.dialect"))
+
+  /** Replaces `?` with the bind parameter markers of the dialect of the test run. */
+  def dialectSql(sql: String): String = Sql.DialectOps(dialect).replaceParameters(sql)
 
   val backtrackingDisabledConfig: Config =
     ConfigFactory.parseString("pekko.persistence.r2dbc.backtracking.enabled = off")

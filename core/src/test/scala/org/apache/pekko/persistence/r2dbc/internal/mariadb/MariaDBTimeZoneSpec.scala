@@ -25,15 +25,12 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestDbLifecycle
 import org.scalatest.Outcome
 import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
-
-object MariaDBTimeZoneSpec {
-  val dialect: String = TestConfig.config.getString("pekko.persistence.r2dbc.dialect")
-}
 
 /**
  * Instants are bound and read as UTC LocalDateTime with the MariaDB driver, which is only correct when the session time
@@ -48,7 +45,7 @@ class MariaDBTimeZoneSpec
   override def typedSystem: ActorSystem[?] = system
 
   override def withFixture(test: NoArgTest): Outcome =
-    if (MariaDBTimeZoneSpec.dialect == "mariadb") super.withFixture(test)
+    if (TestConfig.dialect == Dialect.MariaDB) super.withFixture(test)
     else Pending // only for the MariaDB driver
 
   "MariaDB connections" should {

@@ -161,7 +161,12 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, timeout.toJava)
     }
 
-    if (settings.sslEnabled) {
+    val mariaDB = MariaDBConnections.isMariaDB(builder.build())
+
+    if (settings.sslEnabled && mariaDB) {
+      // the MariaDB driver ignores the SSL option and has its own names and values for the other options
+      MariaDBConnections.sslOptions(settings).foreach { case (option, value) => builder.option(option, value) }
+    } else if (settings.sslEnabled) {
       builder.option(ConnectionFactoryOptions.SSL, java.lang.Boolean.TRUE)
 
       if (settings.sslMode.nonEmpty)
@@ -186,15 +191,12 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
     }
 
-    if (MariaDBConnections.isMariaDB(builder.build())) {
-      // Instants are bound and read as UTC LocalDateTime, see MariaDBConnections
-      builder.option(MariaDBConnections.TimezoneOption, "UTC")
-    }
-
     val options = customizer(builder, config).build()
-    val connectionFactory = ConnectionFactories.get(options)
-    if (MariaDBConnections.isMariaDB(options)) MariaDBConnections.wrap(connectionFactory)
-    else connectionFactory
+    if (MariaDBConnections.isMariaDB(options))
+      // Instants are bound and read as UTC LocalDateTime, which requires the UTC session time zone
+      MariaDBConnections.wrap(ConnectionFactories.get(MariaDBConnections.requireUtcTimezone(options)))
+    else
+      ConnectionFactories.get(options)
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,

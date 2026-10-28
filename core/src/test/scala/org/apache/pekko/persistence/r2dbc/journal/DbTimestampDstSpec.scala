@@ -30,6 +30,7 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -41,7 +42,6 @@ import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
 
 object DbTimestampDstSpec {
-  val dialect: String = TestConfig.config.getString("pekko.persistence.r2dbc.dialect")
 
   /**
    * The time zone of the MySQL and MariaDB database containers, see `docker/docker-compose-*.yml`. It must observe
@@ -68,10 +68,14 @@ class DbTimestampDstSpec
   override implicit def patienceConfig: PatienceConfig = PatienceConfig(10.seconds)
 
   override def withFixture(test: NoArgTest): Outcome =
-    if (DbTimestampDstSpec.dialect == "mysql") Pending // https://github.com/apache/pekko-persistence-r2dbc/issues/533
+    if (TestConfig.dialect == Dialect.MySQL) Pending // https://github.com/apache/pekko-persistence-r2dbc/issues/533
     else super.withFixture(test)
 
-  private val serverTimeZoneMatters = Set("mysql", "mariadb").contains(DbTimestampDstSpec.dialect)
+  // MySQL and MariaDB convert TIMESTAMP values with the session time zone
+  private val serverTimeZoneMatters = TestConfig.dialect match {
+    case Dialect.MySQL | Dialect.MariaDB                  => true
+    case Dialect.Postgres | Dialect.Yugabyte | Dialect.H2 => false
+  }
 
   private lazy val journalDao =
     JournalDao.fromConfig(journalSettings, ConfigFactory.empty())(system, system.executionContext)

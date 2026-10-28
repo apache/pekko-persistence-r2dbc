@@ -34,6 +34,7 @@ import pekko.persistence.r2dbc.snapshot.mariadb.MariaDBSnapshotDao
 import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
 import pekko.persistence.r2dbc.snapshot.h2.H2SnapshotDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import pekko.persistence.typed.PersistenceId
 import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
@@ -62,9 +63,10 @@ private[r2dbc] object SnapshotDao {
       settings: SnapshotSettings,
       config: Config
   )(implicit system: ActorSystem[?], ec: ExecutionContext): SnapshotDao = {
+    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
+    MariaDBConnections.requireMatchingDialect(settings.dialect, connectionFactoryConfig)
     val connectionFactory =
       ConnectionFactoryProvider(system).connectionFactoryFor(settings.useConnectionFactory, config)
-    val connectionFactoryConfig = config.withFallback(system.settings.config).getConfig(settings.useConnectionFactory)
     val closeCallsExceeding = ConnectionFactorySettings.closeCallsExceeding(connectionFactoryConfig)
     settings.dialect match {
       case Dialect.Postgres | Dialect.Yugabyte =>

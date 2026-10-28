@@ -22,6 +22,7 @@ import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.ConnectionFactorySettings
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -44,8 +45,6 @@ object R2dbcExecutorSpec {
     }
     """)
     .withFallback(TestConfig.config)
-
-  val dialect = config.getString("pekko.persistence.r2dbc.dialect")
 }
 
 class R2dbcExecutorSpec
@@ -56,11 +55,9 @@ class R2dbcExecutorSpec
     with LogCapturing {
 
   override def withFixture(test: NoArgTest): Outcome =
-    if (R2dbcExecutorSpec.dialect == "mysql" || R2dbcExecutorSpec.dialect == "mariadb" ||
-      R2dbcExecutorSpec.dialect == "h2") {
-      Pending // uses pg_sleep which is Postgres-specific
-    } else {
-      super.withFixture(test)
+    TestConfig.dialect match {
+      case Dialect.Postgres | Dialect.Yugabyte          => super.withFixture(test)
+      case Dialect.MySQL | Dialect.MariaDB | Dialect.H2 => Pending // uses pg_sleep which is Postgres-specific
     }
 
   override def typedSystem: ActorSystem[?] = system

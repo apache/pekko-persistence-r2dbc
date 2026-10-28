@@ -25,7 +25,7 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
-import pekko.persistence.r2dbc.snapshot.SnapshotDao
+import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
 
 /**
  * INTERNAL API
@@ -35,7 +35,7 @@ private[r2dbc] class MariaDBSnapshotDao(
     settings: SnapshotSettings, connectionFactory: ConnectionFactory,
     closeCallsExceeding: Option[FiniteDuration] = None
 )(implicit ec: ExecutionContext, system: ActorSystem[?])
-    extends SnapshotDao(settings, connectionFactory, closeCallsExceeding) {
+    extends MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding) {
 
   // MariaDB doesn't support the `AS excluded` row alias of MySQL, the inserted values are referenced with VALUES()
   override val upsertSql = sql"""

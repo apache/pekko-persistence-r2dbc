@@ -98,9 +98,16 @@ Enable it with:
 The MariaDB dialect requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, since MariaDB has no
 transaction timestamp like Postgres.
 
+The `mariadb` dialect must be used with the MariaDB driver, and the MariaDB driver with the `mariadb` dialect.
+
 The driver doesn't support `java.time.Instant`, so the plugin binds and reads timestamps as `LocalDateTime` in UTC, and
-sets the `timezone` option of the driver to `UTC` so that the database session uses the UTC time zone. Don't override
-the `timezone` option, for example in the connection `url` or with a `connection-factory-options-customizer`.
+sets the `timezone` option of the driver to UTC so that the database session uses the UTC time zone. The plugin fails to
+start if the connection `url` or a `connection-factory-options-customizer` sets another `timezone`.
+
+The `ssl` settings are passed to the driver as its own options. `mode` can be `require` (encryption without
+certificate verification), `verify-ca` or `verify-full`, which is used when `mode` is empty. `root-cert`, `cert`, `key`
+and `password` are passed as the `serverSslCert`, `clientSslCert`, `clientSslKey` and `clientSslPassword` options of the
+driver.
 
 A database for local testing can be run in Docker:
 

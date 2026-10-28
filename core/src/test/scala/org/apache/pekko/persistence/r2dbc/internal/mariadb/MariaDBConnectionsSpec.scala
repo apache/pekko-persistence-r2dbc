@@ -23,7 +23,11 @@ import java.time.LocalDateTime
 import scala.collection.mutable
 
 import org.apache.pekko
+import pekko.persistence.r2dbc.ConnectionFactorySettings
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.internal.ConnectionAdapter
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
 import io.r2dbc.spi.Result
 import io.r2dbc.spi.Row
@@ -104,8 +108,104 @@ class MariaDBConnectionsSpec extends AnyWordSpec with TestSuite with Matchers {
       driver("mysql") shouldBe false
       driver("postgresql") shouldBe false
       url("r2dbc:mariadb://localhost:3306/db") shouldBe true
-      url("r2dbc:pool:mariadb://localhost:3306/db") shouldBe true
       url("r2dbc:mysql://localhost:3306/db") shouldBe false
+      // the plugin has its own connection pool, a pool url would nest r2dbc-pool in it
+      url("r2dbc:pool:mariadb://localhost:3306/db") shouldBe false
+    }
+
+    "set the UTC session time zone" in {
+      val options = ConnectionFactoryOptions.builder().option(ConnectionFactoryOptions.DRIVER, "mariadb").build()
+      MariaDBConnections.requireUtcTimezone(options).getValue(MariaDBConnections.TimezoneOption) shouldBe "+00:00"
+    }
+
+    "accept a UTC session time zone" in {
+      for (timezone <- Seq("+00:00", "UTC", "Z", "Etc/UTC")) {
+        val options = withTimezone(timezone)
+        MariaDBConnections.requireUtcTimezone(options) shouldBe options
+      }
+    }
+
+    "fail for another session time zone" in {
+      for (timezone <- Seq("auto", "disable", "SYSTEM", "Europe/Vilnius", "+02:00")) {
+        intercept[IllegalArgumentException] {
+          MariaDBConnections.requireUtcTimezone(withTimezone(timezone))
+        }.getMessage should include(s"must be UTC, but is [$timezone]")
+      }
+    }
+
+    "map the ssl settings to the options of the MariaDB driver" in {
+      sslOptions("""
+        ssl.enabled = on
+        ssl.mode = "verify-ca"
+        ssl.root-cert = "/certs/ca.pem"
+        ssl.cert = "/certs/client-cert.pem"
+        ssl.key = "/certs/client-key.pem"
+        ssl.password = "secret"
+        """) shouldBe Map(
+        "sslMode" -> "VERIFY_CA",
+        "serverSslCert" -> "/certs/ca.pem",
+        "clientSslCert" -> "/certs/client-cert.pem",
+        "clientSslKey" -> "/certs/client-key.pem",
+        "clientSslPassword" -> "secret")
+    }
+
+    "map the ssl modes to the modes of the MariaDB driver" in {
+      sslOptions("ssl.mode = \"\"") shouldBe Map("sslMode" -> "VERIFY_FULL")
+      sslOptions("ssl.mode = verify-full") shouldBe Map("sslMode" -> "VERIFY_FULL")
+      sslOptions("ssl.mode = VERIFY-CA") shouldBe Map("sslMode" -> "VERIFY_CA")
+      sslOptions("ssl.mode = require") shouldBe Map("sslMode" -> "TRUST")
+    }
+
+    "fail for ssl modes without an equivalent in the MariaDB driver" in {
+      for (mode <- Seq("allow", "prefer", "tunnel", "disable")) {
+        intercept[IllegalArgumentException] {
+          sslOptions(s"ssl.mode = $mode")
+        }.getMessage should include(s"ssl.mode [$mode] is not supported with the MariaDB driver")
+      }
+    }
+
+    "require the mariadb dialect for the MariaDB driver and the other way around" in {
+      MariaDBConnections.requireMatchingDialect(Dialect.MariaDB, connectionFactoryConfig("driver = mariadb"))
+      MariaDBConnections.requireMatchingDialect(Dialect.MySQL, connectionFactoryConfig("driver = mysql"))
+      MariaDBConnections.requireMatchingDialect(Dialect.Postgres, connectionFactoryConfig("driver = postgres"))
+      MariaDBConnections.requireMatchingDialect(
+        Dialect.MariaDB,
+        connectionFactoryConfig("url = \"r2dbc:mariadb://localhost:3306/db\""))
+
+      intercept[IllegalArgumentException] {
+        MariaDBConnections.requireMatchingDialect(Dialect.MySQL, connectionFactoryConfig("driver = mariadb"))
+      }.getMessage should include("The MariaDB driver requires dialect = mariadb, but the dialect is [mysql]")
+      intercept[IllegalArgumentException] {
+        MariaDBConnections.requireMatchingDialect(
+          Dialect.MySQL,
+          connectionFactoryConfig("url = \"r2dbc:mariadb://localhost:3306/db\""))
+      }.getMessage should include("The MariaDB driver requires dialect = mariadb")
+      intercept[IllegalArgumentException] {
+        MariaDBConnections.requireMatchingDialect(Dialect.MariaDB, connectionFactoryConfig("driver = mysql"))
+      }.getMessage should include("The mariadb dialect requires the MariaDB driver")
+      intercept[IllegalArgumentException] {
+        MariaDBConnections.requireMatchingDialect(
+          Dialect.MariaDB,
+          connectionFactoryConfig("url = \"r2dbc:pool:mariadb://localhost:3306/db\""))
+      }.getMessage should include("The mariadb dialect requires the MariaDB driver")
     }
   }
+
+  private def withTimezone(timezone: String): ConnectionFactoryOptions =
+    ConnectionFactoryOptions
+      .builder()
+      .option(ConnectionFactoryOptions.DRIVER, "mariadb")
+      .option(MariaDBConnections.TimezoneOption, timezone)
+      .build()
+
+  private def connectionFactoryConfig(settings: String): Config =
+    ConfigFactory
+      .parseString(settings)
+      .withFallback(ConfigFactory.defaultReference().getConfig("pekko.persistence.r2dbc.connection-factory"))
+
+  private def sslOptions(settings: String): Map[String, String] =
+    MariaDBConnections
+      .sslOptions(ConnectionFactorySettings(connectionFactoryConfig(settings)))
+      .map { case (option, value) => option.name() -> value }
+      .toMap
 }
