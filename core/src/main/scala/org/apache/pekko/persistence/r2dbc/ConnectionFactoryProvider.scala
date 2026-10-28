@@ -16,6 +16,7 @@ package org.apache.pekko.persistence.r2dbc
 import java.time.{ Duration => JDuration }
 import java.util.concurrent.ConcurrentHashMap
 
+import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.jdk.CollectionConverters._
@@ -31,8 +32,10 @@ import pekko.actor.typed.Extension
 import pekko.actor.typed.ExtensionId
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.NoopCustomizer
+import pekko.persistence.r2dbc.internal.ConnectionAdapter
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
@@ -43,6 +46,7 @@ import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
 import io.r2dbc.spi.Option
+import io.r2dbc.spi.Wrapped
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
   def createExtension(system: ActorSystem[?]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)
@@ -80,13 +84,14 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
 
 class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
 
-  private val sessions = new ConcurrentHashMap[String, ConnectionPool]
+  // the connection pools, or the connection factories that wrap them
+  private val sessions = new ConcurrentHashMap[String, ConnectionFactory]
 
   CoordinatedShutdown(system)
     .addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close connection pools") { () =>
       import system.executionContext
       Future
-        .sequence(sessions.asScala.values.map(_.disposeLater().asFutureDone()))
+        .sequence(sessions.asScala.values.flatMap(connectionPool).map(_.disposeLater().asFutureDone()))
         .map(_ => Done)
     }
 
@@ -102,18 +107,26 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
           val fullConfig = config.withFallback(system.settings.config)
           val connectionFactoryConfig = fullConfig.getConfig(configPath)
           val settings = new ConnectionFactorySettings(connectionFactoryConfig)
-          val connectionFactory =
+          val (connectionFactory, adapter) =
             if (settings.driver == "h2") {
               require(
                 settings.connectionFactoryOptionsCustomizer.isEmpty,
                 "connection-factory-options-customizer is not supported with the h2 driver")
-              H2Connections.create(connectionFactoryConfig.getConfig("h2"))
+              (H2Connections.create(connectionFactoryConfig.getConfig("h2")), None)
             } else
               createConnectionFactory(settings, createConnectionFactoryOptionsCustomizer(settings), fullConfig)
-          createConnectionPoolFactory(settings, connectionFactory)
+          val pool = createConnectionPoolFactory(settings, connectionFactory)
+          // the adapter wraps the pooled connections, so that they unwrap to the driver connections
+          adapter.fold[ConnectionFactory](pool)(_.wrap(pool))
         })
-      .asInstanceOf[ConnectionFactory]
   }
+
+  @tailrec private def connectionPool(connectionFactory: ConnectionFactory): scala.Option[ConnectionPool] =
+    connectionFactory match {
+      case pool: ConnectionPool                           => Some(pool)
+      case wrapped: Wrapped[ConnectionFactory] @unchecked => connectionPool(wrapped.unwrap())
+      case _                                              => None
+    }
 
   private def createConnectionFactoryOptionsCustomizer(
       settings: ConnectionFactorySettings): ConnectionFactoryOptionsCustomizer = {
@@ -132,7 +145,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
 
   private def createConnectionFactory(settings: ConnectionFactorySettings,
       customizer: ConnectionFactoryOptionsCustomizer,
-      config: Config): ConnectionFactory = {
+      config: Config): (ConnectionFactory, scala.Option[ConnectionAdapter]) = {
     val builder =
       settings.urlOption match {
         case Some(url) =>
@@ -160,7 +173,12 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, timeout.toJava)
     }
 
-    if (settings.sslEnabled) {
+    val mariaDB = MariaDBConnections.isMariaDB(builder.build())
+
+    if (settings.sslEnabled && mariaDB) {
+      // the MariaDB driver ignores the SSL option and has its own names and values for the other options
+      MariaDBConnections.sslOptions(settings).foreach { case (option, value) => builder.option(option, value) }
+    } else if (settings.sslEnabled) {
       builder.option(ConnectionFactoryOptions.SSL, java.lang.Boolean.TRUE)
 
       if (settings.sslMode.nonEmpty)
@@ -185,7 +203,12 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
     }
 
-    ConnectionFactories.get(customizer(builder, config).build())
+    val options = customizer(builder, config).build()
+    if (MariaDBConnections.isMariaDB(options))
+      // Instants are bound and read as UTC LocalDateTime, which requires the UTC session time zone
+      (ConnectionFactories.get(MariaDBConnections.requireUtcTimezone(options)), Some(MariaDBConnections))
+    else
+      (ConnectionFactories.get(options), None)
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,

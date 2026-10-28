@@ -113,6 +113,7 @@ lazy val docs = project
       "project.url" -> "https://pekko.apache.org/docs/pekko-persistence-r2dbc/current/",
       "canonical.base_url" -> "https://pekko.apache.org/docs/pekko-persistence-r2dbc/current",
       "pekko.version" -> Dependencies.PekkoVersion,
+      "r2dbc-mariadb.version" -> Dependencies.R2dbcMariadbVersion,
       "h2.version" -> Dependencies.H2Version,
       "r2dbc-h2.version" -> Dependencies.R2dbcH2Version,
       "scala.version" -> scalaVersion.value,

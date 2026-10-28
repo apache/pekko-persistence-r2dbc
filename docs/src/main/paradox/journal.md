@@ -48,7 +48,7 @@ changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
 
 The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, which the
 `batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the
-MySQL dialect requires. With `db-timestamp-monotonic-increasing` the database does not enforce increasing
+MySQL and MariaDB dialects require. With `db-timestamp-monotonic-increasing` the database does not enforce increasing
 timestamps per persistence id, so the application clock must not move backwards between two writes of the
 same entity. The backtracking queries of @ref:[eventsBySlices](query.md) recover events that were stored
 with an out-of-order timestamp. Each write request is stamped when the batch is flushed, just before the

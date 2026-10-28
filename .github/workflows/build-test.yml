@@ -317,6 +317,64 @@ jobs:
       - name: test
         run: sbt -Dpekko.persistence.r2dbc.dialect=mysql ${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
 
+  test-mariadb:
+    name: Run tests with MariaDB
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        SCALA_VERSION: [ scala213, scala3 ]
+        JAVA_VERSION: [ 17, 21 ]
+    # integration tests only run for the published Scala versions
+    if: github.repository == 'apache/pekko-persistence-r2dbc' && github.event_name != 'schedule'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout GitHub merge
+        if: github.event.pull_request
+        run: |-
+          git fetch origin pull/${{ github.event.pull_request.number }}/merge:scratch
+          git checkout scratch
+
+      - name: Setup Java ${{ matrix.JAVA_VERSION }}
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.JAVA_VERSION }}
+
+      - name: Install sbt
+        uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+
+      - name: Cache Coursier cache
+        uses: coursier/cache-action@057d08c2f9a2c4e7a4d33df3aae657b7db88b8cc # v8.2.0
+
+      - name: Enable jvm-opts
+        run: cp .jvmopts-ci .jvmopts
+
+      - name: Start DB
+        run: |-
+          docker compose -f docker/docker-compose-mariadb.yml up -d --wait
+          # loop to wait for the DB to be ready
+          for i in {1..8}; do
+            if docker exec -i docker-mariadb-db-1 mariadb \
+                -h 127.0.0.1 --user=root --password=root --database=mysql -e 'SELECT 1;' 2>/dev/null; then
+              break
+            fi
+            echo "Retry $i: SQL check failed, waiting before retry..."
+            sleep $((i * 2))
+          done
+          docker exec -i docker-mariadb-db-1 mariadb -h 127.0.0.1 --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
+          docker exec -i docker-mariadb-db-1 mariadb -h 127.0.0.1 --user=root --password=root -e 'CREATE SCHEMA database1;'
+          docker exec -i docker-mariadb-db-1 mariadb -h 127.0.0.1 --user=root --password=root --database=database1 < ddl-scripts/create_tables_mysql.sql
+          docker exec -i docker-mariadb-db-1 mariadb -h 127.0.0.1 --user=root --password=root -e 'CREATE SCHEMA database2;'
+          docker exec -i docker-mariadb-db-1 mariadb -h 127.0.0.1 --user=root --password=root --database=database2 < ddl-scripts/create_tables_mysql.sql
+
+      - name: test
+        run: sbt -Dpekko.persistence.r2dbc.dialect=mariadb ${{ matrix.SCALA_VERSION }} ${{ matrix.COMPILE_ONLY && 'Test/compile' || 'test' }}
+
   test-h2:
     name: Run tests with H2
     runs-on: ${{ matrix.OS }}

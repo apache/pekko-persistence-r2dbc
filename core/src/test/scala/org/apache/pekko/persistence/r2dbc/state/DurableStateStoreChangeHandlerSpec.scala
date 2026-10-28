@@ -29,7 +29,6 @@ import pekko.persistence.query.UpdatedDurableState
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
@@ -51,12 +50,8 @@ object DurableStateStoreChangeHandlerSpec {
     """)
     .withFallback(TestConfig.config)
 
-  val dialect: String = config.getString("pekko.persistence.r2dbc.dialect")
-
-  // MySQL uses ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
   private val insertSql: String =
-    if (dialect == "mysql") "insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
-    else sql"insert into changes_test (pid, rev, the_value) values (?, ?, ?)"
+    TestConfig.dialectSql("insert into changes_test (pid, rev, the_value) values (?, ?, ?)")
 
   class Handler(system: ActorSystem[?]) extends ChangeHandler[String] {
     private implicit val ec: ExecutionContext = system.executionContext

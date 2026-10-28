@@ -35,7 +35,7 @@ object Sql {
       dialect match {
         case Dialect.Postgres | Dialect.Yugabyte | Dialect.H2 =>
           fillInParameterNumbers(sql)
-        case Dialect.MySQL =>
+        case Dialect.MySQL | Dialect.MariaDB =>
           sql
       }
     }

@@ -17,6 +17,7 @@ import org.apache.pekko.Done;
 import org.apache.pekko.actor.typed.ActorSystem;
 import org.apache.pekko.persistence.query.DurableStateChange;
 import org.apache.pekko.persistence.query.UpdatedDurableState;
+import org.apache.pekko.persistence.r2dbc.TestConfig;
 import org.apache.pekko.persistence.r2dbc.session.javadsl.R2dbcSession;
 import org.apache.pekko.persistence.r2dbc.state.javadsl.ChangeHandler;
 
@@ -28,13 +29,8 @@ public class JavadslChangeHandler implements ChangeHandler<String> {
   private final String insertSql;
 
   public JavadslChangeHandler(ActorSystem<?> system) {
-    String dialect = system.settings().config().getString("pekko.persistence.r2dbc.dialect");
-    // MySQL uses ? as parameter markers; Postgres/Yugabyte use $1, $2, $3
-    if ("mysql".equals(dialect)) {
-      this.insertSql = "insert into changes_test (pid, rev, the_value) values (?, ?, ?)";
-    } else {
-      this.insertSql = "insert into changes_test (pid, rev, the_value) values ($1, $2, $3)";
-    }
+    this.insertSql =
+        TestConfig.dialectSql("insert into changes_test (pid, rev, the_value) values (?, ?, ?)");
   }
 
   @Override
