@@ -67,7 +67,8 @@ class StartFromSnapshotDisabledSpec
     PersistenceQuery(testKit.system).getReadJournalFor(classOf[JavadslR2dbcReadJournal], R2dbcReadJournal.Identifier)
 
   private def createLegacyTableSql: String = {
-    val payloadType = if (snapshotSettings.dialect == Dialect.MySQL) "BLOB" else "BYTEA"
+    val payloadType =
+      if (snapshotSettings.dialect == Dialect.MySQL || snapshotSettings.dialect == Dialect.MariaDB) "BLOB" else "BYTEA"
     s"""CREATE TABLE IF NOT EXISTS $legacyTable(
       slice INT NOT NULL,
       entity_type VARCHAR(255) NOT NULL,

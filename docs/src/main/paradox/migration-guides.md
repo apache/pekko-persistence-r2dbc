@@ -39,7 +39,7 @@ all three steps:
 
 * PostgreSQL (both the `BYTEA` and the `JSONB` schema): `snapshot_start_from_snapshot_postgres.sql`
 * Yugabyte: `snapshot_start_from_snapshot_yugabyte.sql`
-* MySQL: `snapshot_start_from_snapshot_mysql.sql`
+* MySQL and MariaDB: `snapshot_start_from_snapshot_mysql.sql`
 
 For example, for PostgreSQL:
 
