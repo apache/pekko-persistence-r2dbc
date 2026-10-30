@@ -101,7 +101,8 @@ class StartFromSnapshotMigrationScriptSpec
 
   private def scriptFile(fileName: String): Path = {
     // the working directory is the root project in sbt, but can be the module directory in an IDE
-    val candidates = List(Paths.get("ddl-scripts", "migration", fileName), Paths.get("..", "ddl-scripts", "migration", fileName))
+    val candidates =
+      List(Paths.get("ddl-scripts", "migration", fileName), Paths.get("..", "ddl-scripts", "migration", fileName))
     candidates.find(Files.exists(_)).getOrElse(fail(s"Migration script [$fileName] not found"))
   }
 
