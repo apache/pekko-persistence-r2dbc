@@ -56,6 +56,8 @@ class CurrentPersistenceIdsQuerySpec
     (1 to numberOfEntityTypes).flatMap(entityTypeId =>
       (1 to numberOfPids / numberOfEntityTypes).map(n =>
         PersistenceId(entityTypes(entityTypeId - 1), "p" + zeros.drop(n.toString.length) + n)))
+      // the ids are returned in string order, and e.g. TestEntity-100 is before TestEntity-99
+      .sortBy(_.id)
   }
 
   override protected def beforeAll(): Unit = {
@@ -92,13 +94,14 @@ class CurrentPersistenceIdsQuerySpec
 
     "retrieve ids for entity type after id" in {
       val entityType = entityTypes(0)
+      val entityTypePids = pids.filter(_.entityTypeHint == entityType)
       val result =
         query
-          .currentPersistenceIds(entityType = entityType, afterId = Some(pids(9).id), limit = 7)
+          .currentPersistenceIds(entityType = entityType, afterId = Some(entityTypePids(9).id), limit = 7)
           .runWith(Sink.seq)
           .futureValue
 
-      result shouldBe pids.filter(_.entityTypeHint == entityType).slice(10, 17).map(_.id)
+      result shouldBe entityTypePids.slice(10, 17).map(_.id)
     }
 
   }
