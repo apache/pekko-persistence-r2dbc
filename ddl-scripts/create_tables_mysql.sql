@@ -46,16 +46,21 @@ CREATE TABLE IF NOT EXISTS snapshot(
   entity_type VARCHAR(255) NOT NULL,
   persistence_id VARCHAR(255) NOT NULL,
   seq_nr BIGINT NOT NULL,
+  db_timestamp TIMESTAMP(6),
   write_timestamp BIGINT NOT NULL,
   ser_id INTEGER NOT NULL,
   ser_manifest VARCHAR(255) NOT NULL,
   snapshot BLOB NOT NULL,
+  tags JSON, -- stored as a JSON array of strings
   meta_ser_id INTEGER,
   meta_ser_manifest VARCHAR(255),
   meta_payload BLOB,
 
   PRIMARY KEY(persistence_id)
 );
+
+-- `snapshot_slice_idx` is only needed if the slice based queries are used together with snapshot as starting point
+CREATE INDEX snapshot_slice_idx ON snapshot(slice, entity_type, db_timestamp);
 
 CREATE TABLE IF NOT EXISTS durable_state (
   slice INT NOT NULL,

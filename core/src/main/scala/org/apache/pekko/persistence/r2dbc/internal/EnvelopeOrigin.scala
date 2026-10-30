@@ -24,6 +24,7 @@ import pekko.persistence.query.typed.EventEnvelope
   val SourceQuery = ""
   val SourceBacktracking = "BT"
   val SourcePubSub = "PS"
+  val SourceSnapshot = "SN"
 
   def fromQuery(env: EventEnvelope[?]): Boolean =
     env.source == SourceQuery
@@ -33,6 +34,9 @@ import pekko.persistence.query.typed.EventEnvelope
 
   def fromPubSub(env: EventEnvelope[?]): Boolean =
     env.source == SourcePubSub
+
+  def fromSnapshot(env: EventEnvelope[?]): Boolean =
+    env.source == SourceSnapshot
 
   def isFilteredEvent(env: Any): Boolean =
     env match {

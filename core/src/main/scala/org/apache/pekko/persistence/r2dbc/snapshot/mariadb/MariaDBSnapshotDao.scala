@@ -38,17 +38,35 @@ private[r2dbc] class MariaDBSnapshotDao(
     extends MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding) {
 
   // MariaDB doesn't support the `AS excluded` row alias of MySQL, the inserted values are referenced with VALUES()
-  override val upsertSql = sql"""
-    INSERT INTO $snapshotTable
-    (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      seq_nr = VALUES(seq_nr),
-      write_timestamp = VALUES(write_timestamp),
-      snapshot = VALUES(snapshot),
-      ser_id = VALUES(ser_id),
-      ser_manifest = VALUES(ser_manifest),
-      meta_payload = VALUES(meta_payload),
-      meta_ser_id = VALUES(meta_ser_id),
-      meta_ser_manifest = VALUES(meta_ser_manifest)"""
+  override protected def createUpsertSql: String =
+    if (settings.startFromSnapshotEnabled)
+      sql"""
+        INSERT INTO $snapshotTable
+        (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest, db_timestamp, tags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          seq_nr = VALUES(seq_nr),
+          db_timestamp = VALUES(db_timestamp),
+          write_timestamp = VALUES(write_timestamp),
+          snapshot = VALUES(snapshot),
+          ser_id = VALUES(ser_id),
+          tags = VALUES(tags),
+          ser_manifest = VALUES(ser_manifest),
+          meta_payload = VALUES(meta_payload),
+          meta_ser_id = VALUES(meta_ser_id),
+          meta_ser_manifest = VALUES(meta_ser_manifest)"""
+    else
+      sql"""
+        INSERT INTO $snapshotTable
+        (slice, entity_type, persistence_id, seq_nr, write_timestamp, snapshot, ser_id, ser_manifest, meta_payload, meta_ser_id, meta_ser_manifest)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          seq_nr = VALUES(seq_nr),
+          write_timestamp = VALUES(write_timestamp),
+          snapshot = VALUES(snapshot),
+          ser_id = VALUES(ser_id),
+          ser_manifest = VALUES(ser_manifest),
+          meta_payload = VALUES(meta_payload),
+          meta_ser_id = VALUES(meta_ser_id),
+          meta_ser_manifest = VALUES(meta_ser_manifest)"""
 }

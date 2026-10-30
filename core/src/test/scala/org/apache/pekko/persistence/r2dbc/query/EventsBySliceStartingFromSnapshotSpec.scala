@@ -1,0 +1,447 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * license agreements; and to You under the Apache License, version 2.0:
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * This file is part of the Apache Pekko project, which was derived from Akka.
+ */
+
+/*
+ * Copyright (C) 2022 - 2023 Lightbend Inc. <https://www.lightbend.com>
+ */
+
+package org.apache.pekko.persistence.r2dbc.query
+
+import scala.concurrent.duration._
+
+import org.apache.pekko
+import pekko.Done
+import pekko.NotUsed
+import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import pekko.actor.typed.ActorRef
+import pekko.actor.typed.ActorSystem
+import pekko.persistence.query.NoOffset
+import pekko.persistence.query.Offset
+import pekko.persistence.query.PersistenceQuery
+import pekko.persistence.query.TimestampOffset.toTimestampOffset
+import pekko.persistence.query.typed.EventEnvelope
+import pekko.persistence.r2dbc.TestActors
+import pekko.persistence.r2dbc.TestActors.Persister
+import pekko.persistence.r2dbc.TestActors.Persister.Persist
+import pekko.persistence.r2dbc.TestActors.Persister.PersistWithAck
+import pekko.persistence.r2dbc.TestActors.Persister.Ping
+import pekko.persistence.r2dbc.TestConfig
+import pekko.persistence.r2dbc.TestData
+import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
+import pekko.persistence.r2dbc.query.javadsl.{ R2dbcReadJournal => JavadslR2dbcReadJournal }
+import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
+import pekko.persistence.typed.PersistenceId
+import pekko.stream.scaladsl.Sink
+import pekko.stream.scaladsl.Source
+import pekko.stream.testkit.TestSubscriber
+import pekko.stream.testkit.scaladsl.TestSink
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import org.scalatest.wordspec.AnyWordSpecLike
+
+object EventsBySliceStartingFromSnapshotSpec {
+  sealed trait QueryType
+  case object Live extends QueryType
+  case object Current extends QueryType
+
+  // resolved together with the defaults so that the snapshot plugin also sees start-from-snapshot.enabled
+  def config: Config =
+    ConfigFactory.load(
+      ConfigFactory
+        .parseString("""
+    pekko.persistence.r2dbc.query.start-from-snapshot.enabled = true
+
+    # This test is not using backtracking, so increase behind-current-time to
+    # reduce risk of missing events
+    pekko.persistence.r2dbc.query.behind-current-time = 500 millis
+
+    pekko.persistence.r2dbc.journal.publish-events = off
+    """)
+        .withFallback(TestConfig.backtrackingDisabledConfig)
+        .withFallback(TestConfig.unresolvedConfig))
+}
+
+class EventsBySliceStartingFromSnapshotSpec
+    extends ScalaTestWithActorTestKit(EventsBySliceStartingFromSnapshotSpec.config)
+    with AnyWordSpecLike
+    with TestDbLifecycle
+    with TestData
+    with LogCapturing {
+  import EventsBySliceStartingFromSnapshotSpec._
+
+  override def typedSystem: ActorSystem[?] = system
+
+  private val query = PersistenceQuery(testKit.system).readJournalFor[R2dbcReadJournal](R2dbcReadJournal.Identifier)
+
+  // Snapshots of the Persister is string concatenation of the events
+  private def expectedSnapshotEvent(seqNr: Long): String = (1L to seqNr).map(i => s"e-$i").mkString("|") + "-snap"
+
+  private class Setup {
+    val entityType = nextEntityType()
+    val persistenceId = PersistenceId.ofUniqueId(nextPid(entityType))
+    val slice = query.sliceForPersistenceId(persistenceId.id)
+    val snapshotAckProbe = createTestProbe[Long]()
+    val persister = spawn(TestActors.Persister.withSnapshotAck(persistenceId, Set.empty, snapshotAckProbe.ref))
+    val probe = createTestProbe[Done]()
+    val sinkProbe = TestSink[EventEnvelope[String]]()(system.classicSystem)
+  }
+
+  List[QueryType](Current, Live).foreach { queryType =>
+    def doQuery(
+        entityType: String,
+        minSlice: Int,
+        maxSlice: Int,
+        offset: Offset,
+        queryImpl: R2dbcReadJournal = query): Source[EventEnvelope[String], NotUsed] =
+      queryType match {
+        case Live =>
+          queryImpl.eventsBySlicesStartingFromSnapshots[String, String](
+            entityType,
+            minSlice,
+            maxSlice,
+            offset,
+            snap => snap)
+        case Current =>
+          queryImpl.currentEventsBySlicesStartingFromSnapshots[String, String](
+            entityType,
+            minSlice,
+            maxSlice,
+            offset,
+            snap => snap)
+      }
+
+    def assertFinished(probe: TestSubscriber.Probe[EventEnvelope[String]]): Unit =
+      queryType match {
+        case Live =>
+          probe.expectNoMessage()
+          probe.cancel()
+        case Current =>
+          probe.expectComplete()
+      }
+
+    s"$queryType eventsBySlicesStartingFromSnapshots" should {
+      "return all snapshots and events for NoOffset" in new Setup {
+        for (i <- 1 to 20) {
+          if (i == 17) {
+            persister ! PersistWithAck(s"e-$i-snap", probe.ref)
+            snapshotAckProbe.expectMessage(17L)
+          } else
+            persister ! PersistWithAck(s"e-$i", probe.ref)
+          probe.expectMessage(Done)
+        }
+        val result: TestSubscriber.Probe[EventEnvelope[String]] =
+          doQuery(entityType, slice, slice, NoOffset)
+            .runWith(sinkProbe)
+            .request(21)
+
+        val snapshotEnv = result.expectNext()
+        snapshotEnv.event shouldBe expectedSnapshotEvent(17)
+        EnvelopeOrigin.fromSnapshot(snapshotEnv) shouldBe true
+        for (i <- 18 to 20) {
+          val env = result.expectNext()
+          env.event shouldBe s"e-$i"
+          EnvelopeOrigin.fromSnapshot(env) shouldBe false
+        }
+        assertFinished(result)
+      }
+
+      "only return snapshots and events after an offset" in new Setup {
+        for (i <- 1 to 20) {
+          if (i == 3) {
+            persister ! PersistWithAck(s"e-$i-snap", probe.ref)
+            snapshotAckProbe.expectMessage(3L)
+          } else
+            persister ! PersistWithAck(s"e-$i", probe.ref)
+          probe.expectMessage(Done)
+        }
+
+        val result: TestSubscriber.Probe[EventEnvelope[String]] =
+          doQuery(entityType, slice, slice, NoOffset)
+            .runWith(sinkProbe)
+            .request(21)
+
+        // we want to start next query from offset corresponding to 10
+        // first two events are not included because of snapshot at 3
+        result.expectNextN(9 - 2)
+        val offset = result.expectNext().offset
+        result.cancel()
+
+        val withOffset =
+          doQuery(entityType, slice, slice, offset)
+            .runWith(TestSink[EventEnvelope[String]]()(system.classicSystem))
+        withOffset.request(12)
+        for (i <- 11 to 20) {
+          // doesn't include the snapshot because that was before the offset
+          withOffset.expectNext().event shouldBe s"e-$i"
+        }
+        assertFinished(withOffset)
+      }
+
+      "use same timestamp for the snapshot as the event" in new Setup {
+        for (i <- 1 to 20) {
+          if (i == 17) {
+            persister ! PersistWithAck(s"e-$i-snap", probe.ref)
+            snapshotAckProbe.expectMessage(17L)
+          } else
+            persister ! PersistWithAck(s"e-$i", probe.ref)
+          probe.expectMessage(Done)
+        }
+        val result: TestSubscriber.Probe[EventEnvelope[String]] =
+          doQuery(entityType, slice, slice, NoOffset)
+            .runWith(sinkProbe)
+            .request(21)
+
+        val snapEnvelope = result.expectNextN(3).head
+        val eventEnvelope = query.loadEnvelope[String](snapEnvelope.persistenceId, snapEnvelope.sequenceNr).futureValue
+        toTimestampOffset(snapEnvelope.offset).timestamp shouldBe toTimestampOffset(eventEnvelope.offset).timestamp
+        // also verify that the seen Map is populated
+        toTimestampOffset(snapEnvelope.offset).seen(snapEnvelope.persistenceId) shouldBe (snapEnvelope.sequenceNr)
+
+        result.cancel()
+      }
+
+      "includes tags in snapshot" in new Setup {
+        val taggingPersister: ActorRef[Persister.Command] =
+          spawn(TestActors.Persister.withSnapshotAck(persistenceId, tags = Set("tag-A"), snapshotAckProbe.ref))
+
+        taggingPersister ! PersistWithAck(s"e-1", probe.ref)
+        probe.expectMessage(Done)
+        taggingPersister ! PersistWithAck(s"e-2-snap", probe.ref)
+        snapshotAckProbe.expectMessage(2L)
+        probe.expectMessage(Done)
+        taggingPersister ! PersistWithAck(s"e-3", probe.ref)
+        probe.expectMessage(Done)
+
+        val result: TestSubscriber.Probe[EventEnvelope[String]] =
+          doQuery(entityType, slice, slice, NoOffset)
+            .runWith(TestSink())
+        result.request(2)
+
+        val snapshotEnvelope = result.expectNext()
+        snapshotEnvelope.event shouldBe expectedSnapshotEvent(2)
+        snapshotEnvelope.tags shouldBe Set("tag-A")
+
+        val e3Envelope = result.expectNext()
+        e3Envelope.event shouldBe "e-3"
+        e3Envelope.tags shouldBe Set("tag-A")
+
+        assertFinished(result)
+      }
+
+      "include older events of entities without a snapshot for NoOffset" in new Setup {
+        val persisterWithoutSnapshot = spawn(TestActors.Persister(PersistenceId.ofUniqueId(nextPid(entityType))))
+        persisterWithoutSnapshot ! PersistWithAck("c-1", probe.ref)
+        probe.expectMessage(Done)
+        persister ! PersistWithAck("e-1-snap", probe.ref)
+        snapshotAckProbe.expectMessage(1L)
+        probe.expectMessage(Done)
+
+        val result: TestSubscriber.Probe[EventEnvelope[String]] =
+          doQuery(entityType, 0, persistenceExt.numberOfSlices - 1, NoOffset)
+            .runWith(sinkProbe)
+            .request(10)
+
+        result.expectNext().event shouldBe expectedSnapshotEvent(1)
+        // c-1 is before the timestamp of the only snapshot
+        result.expectNext().event shouldBe "c-1"
+        assertFinished(result)
+      }
+
+    }
+  }
+
+  // tests just relevant for current query
+  "Current eventsBySlicesStartingFromSnapshots" should {
+    "retrieve from several slices" in new Setup {
+      val numberOfPersisters = 20
+      val numberOfEvents = 3
+      val persistenceIds = (1 to numberOfPersisters).map(_ => PersistenceId.ofUniqueId(nextPid(entityType))).toVector
+      val persisters = persistenceIds.map { pid =>
+        val ref = testKit.spawn(TestActors.Persister.withSnapshotAck(pid, Set.empty, snapshotAckProbe.ref))
+        for (i <- 1 to numberOfEvents) {
+          if (i == 2) {
+            ref ! PersistWithAck(s"e-$i-snap", probe.ref)
+            snapshotAckProbe.expectMessage(i.toLong)
+          } else
+            ref ! PersistWithAck(s"e-$i", probe.ref)
+          probe.expectMessage(Done)
+        }
+      }
+
+      persistenceExt.numberOfSlices should be(1024)
+      val ranges = query.sliceRanges(4)
+      ranges(0) should be(0 to 255)
+      ranges(1) should be(256 to 511)
+      ranges(2) should be(512 to 767)
+      ranges(3) should be(768 to 1023)
+
+      val allEnvelopes = (0 until 4).flatMap { rangeIndex =>
+        val result =
+          query
+            .currentEventsBySlicesStartingFromSnapshots[String, String](
+              entityType,
+              ranges(rangeIndex).min,
+              ranges(rangeIndex).max,
+              NoOffset,
+              snap => snap)
+            .runWith(Sink.seq)
+            .futureValue
+        result.foreach { env =>
+          ranges(rangeIndex) should contain(query.sliceForPersistenceId(env.persistenceId))
+        }
+        result
+      }
+
+      val numberOfEventsBeforeSnapshots = numberOfPersisters
+      allEnvelopes.size should be(numberOfPersisters * numberOfEvents - numberOfEventsBeforeSnapshots)
+    }
+  }
+
+  // tests just relevant for live query
+  "Live eventsBySlicesStartingFromSnapshots" should {
+    "be supported by the javadsl" in new Setup {
+      val javadslQuery = PersistenceQuery(testKit.system)
+        .getReadJournalFor(classOf[JavadslR2dbcReadJournal], R2dbcReadJournal.Identifier)
+      persister ! PersistWithAck("e-1", probe.ref)
+      probe.expectMessage(Done)
+      persister ! PersistWithAck("e-2-snap", probe.ref)
+      snapshotAckProbe.expectMessage(2L)
+      probe.expectMessage(Done)
+      persister ! PersistWithAck("e-3", probe.ref)
+      probe.expectMessage(Done)
+
+      val result: TestSubscriber.Probe[EventEnvelope[String]] =
+        javadslQuery
+          .eventsBySlicesStartingFromSnapshots[String, String](entityType, slice, slice, NoOffset,
+            (snap: String) => snap)
+          .asScala
+          .runWith(sinkProbe)
+          .request(10)
+
+      result.expectNext().event shouldBe expectedSnapshotEvent(2)
+      result.expectNext().event shouldBe "e-3"
+      result.expectNoMessage()
+      result.cancel()
+
+      javadslQuery
+        .currentEventsBySlicesStartingFromSnapshots[String, String](entityType, slice, slice, NoOffset,
+          (snap: String) => snap)
+        .asScala
+        .map(_.event)
+        .runWith(Sink.seq)
+        .futureValue shouldBe Seq(expectedSnapshotEvent(2), "e-3")
+    }
+
+    "find new events" in new Setup {
+      for (i <- 1 to 20) {
+        if (i == 17) {
+          persister ! PersistWithAck(s"e-$i-snap", probe.ref)
+          snapshotAckProbe.expectMessage(17L)
+        } else
+          persister ! PersistWithAck(s"e-$i", probe.ref)
+        probe.expectMessage(Done)
+      }
+      val result: TestSubscriber.Probe[EventEnvelope[String]] =
+        query
+          .eventsBySlicesStartingFromSnapshots[String, String](entityType, slice, slice, NoOffset, snap => snap)
+          .runWith(sinkProbe)
+          .request(21)
+
+      result.expectNext().event shouldBe expectedSnapshotEvent(17)
+      for (i <- 18 to 20) {
+        result.expectNext().event shouldBe s"e-$i"
+      }
+
+      for (i <- 21 to 40) {
+        persister ! PersistWithAck(s"e-$i", probe.ref)
+        // make sure the query doesn't get an element in its buffer with nothing to take it
+        // resulting in it not finishing the query and giving up the session
+        result.request(1)
+        probe.expectMessage(Done)
+      }
+
+      result.request(1)
+
+      for (i <- 21 to 40) {
+        result.expectNext().event shouldBe s"e-$i"
+      }
+
+      result.cancel()
+    }
+
+    "retrieve from several slices" in new Setup {
+      val numberOfPersisters = 20
+      val numberOfEventsPhase1 = 3
+      val numberOfEventsPhase2 = 2
+
+      val persistenceIds = (1 to numberOfPersisters)
+        .map(_ => PersistenceId.ofUniqueId(nextPid(entityType)))
+        .toVector
+      val persisters = persistenceIds.map { pid =>
+        val ref = testKit.spawn(TestActors.Persister.withSnapshotAck(pid, Set.empty, snapshotAckProbe.ref))
+        for (i <- 1 to numberOfEventsPhase1) {
+          if (i == numberOfEventsPhase1) {
+            ref ! PersistWithAck(s"e-$i-snap", probe.ref)
+            probe.expectMessage(Done)
+            snapshotAckProbe.expectMessage(i.toLong)
+          } else {
+            ref ! PersistWithAck(s"e-$i", probe.ref)
+            probe.expectMessage(Done)
+          }
+        }
+        ref
+      }
+
+      persistenceExt.numberOfSlices should be(1024)
+      val ranges = query.sliceRanges(4)
+      ranges(0) should be(0 to 255)
+      ranges(1) should be(256 to 511)
+      ranges(2) should be(512 to 767)
+      ranges(3) should be(768 to 1023)
+
+      val queries: Seq[Source[EventEnvelope[String], NotUsed]] = (0 until 4).map { rangeIndex =>
+        query
+          .eventsBySlicesStartingFromSnapshots[String, String](
+            entityType,
+            ranges(rangeIndex).min,
+            ranges(rangeIndex).max,
+            NoOffset,
+            snap => snap)
+          .map { env =>
+            ranges(rangeIndex) should contain(query.sliceForPersistenceId(env.persistenceId))
+            env
+          }
+      }
+
+      // events before the snapshot are not included
+      val numberOfSnapshots = numberOfPersisters
+      val expectedNumberOfEvents = numberOfSnapshots + numberOfPersisters * numberOfEventsPhase2
+
+      val allEnvelopes =
+        queries(0)
+          .merge(queries(1))
+          .merge(queries(2))
+          .merge(queries(3))
+          .take(expectedNumberOfEvents)
+          .runWith(Sink.seq[EventEnvelope[String]])
+
+      persisters.foreach { ref =>
+        for (i <- 1 to numberOfEventsPhase2) {
+          ref ! PersistWithAck(s"e-${numberOfEventsPhase1 + i}", probe.ref)
+          probe.expectMessage(Done)
+        }
+      }
+
+      allEnvelopes.futureValue.size should be(expectedNumberOfEvents)
+    }
+  }
+
+}

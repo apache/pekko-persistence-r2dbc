@@ -40,6 +40,7 @@ import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.ChangeHandlerFactory
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
@@ -83,6 +84,9 @@ import org.slf4j.LoggerFactory
       tags: Set[String])
       extends BySliceQuery.SerializedRow {
     override def seqNr: Long = revision
+    override def source: String =
+      // payload = null => lazy loaded for backtracking (ugly, but not worth changing UpdatedDurableState in Pekko)
+      if (payload == null) EnvelopeOrigin.SourceBacktracking else EnvelopeOrigin.SourceQuery
   }
 
   private final case class EvaluatedAdditionalColumnBindings(

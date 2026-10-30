@@ -27,6 +27,7 @@ import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
+import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
 import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -67,7 +68,10 @@ private[r2dbc] object JournalDao {
       writerUuid: String,
       tags: Set[String],
       metadata: Option[SerializedEventMetadata])
-      extends BySliceQuery.SerializedRow
+      extends BySliceQuery.SerializedRow {
+    override def source: String =
+      if (payload.isDefined) EnvelopeOrigin.SourceQuery else EnvelopeOrigin.SourceBacktracking
+  }
 
   final case class SerializedEventMetadata(serId: Int, serManifest: String, payload: Array[Byte])
 

@@ -160,6 +160,7 @@ import org.slf4j.Logger
     def seqNr: Long
     def dbTimestamp: Instant
     def readDbTimestamp: Instant
+    def source: String
   }
 
   trait Dao[SerializedRow] {
@@ -213,7 +214,8 @@ import org.slf4j.Logger
       entityType: String,
       minSlice: Int,
       maxSlice: Int,
-      offset: Offset): Source[Envelope, NotUsed] = {
+      offset: Offset,
+      filterEventsBeforeSnapshots: Envelope => Boolean = (_: Envelope) => true): Source[Envelope, NotUsed] = {
     val initialOffset = toTimestampOffset(offset)
 
     def nextOffset(state: QueryState, envelope: Envelope): QueryState =
@@ -281,12 +283,15 @@ import org.slf4j.Logger
               initialOffset.timestamp,
               currentDbTime)
 
+          // filter after ContinuousQuery so that the filtered envelopes still update the query state,
+          // otherwise a page of only filtered rows would look empty
           ContinuousQuery[QueryState, Envelope](
             initialState = QueryState.empty.copy(latest = initialOffset),
             updateState = nextOffset,
             delayNextQuery = _ => None,
             nextQuery = state => nextQuery(state, currentDbTime),
             beforeQuery = beforeQuery(logPrefix, entityType, minSlice, maxSlice, _))
+            .filter(filterEventsBeforeSnapshots)
         }
       }
       .mapMaterializedValue(_ => NotUsed)
@@ -297,7 +302,8 @@ import org.slf4j.Logger
       entityType: String,
       minSlice: Int,
       maxSlice: Int,
-      offset: Offset): Source[Envelope, NotUsed] = {
+      offset: Offset,
+      filterEventsBeforeSnapshots: Envelope => Boolean = (_: Envelope) => true): Source[Envelope, NotUsed] = {
     val initialOffset = toTimestampOffset(offset)
 
     if (log.isDebugEnabled())
@@ -463,12 +469,15 @@ import org.slf4j.Logger
           .via(deserializeAndAddOffset(newState.currentOffset)))
     }
 
+    // filter after ContinuousQuery so that the filtered envelopes still update the query state,
+    // otherwise a page of only filtered rows would never move the offset forward
     ContinuousQuery[QueryState, Envelope](
       initialState = QueryState.empty.copy(latest = initialOffset),
       updateState = nextOffset,
       delayNextQuery = delayNextQuery,
       nextQuery = nextQuery,
       beforeQuery = beforeQuery(logPrefix, entityType, minSlice, maxSlice, _))
+      .filter(filterEventsBeforeSnapshots)
   }
 
   private def beforeQuery(

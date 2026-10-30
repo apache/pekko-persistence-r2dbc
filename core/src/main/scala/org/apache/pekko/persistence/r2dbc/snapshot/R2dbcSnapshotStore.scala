@@ -13,12 +13,15 @@
 
 package org.apache.pekko.persistence.r2dbc.snapshot
 
+import java.time.Instant
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
+import pekko.persistence.Persistence
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotMetadata
 import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotRow
@@ -26,6 +29,7 @@ import pekko.persistence.snapshot.SnapshotStore
 import pekko.persistence.SelectedSnapshot
 import pekko.persistence.SnapshotMetadata
 import pekko.persistence.SnapshotSelectionCriteria
+import pekko.persistence.typed.PersistenceId
 import pekko.serialization.Serializers
 import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
@@ -58,11 +62,10 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
   private implicit val ec: ExecutionContext = context.dispatcher
   private val serialization: Serialization = SerializationExtension(context.system)
   private implicit val system: ActorSystem[?] = context.system.toTyped
+  private val persistenceExt = Persistence(system)
 
-  private val dao = {
-    val settings = SnapshotSettings(cfg)
-    SnapshotDao.fromConfig(settings, cfg)
-  }
+  private val settings = SnapshotSettings(cfg)
+  private val dao = SnapshotDao.fromConfig(settings, cfg)
 
   def loadAsync(persistenceId: String, criteria: SnapshotSelectionCriteria): Future[Option[SelectedSnapshot]] =
     dao
@@ -70,6 +73,9 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
       .map(_.map(row => deserializeSnapshotRow(row, serialization)))
 
   def saveAsync(metadata: SnapshotMetadata, snapshot: Any): Future[Unit] = {
+    val entityType = PersistenceId.extractEntityType(metadata.persistenceId)
+    val slice = persistenceExt.sliceForPersistenceId(metadata.persistenceId)
+
     val snapshotAnyRef = snapshot.asInstanceOf[AnyRef]
     val serializedSnapshot = serialization.serialize(snapshotAnyRef).get
     val snapshotSerializer = serialization.findSerializerFor(snapshotAnyRef)
@@ -83,16 +89,31 @@ private[r2dbc] final class R2dbcSnapshotStore(cfg: Config, cfgPath: String) exte
       SerializedSnapshotMetadata(serializedMeta, metaSerializer.identifier, metaManifest)
     }
 
-    val serializedRow = SerializedSnapshotRow(
-      metadata.persistenceId,
-      metadata.sequenceNr,
-      metadata.timestamp,
-      serializedSnapshot,
-      snapshotSerializer.identifier,
-      snapshotManifest,
-      serializedMeta)
+    val correspondingEvent: Future[Option[(Instant, Set[String])]] =
+      if (settings.startFromSnapshotEnabled)
+        dao.eventTimestampAndTags(metadata.persistenceId, metadata.sequenceNr)
+      else
+        Future.successful(None)
 
-    dao.store(serializedRow)
+    // use same timestamp and tags as the corresponding event, if start-from-snapshot is enabled and the event exists
+    correspondingEvent.flatMap { eventOpt =>
+      val (timestamp, tags) = eventOpt.getOrElse(Instant.ofEpochMilli(metadata.timestamp) -> Set.empty[String])
+
+      val serializedRow = SerializedSnapshotRow(
+        slice,
+        entityType,
+        metadata.persistenceId,
+        metadata.sequenceNr,
+        timestamp,
+        metadata.timestamp,
+        serializedSnapshot,
+        snapshotSerializer.identifier,
+        snapshotManifest,
+        tags,
+        serializedMeta)
+
+      dao.store(serializedRow)
+    }
   }
 
   def deleteAsync(metadata: SnapshotMetadata): Future[Unit] = {
