@@ -69,7 +69,23 @@ class StartFromSnapshotDisabledSpec
   private def createLegacyTableSql: String = {
     val payloadType =
       if (snapshotSettings.dialect == Dialect.MySQL || snapshotSettings.dialect == Dialect.MariaDB) "BLOB" else "BYTEA"
-    s"""CREATE TABLE IF NOT EXISTS $legacyTable(
+    // nullable like in the Oracle DDL, since Oracle stores the empty string as NULL
+    if (snapshotSettings.dialect == Dialect.Oracle)
+      s"""CREATE TABLE IF NOT EXISTS $legacyTable(
+        slice NUMBER(10) NOT NULL,
+        entity_type VARCHAR2(255),
+        persistence_id VARCHAR2(255) NOT NULL,
+        seq_nr NUMBER(19) NOT NULL,
+        write_timestamp NUMBER(19) NOT NULL,
+        ser_id NUMBER(10) NOT NULL,
+        ser_manifest VARCHAR2(255),
+        snapshot BLOB NOT NULL,
+        meta_ser_id NUMBER(10),
+        meta_ser_manifest VARCHAR2(255),
+        meta_payload BLOB,
+        PRIMARY KEY(persistence_id))"""
+    else
+      s"""CREATE TABLE IF NOT EXISTS $legacyTable(
       slice INT NOT NULL,
       entity_type VARCHAR(255) NOT NULL,
       persistence_id VARCHAR(255) NOT NULL,

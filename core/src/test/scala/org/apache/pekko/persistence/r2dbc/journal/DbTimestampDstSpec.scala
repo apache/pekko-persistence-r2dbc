@@ -73,8 +73,9 @@ class DbTimestampDstSpec
 
   // MySQL and MariaDB convert TIMESTAMP values with the session time zone
   private val serverTimeZoneMatters = TestConfig.dialect match {
-    case Dialect.MySQL | Dialect.MariaDB                  => true
-    case Dialect.Postgres | Dialect.Yugabyte | Dialect.H2 => false
+    case Dialect.MySQL | Dialect.MariaDB => true
+    // Oracle TIMESTAMP columns have no time zone, and the database timestamp is UTC
+    case Dialect.Postgres | Dialect.Yugabyte | Dialect.Oracle | Dialect.H2 => false
   }
 
   private lazy val journalDao =

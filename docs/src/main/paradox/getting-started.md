@@ -127,6 +127,53 @@ The ddl script can be run in Docker with:
 docker exec -i docker-mariadb-db-1 mariadb --user=root --password=root --database=mysql < ddl-scripts/create_tables_mysql.sql
 ```
 
+<a id="oracle"></a>
+### Oracle
+
+Oracle Database 23ai or later is supported.
+
+The Oracle R2DBC driver is not included as a dependency of the plugin, add it to your build:
+
+@@dependency [Maven,sbt,Gradle] {
+  group=com.oracle.database.r2dbc
+  artifact=oracle-r2dbc
+  version=$oracle-r2dbc.version$
+}
+
+The driver depends on the Oracle JDBC driver `com.oracle.database.jdbc:ojdbc11`, which is licensed under the
+[Oracle Free Use Terms and Conditions](https://www.oracle.com/downloads/licenses/oracle-free-license.html) rather than
+the Apache License. Check that its license is acceptable for your use.
+
+Enable it with:
+
+@@snip [application.conf](/docs/src/test/resources/application-oracle.conf) { #connection-settings }
+
+The Oracle dialect requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, since Oracle has no
+transaction timestamp like Postgres.
+
+A database for local testing can be run in Docker:
+
+@@snip [docker-compose.yml](/docker/docker-compose-oracle.yml)
+
+```
+docker compose -f docker/docker-compose-oracle.yml up --wait
+```
+
+Tables and indexes:
+
+@@snip [create_tables.sql](/ddl-scripts/create_tables_oracle.sql)
+
+The ddl script can be run in Docker with:
+
+```
+docker exec -i docker-oracle-db-1 sqlplus -s pekko/pekko@//localhost/FREEPDB1 < ddl-scripts/create_tables_oracle.sql
+```
+
+Oracle stores empty strings and empty byte arrays as `NULL`. The entity type, serializer manifest, writer and payload
+columns are therefore nullable, and the plugin reads `NULL` in those columns back as empty values. Events, snapshots and
+durable state are stored in `BLOB` columns, the `JSONB` payload column type is not supported, and tags are stored as a
+JSON array in a `CLOB` column.
+
 <a id="h2"></a>
 ### H2
 

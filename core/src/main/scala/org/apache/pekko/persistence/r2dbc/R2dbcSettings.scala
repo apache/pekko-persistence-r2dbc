@@ -48,6 +48,9 @@ object Dialect {
   case object MariaDB extends Dialect
 
   /** @since 2.0.0 */
+  case object Oracle extends Dialect
+
+  /** @since 2.0.0 */
   case object H2 extends Dialect
 
   /** @since 1.1.0 */
@@ -57,10 +60,11 @@ object Dialect {
       case "postgres" => Dialect.Postgres
       case "mysql"    => Dialect.MySQL
       case "mariadb"  => Dialect.MariaDB
+      case "oracle"   => Dialect.Oracle
       case "h2"       => Dialect.H2
       case other      =>
         throw new IllegalArgumentException(
-          s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres, mysql, mariadb, h2].")
+          s"Unknown dialect [$other]. Supported dialects are [yugabyte, postgres, mysql, mariadb, oracle, h2].")
     }
   }
 }

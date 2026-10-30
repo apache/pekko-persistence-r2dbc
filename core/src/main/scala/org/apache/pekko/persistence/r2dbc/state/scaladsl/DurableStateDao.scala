@@ -52,6 +52,7 @@ import pekko.persistence.r2dbc.state.ChangeHandlerException
 import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
+import pekko.persistence.r2dbc.state.scaladsl.oracle.OracleDurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
@@ -109,6 +110,8 @@ import org.slf4j.LoggerFactory
         new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleDurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tables =
           (settings.durableStateTableWithSchema +:

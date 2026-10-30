@@ -76,6 +76,21 @@ object TestConfig {
             use-app-timestamp = on
           }
           """)
+      case "oracle" =>
+        ConfigFactory.parseString("""
+          pekko.persistence.r2dbc {
+            connection-factory {
+              driver = "oracle"
+              host = "localhost"
+              port = 1521
+              user = "pekko"
+              password = "pekko"
+              database = "FREEPDB1"
+            }
+            db-timestamp-monotonic-increasing = on
+            use-app-timestamp = on
+          }
+          """)
       case "h2" =>
         ConfigFactory.parseString("""
           pekko.persistence.r2dbc {

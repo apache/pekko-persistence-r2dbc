@@ -70,7 +70,7 @@ class PersistTagsSpec
             row => {
               val tags =
                 settings.dialect match {
-                  case Dialect.MySQL | Dialect.MariaDB =>
+                  case Dialect.MySQL | Dialect.MariaDB | Dialect.Oracle =>
                     MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
                   case Dialect.H2 =>
                     H2Utils.tagsFromDb(row, "tags")

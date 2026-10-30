@@ -63,6 +63,15 @@ import org.slf4j.LoggerFactory
 
 object RuntimePluginConfigSpec {
 
+  /**
+   * Oracle has a schema per user rather than separate databases, so for Oracle the plugins connect as different users.
+   */
+  private def connectionConfig(database: String): String =
+    if (TestConfig.config.getString("pekko.persistence.r2dbc.dialect") == "oracle")
+      s"""user = "$database", password = "$database""""
+    else
+      s"""database = "$database""""
+
   trait EventSourced {
     import EventSourced._
     import pekko.persistence.typed.scaladsl.Effect
@@ -76,7 +85,7 @@ object RuntimePluginConfigSpec {
               $configKey = $${pekko.persistence.r2dbc}
               $configKey = {
                 connection-factory {
-                  database = "$database"
+                  ${connectionConfig(database)}
                   # only used by the h2 driver
                   h2.database = "$database"
                 }
@@ -137,7 +146,7 @@ object RuntimePluginConfigSpec {
               $configKey = $${pekko.persistence.r2dbc}
               $configKey = {
                 connection-factory {
-                  database = "$database"
+                  ${connectionConfig(database)}
                   # only used by the h2 driver
                   h2.database = "$database"
                 }
