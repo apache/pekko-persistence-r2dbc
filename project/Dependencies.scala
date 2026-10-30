@@ -26,7 +26,7 @@ object Dependencies {
   val PekkoPersistenceJdbcVersion = PekkoPersistenceJdbcDependency.version
   val PekkoPersistenceR2dbcVersionInDocs = "current"
   val PekkoProjectionVersionInDocs = "current"
-  val R2dbcMariadbVersion = "1.3.0"
+  val R2dbcMariadbVersion = "1.3.2"
   val R2dbcH2Version = "1.1.0.RELEASE"
   // the H2 version that r2dbc-h2 is built against
   val H2Version = "2.5.252"
