@@ -115,7 +115,8 @@ class OracleDialectSpec
       val payload2 = Array.fill[Byte](200000)(2)
 
       dao
-        .store(SerializedSnapshotRow(persistenceId, 1L, 1000L, payload1, 1, "", None))
+        .store(SerializedSnapshotRow(1, "Entity", persistenceId, 1L, Instant.EPOCH, 1000L, payload1, 1, "", Set.empty,
+          None))
         .futureValue
       val loaded1 = dao.load(persistenceId, SnapshotSelectionCriteria.Latest).futureValue.get
       loaded1.seqNr shouldBe 1L
@@ -124,7 +125,7 @@ class OracleDialectSpec
       loaded1.metadata shouldBe None
 
       dao
-        .store(SerializedSnapshotRow(persistenceId, 2L, 2000L, payload2, 1, "m2",
+        .store(SerializedSnapshotRow(1, "Entity", persistenceId, 2L, Instant.EPOCH, 2000L, payload2, 1, "m2", Set.empty,
           Some(SerializedSnapshotMetadata(Array[Byte](3), 1, ""))))
         .futureValue
       val loaded2 = dao.load(persistenceId, SnapshotSelectionCriteria.Latest).futureValue.get
