@@ -9,4 +9,8 @@ UPDATE snapshot s JOIN event_journal e
   ON s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr AND e.deleted = false
   SET s.db_timestamp = e.db_timestamp, s.tags = e.tags;
 
+-- snapshots without a matching event, for example because the events were deleted, get the snapshot's write timestamp,
+-- like the snapshot plugin does when it doesn't find the event
+UPDATE snapshot SET db_timestamp = FROM_UNIXTIME(write_timestamp / 1000) WHERE db_timestamp IS NULL;
+
 CREATE INDEX snapshot_slice_idx ON snapshot(slice, entity_type, db_timestamp);

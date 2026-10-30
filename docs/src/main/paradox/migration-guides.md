@@ -51,11 +51,17 @@ UPDATE snapshot s SET db_timestamp = e.db_timestamp, tags = e.tags
   FROM event_journal e
   WHERE s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr AND e.deleted = false;
 
+UPDATE snapshot SET db_timestamp = TIMESTAMP WITH TIME ZONE 'epoch' + write_timestamp * INTERVAL '1 millisecond'
+  WHERE db_timestamp IS NULL;
+
 CREATE INDEX IF NOT EXISTS snapshot_slice_idx ON snapshot(slice, entity_type, db_timestamp);
 ```
 
-The update only uses events that are not marked as deleted, like the snapshot plugin does. For a large `snapshot`
-table you may want to run the update in batches, for example by restricting it to a range of `slice` values per
+The first update only uses events that are not marked as deleted, like the snapshot plugin does. Snapshots without
+such an event, for example because the events were deleted with `deleteMessages`, get the snapshot's write timestamp
+and no tags from the second update, also like the snapshot plugin does when it doesn't find the event. Without a
+timestamp, such snapshots would not be emitted by the queries that start from snapshots. For a large `snapshot`
+table you may want to run the updates in batches, for example by restricting them to a range of `slice` values per
 statement, to avoid one long running transaction.
 
 The new schema in `ddl-scripts/create_tables_*.sql` already includes the columns and the index. With H2, the plugin
