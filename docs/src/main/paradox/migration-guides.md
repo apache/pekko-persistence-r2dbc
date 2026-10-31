@@ -2,6 +2,110 @@
 
 Apache Pekko Persistence R2DBC 1.0.0 is based on Akka Persistence R2DBC 0.7.7.
 
+## MySQL time zone in 2.0.0
+
+Since 1.1.0 the plugin set the `connectionTimeZone` option of the MySQL driver to `SERVER`, so that the driver converted
+timestamps with the time zone of the server. Since 2.0.0 it sets `connectionTimeZone` to `UTC` and
+`forceConnectionTimeZoneToSession` to `true`, so that the database session uses UTC, see
+@ref:[MySQL](getting-started.md#mysql).
+
+SQL that runs on the plugin's connections, for example in a `ChangeHandler` of durable state, now sees `NOW()`,
+`CURRENT_TIMESTAMP` and `TIMESTAMP` values in UTC instead of in the time zone of the server.
+
+### Timestamps stored by earlier versions
+
+If the driver could resolve the time zone of the server, rows written by earlier versions are read as the same instants
+after upgrading. Only timestamps in the local hour that is repeated when daylight saving time ends may have been stored
+one hour off.
+
+If the driver couldn't resolve the time zone of the server, it used the time zone of the JVM instead and logged a
+warning:
+
+```
+The server timezone is unknown <EDT>, trying to use system default timezone
+```
+
+This happens for abbreviations such as `EDT`, `CDT`, `PDT` or `AEST` in `@@system_time_zone`. If the time zone of the
+JVM is also different from the time zone of the server, all timestamps written by earlier versions are stored shifted by
+the difference between the two time zones, and are read shifted after upgrading. You can check it by comparing the
+latest timestamps with the current time in a UTC session, on a system that is writing events:
+
+```sql
+SET time_zone = '+00:00';
+SELECT MAX(db_timestamp), UTC_TIMESTAMP(6) FROM event_journal;
+```
+
+If they differ by the difference between the time zones of the JVM and the server, the stored timestamps are shifted,
+in either direction:
+
+* When the time zone of the JVM is ahead of the time zone of the server, for example UTC and `America/New_York`, the
+  stored timestamps and the timestamp offsets of projections are in the future after upgrading. Events written after
+  the upgrade are then older than the offsets, and `eventsBySlices` queries and projections can skip them, which
+  backtracking doesn't cover.
+* When the time zone of the JVM is behind the time zone of the server, for example `America/Los_Angeles` and
+  `America/New_York`, the stored timestamps are in the past, which can look like a system that hasn't written events
+  for a while.
+
+In both cases, correct the stored timestamps before upgrading. Stop all applications that write to or project from the
+tables, and run the following in a UTC session. Replace `<jvm-time-zone>` with the time zone of the JVM, for example
+`America/Los_Angeles`, or `+00:00` if the JVM runs in UTC, and use the table names and schema that you have
+configured:
+
+```sql
+SET time_zone = '+00:00';
+UPDATE event_journal
+  SET db_timestamp = CONVERT_TZ(CONVERT_TZ(db_timestamp, '+00:00', 'SYSTEM'), '<jvm-time-zone>', '+00:00');
+UPDATE durable_state
+  SET db_timestamp = CONVERT_TZ(CONVERT_TZ(db_timestamp, '+00:00', 'SYSTEM'), '<jvm-time-zone>', '+00:00');
+-- the timestamp offsets of Apache Pekko Projection R2DBC
+UPDATE projection_timestamp_offset_store
+  SET timestamp_offset = CONVERT_TZ(CONVERT_TZ(timestamp_offset, '+00:00', 'SYSTEM'), '<jvm-time-zone>', '+00:00'),
+    timestamp_consumed = CONVERT_TZ(CONVERT_TZ(timestamp_consumed, '+00:00', 'SYSTEM'), '<jvm-time-zone>', '+00:00');
+```
+
+Named time zones such as `America/Los_Angeles` require the time zone tables of MySQL to be loaded. Timestamps in the
+local hour of the JVM time zone that is repeated when daylight saving time ends can't be corrected exactly. All
+applications must have run in the same time zone.
+
+Correct the `event_journal` table before running `snapshot_start_from_snapshot_mysql.sql`, see
+@ref:[Snapshots as starting points for queries](#eventsBySlicesStartingFromSnapshots), so that it copies the corrected
+timestamps of the events to the `snapshot` table. If the `snapshot` table already has the `db_timestamp` column, set it
+again from the corrected events instead of converting it, because the timestamps of snapshots without an event are
+taken from `write_timestamp` and are not shifted:
+
+```sql
+SET time_zone = '+00:00';
+UPDATE snapshot s JOIN event_journal e
+  ON s.persistence_id = e.persistence_id AND s.seq_nr = e.seq_nr AND e.deleted = false
+  SET s.db_timestamp = e.db_timestamp;
+UPDATE snapshot s SET s.db_timestamp = FROM_UNIXTIME(s.write_timestamp / 1000)
+  WHERE NOT EXISTS (SELECT 1 FROM event_journal e
+    WHERE e.persistence_id = s.persistence_id AND e.seq_nr = s.seq_nr AND e.deleted = false);
+```
+
+Alternatively, keep the previous options until the data is corrected, with
+`connectionTimeZone=SERVER&forceConnectionTimeZoneToSession=false` in the `url`, or with a
+`connection-factory-options-customizer`. The previous problems remain then:
+
+```scala
+import com.typesafe.config.Config
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
+
+class PreviousMySQLTimeZone(system: ActorSystem[_]) extends ConnectionFactoryOptionsCustomizer {
+  override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder =
+    builder
+      .option(Option.valueOf[String]("connectionTimeZone"), "SERVER")
+      .option(Option.valueOf[java.lang.Boolean]("forceConnectionTimeZoneToSession"), java.lang.Boolean.FALSE)
+}
+```
+
+```HOCON
+pekko.persistence.r2dbc.connection-factory.connection-factory-options-customizer = "com.example.PreviousMySQLTimeZone"
+```
+
 ## Migration to Apache Pekko
 
 These migration notes are designed for users migrating from Akka Persistence R2DBC 0.7.7 to Persistence R2DBC 1.0
