@@ -79,6 +79,18 @@ Yugabyte:
 docker exec -i yb-tserver-n1 /home/yugabyte/bin/ysqlsh -h yb-tserver-n1 -t < ddl-scripts/create_tables_yugabyte.sql
 ```
 
+### MySQL
+
+The plugin sets the `connectionTimeZone` option of the MySQL driver to `UTC` and `forceConnectionTimeZoneToSession` to
+`true`, so that timestamps are stored and read correctly whatever the time zone of the server is, including the local
+hour that is repeated when daylight saving time ends. The database session therefore uses the UTC time zone, and SQL
+that runs on the plugin's connections, for example in a `ChangeHandler` of durable state, sees `NOW()` and `TIMESTAMP`
+values in UTC.
+
+A `connection-factory-options-customizer` can override these options, but timestamps are then only stored correctly
+if the connection time zone is also the session time zone and has no daylight saving time. This is meant for upgrading
+from earlier versions, see the @ref:[migration guide](migration-guides.md#mysql-time-zone-in-2-0-0).
+
 ### MariaDB
 
 MariaDB 10.11 or later is supported.

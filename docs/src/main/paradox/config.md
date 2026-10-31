@@ -21,13 +21,8 @@ H2:
 : @@snip [application.conf](/docs/src/test/resources/application-h2.conf) { #connection-settings }
 
 For H2 the connection is configured in the `h2` section of the connection factory configuration, see
-@ref:[H2](getting-started.md#h2). For MariaDB, see @ref:[MariaDB](getting-started.md#mariadb).
-
-For MySQL the plugin sets the `connectionTimeZone` option of the driver to `UTC` and `forceConnectionTimeZoneToSession`
-to `true`, so that timestamps are stored and read correctly whatever the time zone of the server is, including the
-local hour that is repeated when daylight saving time ends. The database session therefore uses the UTC time zone, and
-SQL that runs on the plugin's connections, for example in a `ChangeHandler` of durable state, sees `NOW()` and
-`TIMESTAMP` values in UTC.
+@ref:[H2](getting-started.md#h2). For MySQL and MariaDB, see @ref:[MySQL](getting-started.md#mysql) and
+@ref:[MariaDB](getting-started.md#mariadb).
 
 ## Reference configuration 
 

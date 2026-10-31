@@ -202,6 +202,9 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       // stored correctly, see https://github.com/asyncer-io/r2dbc-mysql/pull/240. UTC has no ambiguous local times when
       // daylight saving time ends, and the server time zone may not be resolvable by the driver (e.g. `EDT`), see
       // https://github.com/apache/pekko-persistence-r2dbc/issues/533.
+      // Unlike the MariaDB time zone, these are set before the customizer on purpose: rows written by earlier versions
+      // may be stored shifted, and a customizer can restore the previous options until the data is corrected, see the
+      // migration guide.
       builder.option(Option.valueOf("connectionTimeZone"), "UTC")
       builder.option(Option.valueOf("forceConnectionTimeZoneToSession"), java.lang.Boolean.TRUE)
     }
