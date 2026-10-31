@@ -173,7 +173,10 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, timeout.toJava)
     }
 
-    val mariaDB = MariaDBConnections.isMariaDB(builder.build())
+    val driverOptions = builder.build()
+    val mariaDB = MariaDBConnections.isMariaDB(driverOptions)
+    // the driver can be set with the `driver` setting or in the `url`
+    val mySQL = scala.Option(driverOptions.getValue(ConnectionFactoryOptions.DRIVER)).exists(_.toString == "mysql")
 
     if (settings.sslEnabled && mariaDB) {
       // the MariaDB driver ignores the SSL option and has its own names and values for the other options
@@ -197,16 +200,20 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_PASSWORD, settings.sslPassword)
     }
 
-    if (settings.driver == "mysql") {
+    if (mySQL) {
       // Instants are converted with the connection time zone, which must be the session time zone for timestamps to be
       // stored correctly, see https://github.com/asyncer-io/r2dbc-mysql/pull/240. UTC has no ambiguous local times when
       // daylight saving time ends, and the server time zone may not be resolvable by the driver (e.g. `EDT`), see
       // https://github.com/apache/pekko-persistence-r2dbc/issues/533.
-      // Unlike the MariaDB time zone, these are set before the customizer on purpose: rows written by earlier versions
-      // may be stored shifted, and a customizer can restore the previous options until the data is corrected, see the
+      // Unlike the MariaDB time zone, these are not enforced on purpose: rows written by earlier versions may be stored
+      // shifted, and the `url` or a customizer can keep the previous options until the data is corrected, see the
       // migration guide.
-      builder.option(Option.valueOf("connectionTimeZone"), "UTC")
-      builder.option(Option.valueOf("forceConnectionTimeZoneToSession"), java.lang.Boolean.TRUE)
+      val connectionTimeZone = Option.valueOf[String]("connectionTimeZone")
+      val forceConnectionTimeZoneToSession = Option.valueOf[java.lang.Boolean]("forceConnectionTimeZoneToSession")
+      if (!driverOptions.hasOption(connectionTimeZone))
+        builder.option(connectionTimeZone, "UTC")
+      if (!driverOptions.hasOption(forceConnectionTimeZoneToSession))
+        builder.option(forceConnectionTimeZoneToSession, java.lang.Boolean.TRUE)
     }
 
     val options = customizer(builder, config).build()
