@@ -48,6 +48,20 @@ object DbTimestampDstSpec {
    * daylight saving time, so that it has a repeated local hour when the clocks are set back.
    */
   val DstZone: ZoneId = ZoneId.of("America/New_York")
+
+  /**
+   * The first transition after `now` when the clocks are set back in `zone`, if any. The search is bounded by a number
+   * of transitions instead of a period of time, because the next set-back can be more than a year away right after the
+   * clocks were set back.
+   */
+  def nextClocksSetBack(zone: ZoneId, now: Instant): Option[ZoneOffsetTransition] = {
+    val rules = zone.getRules
+    Iterator
+      .iterate(rules.nextTransition(now))(t => if (t == null) null else rules.nextTransition(t.getInstant))
+      .take(10)
+      .takeWhile(_ != null)
+      .find(_.isOverlap)
+  }
 }
 
 /**
@@ -62,6 +76,7 @@ class DbTimestampDstSpec
     with TestData
     with LogCapturing {
   import DbTimestampDstSpec.DstZone
+  import DbTimestampDstSpec.nextClocksSetBack
 
   override def typedSystem: ActorSystem[?] = system
 
@@ -84,17 +99,10 @@ class DbTimestampDstSpec
     QueryDao.fromConfig(querySettings, ConfigFactory.empty())(system, system.executionContext)
 
   // the next time the clocks are set back, when a local hour is repeated
-  private lazy val clocksSetBack: ZoneOffsetTransition = {
-    val rules = DstZone.getRules
-    val now = Instant.now()
-    Iterator
-      .iterate(rules.nextTransition(now))(t => if (t == null) null else rules.nextTransition(t.getInstant))
-      .takeWhile(t => t != null && t.getInstant.isBefore(now.plus(Duration.ofDays(366))))
-      .find(_.isOverlap)
-      .getOrElse(fail(
-        s"$DstZone has no daylight saving time change within a year, it doesn't observe daylight saving time anymore. " +
-        "Pick another time zone for the database containers in CI and for DstZone."))
-  }
+  private lazy val clocksSetBack: ZoneOffsetTransition =
+    nextClocksSetBack(DstZone, Instant.now()).getOrElse(fail(
+      s"$DstZone has no upcoming daylight saving time change, it doesn't observe daylight saving time anymore. " +
+      "Pick another time zone for the database containers in CI and for DstZone."))
 
   // the same local time before and after the clocks are set back
   private lazy val beforeSetBack = clocksSetBack.getInstant.minus(Duration.ofMinutes(30))
@@ -130,6 +138,19 @@ class DbTimestampDstSpec
         Seq(SerializedJournalRow(slice, "TestEntity", persistenceId, seqNr, timestamp, timestamp,
           Some(Array[Byte](1)), 1, "", "writer", Set.empty, None)))
       .futureValue
+  }
+
+  "nextClocksSetBack" should {
+    // https://github.com/apache/pekko-persistence-r2dbc/issues/542
+    "find the next set-back when it is more than a year away" in {
+      val now = Instant.parse("2026-11-02T12:00:00Z")
+      nextClocksSetBack(DstZone, now).map(_.getInstant) shouldBe Some(Instant.parse("2027-11-07T06:00:00Z"))
+    }
+
+    "find nothing for a time zone without daylight saving time" in {
+      nextClocksSetBack(ZoneId.of("UTC"), Instant.now()) shouldBe None
+      nextClocksSetBack(ZoneId.of("Asia/Tokyo"), Instant.now()) shouldBe None
+    }
   }
 
   "The database timestamps" should {
