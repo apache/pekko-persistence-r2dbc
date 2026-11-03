@@ -18,6 +18,7 @@
 package org.apache.pekko.persistence.r2dbc
 
 import org.apache.pekko
+import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.testkit.typed.scaladsl.TestProbe
 import pekko.actor.typed.ActorSystem
@@ -63,6 +64,9 @@ object MySQLConnectionFactoryProviderSpec {
     mysql-url-time-zone = $${mysql-url} {
       url = "r2dbc:mysql://root:root@localhost:3306/mysql?connectionTimeZone=SERVER&forceConnectionTimeZoneToSession=false"
     }
+    mysql-url-not-forced = $${mysql-url} {
+      url = "r2dbc:mysql://root:root@localhost:3306/mysql?forceConnectionTimeZoneToSession=false"
+    }
     """)
     .withFallback(ConfigFactory.load())
     .resolve()
@@ -72,6 +76,8 @@ class MySQLConnectionFactoryProviderSpec
     extends ScalaTestWithActorTestKit(MySQLConnectionFactoryProviderSpec.config)
     with AnyWordSpecLike {
   import MySQLConnectionFactoryProviderSpec.TimeZoneOptions
+
+  private val sessionTimeZoneWarning = "the database session uses the time zone of the server"
 
   private def timeZoneOptions(configPath: String): TimeZoneOptions = {
     val probe = TestProbe[TimeZoneOptions]()
@@ -84,15 +90,27 @@ class MySQLConnectionFactoryProviderSpec
 
   "ConnectionFactoryProvider with the MySQL driver" should {
     "use the UTC session time zone with the driver setting" in {
-      timeZoneOptions("mysql-driver") shouldBe TimeZoneOptions("UTC", "true")
+      LoggingTestKit.warn(sessionTimeZoneWarning).withOccurrences(0).expect {
+        timeZoneOptions("mysql-driver") shouldBe TimeZoneOptions("UTC", "true")
+      }
     }
 
     "use the UTC session time zone with a url" in {
-      timeZoneOptions("mysql-url") shouldBe TimeZoneOptions("UTC", "true")
+      LoggingTestKit.warn(sessionTimeZoneWarning).withOccurrences(0).expect {
+        timeZoneOptions("mysql-url") shouldBe TimeZoneOptions("UTC", "true")
+      }
     }
 
     "keep the time zone options of a url" in {
-      timeZoneOptions("mysql-url-time-zone") shouldBe TimeZoneOptions("SERVER", "false")
+      LoggingTestKit.warn(sessionTimeZoneWarning).withOccurrences(0).expect {
+        timeZoneOptions("mysql-url-time-zone") shouldBe TimeZoneOptions("SERVER", "false")
+      }
+    }
+
+    "warn if the connection time zone is not the session time zone" in {
+      LoggingTestKit.warn(sessionTimeZoneWarning).expect {
+        timeZoneOptions("mysql-url-not-forced") shouldBe TimeZoneOptions("UTC", "false")
+      }
     }
   }
 }

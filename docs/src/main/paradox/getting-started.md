@@ -88,7 +88,8 @@ daylight saving time ends. The database session therefore uses the UTC time zone
 connections, for example in a `ChangeHandler` of durable state, sees `NOW()` and `TIMESTAMP` values in UTC.
 
 The `url` or a `connection-factory-options-customizer` can override these options, but timestamps are then only stored
-correctly if the connection time zone is also the session time zone and has no daylight saving time. This is meant for
+correctly if the connection time zone is also the session time zone and has no daylight saving time. The plugin logs a
+warning if `forceConnectionTimeZoneToSession` is not enabled and `connectionTimeZone` is not `SERVER`. This is meant for
 upgrading from earlier versions, see the @ref:[migration guide](migration-guides.md#mysql-time-zone-in-2-0-0).
 
 ### MariaDB
