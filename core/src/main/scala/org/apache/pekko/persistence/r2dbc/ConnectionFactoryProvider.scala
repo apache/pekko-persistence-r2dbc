@@ -47,6 +47,7 @@ import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
 import io.r2dbc.spi.Option
 import io.r2dbc.spi.Wrapped
+import org.slf4j.LoggerFactory
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
   def createExtension(system: ActorSystem[?]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)
@@ -83,6 +84,8 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
 }
 
 class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
+
+  private val log = LoggerFactory.getLogger(classOf[ConnectionFactoryProvider])
 
   // the connection pools, or the connection factories that wrap them
   private val sessions = new ConcurrentHashMap[String, ConnectionFactory]
@@ -173,7 +176,10 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, timeout.toJava)
     }
 
-    val mariaDB = MariaDBConnections.isMariaDB(builder.build())
+    val driverOptions = builder.build()
+    val mariaDB = MariaDBConnections.isMariaDB(driverOptions)
+    // the driver can be set with the `driver` setting or in the `url`
+    val mySQL = scala.Option(driverOptions.getValue(ConnectionFactoryOptions.DRIVER)).exists(_.toString == "mysql")
 
     if (settings.sslEnabled && mariaDB) {
       // the MariaDB driver ignores the SSL option and has its own names and values for the other options
@@ -197,18 +203,45 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         builder.option(PostgresqlConnectionFactoryProvider.SSL_PASSWORD, settings.sslPassword)
     }
 
-    if (settings.driver == "mysql") {
-      // Either `connectionTimeZone = SERVER` or `forceConnectionTimeZoneToSession = true` need to be set for timezones to work correctly,
-      // likely caused by bug in https://github.com/asyncer-io/r2dbc-mysql/pull/240.
-      builder.option(Option.valueOf("connectionTimeZone"), "SERVER")
+    if (mySQL) {
+      // Instants are converted with the connection time zone, which must be the session time zone for timestamps to be
+      // stored correctly, see https://github.com/asyncer-io/r2dbc-mysql/pull/240. UTC has no ambiguous local times when
+      // daylight saving time ends, and the server time zone may not be resolvable by the driver (e.g. `EDT`), see
+      // https://github.com/apache/pekko-persistence-r2dbc/issues/533.
+      // Unlike the MariaDB time zone, these are not enforced on purpose: rows written by earlier versions may be stored
+      // shifted, and the `url` or a customizer can keep the previous options until the data is corrected, see the
+      // migration guide.
+      val connectionTimeZone = Option.valueOf[String]("connectionTimeZone")
+      val forceConnectionTimeZoneToSession = Option.valueOf[java.lang.Boolean]("forceConnectionTimeZoneToSession")
+      if (!driverOptions.hasOption(connectionTimeZone))
+        builder.option(connectionTimeZone, "UTC")
+      if (!driverOptions.hasOption(forceConnectionTimeZoneToSession))
+        builder.option(forceConnectionTimeZoneToSession, java.lang.Boolean.TRUE)
     }
 
     val options = customizer(builder, config).build()
+    if (mySQL)
+      warnIfSessionTimeZoneDiffers(options)
     if (MariaDBConnections.isMariaDB(options))
       // Instants are bound and read as UTC LocalDateTime, which requires the UTC session time zone
       (ConnectionFactories.get(MariaDBConnections.requireUtcTimezone(options)), Some(MariaDBConnections))
     else
       (ConnectionFactories.get(options), None)
+  }
+
+  // The `url` or a customizer can set the options so that the driver converts timestamps with another time zone than
+  // the session uses. Timestamps are then stored shifted, and round trips through the driver hide it.
+  private def warnIfSessionTimeZoneDiffers(options: ConnectionFactoryOptions): Unit = {
+    def value(name: String): scala.Option[String] =
+      scala.Option(options.getValue(Option.valueOf[AnyRef](name))).map(_.toString)
+    val connectionTimeZone = value("connectionTimeZone").getOrElse("LOCAL") // the default of the driver
+    val forced = value("forceConnectionTimeZoneToSession").exists(_.equalsIgnoreCase("true"))
+    if (!forced && !connectionTimeZone.equalsIgnoreCase("SERVER"))
+      log.warn(
+        "The MySQL driver converts timestamps with the [{}] time zone, but the database session uses the time zone of " +
+        "the server, because forceConnectionTimeZoneToSession is not enabled. Timestamps are stored shifted if these " +
+        "time zones differ. Set forceConnectionTimeZoneToSession to true, or connectionTimeZone to SERVER.",
+        connectionTimeZone)
   }
 
   private def createConnectionPoolFactory(settings: ConnectionFactorySettings,

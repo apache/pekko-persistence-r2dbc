@@ -21,7 +21,8 @@ H2:
 : @@snip [application.conf](/docs/src/test/resources/application-h2.conf) { #connection-settings }
 
 For H2 the connection is configured in the `h2` section of the connection factory configuration, see
-@ref:[H2](getting-started.md#h2). For MariaDB, see @ref:[MariaDB](getting-started.md#mariadb).
+@ref:[H2](getting-started.md#h2). For MySQL and MariaDB, see @ref:[MySQL](getting-started.md#mysql) and
+@ref:[MariaDB](getting-started.md#mariadb).
 
 ## Reference configuration 
 

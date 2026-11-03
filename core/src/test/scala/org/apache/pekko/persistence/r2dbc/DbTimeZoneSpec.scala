@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.pekko.persistence.r2dbc.internal.mariadb
+package org.apache.pekko.persistence.r2dbc
 
 import java.time.Instant
 
@@ -25,18 +25,16 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
-import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.TestConfig
-import pekko.persistence.r2dbc.TestDbLifecycle
 import org.scalatest.Outcome
 import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
 
 /**
- * Instants are bound and read as UTC LocalDateTime with the MariaDB driver, which is only correct when the session time
- * zone is UTC. Run against a server with a non-UTC time zone to verify that the session time zone is set.
+ * MySQL and MariaDB convert TIMESTAMP values with the session time zone, and the drivers convert Instant with the
+ * time zone the plugin configures, which is only correct when the session time zone is UTC. Run against a server with
+ * a non-UTC time zone to verify that the session time zone is set.
  */
-class MariaDBTimeZoneSpec
+class DbTimeZoneSpec
     extends ScalaTestWithActorTestKit(TestConfig.config)
     with AnyWordSpecLike
     with TestDbLifecycle
@@ -45,10 +43,12 @@ class MariaDBTimeZoneSpec
   override def typedSystem: ActorSystem[?] = system
 
   override def withFixture(test: NoArgTest): Outcome =
-    if (TestConfig.dialect == Dialect.MariaDB) super.withFixture(test)
-    else Pending // only for the MariaDB driver
+    TestConfig.dialect match {
+      case Dialect.MySQL | Dialect.MariaDB                  => super.withFixture(test)
+      case Dialect.Postgres | Dialect.Yugabyte | Dialect.H2 => Pending // the session time zone doesn't matter
+    }
 
-  "MariaDB connections" should {
+  "Database connections" should {
     "use the UTC session time zone" in {
       // the session time zone can also be SYSTEM when the server time zone is UTC, so the offset is checked
       r2dbcExecutor
@@ -62,7 +62,7 @@ class MariaDBTimeZoneSpec
       val instant = Instant.parse("2026-10-27T11:19:11Z")
       r2dbcExecutor
         .selectOne("select epoch seconds")(
-          _.createStatement("SELECT UNIX_TIMESTAMP(?) AS epoch").bind(0, instant),
+          _.createStatement("SELECT CAST(UNIX_TIMESTAMP(?) AS SIGNED) AS epoch").bind(0, instant),
           row => row.get("epoch", classOf[java.lang.Long]).longValue)
         .futureValue shouldBe Some(instant.getEpochSecond)
     }

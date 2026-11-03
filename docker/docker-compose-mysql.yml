@@ -23,6 +23,9 @@ services:
       - 3306:3306
     environment:
       MYSQL_ROOT_PASSWORD: root
+      # a server time zone with daylight saving time, so that tests verify that the plugin uses UTC sessions, see
+      # DbTimeZoneSpec and DbTimestampDstSpec
+      TZ: America/New_York
     healthcheck:
       test: [ "CMD", "mysqladmin", "--password=root", "ping", "-h", "127.0.0.1" ]
       interval: 1s
