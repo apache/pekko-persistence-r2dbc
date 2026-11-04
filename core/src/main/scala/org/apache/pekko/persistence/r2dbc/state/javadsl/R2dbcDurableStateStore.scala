@@ -23,6 +23,7 @@ import scala.jdk.FutureConverters._
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
+import pekko.annotation.InternalApi
 import pekko.japi.Pair
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.Offset
@@ -37,7 +38,12 @@ object R2dbcDurableStateStore {
   val Identifier: String = ScalaR2dbcDurableStateStore.Identifier
 }
 
-class R2dbcDurableStateStore[A](scalaStore: ScalaR2dbcDurableStateStore[A])(implicit ec: ExecutionContext)
+/**
+ * @constructor
+ *   INTERNAL API: use `DurableStateStoreRegistry` to get an instance of the store.
+ */
+class R2dbcDurableStateStore[A] @InternalApi() (scalaStore: ScalaR2dbcDurableStateStore[A])(
+    implicit ec: ExecutionContext)
     extends DurableStateUpdateStore[A]
     with DurableStateStoreBySliceQuery[A]
     with DurableStateStorePagedPersistenceIdsQuery[A] {

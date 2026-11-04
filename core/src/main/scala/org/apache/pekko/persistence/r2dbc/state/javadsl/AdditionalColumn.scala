@@ -13,13 +13,34 @@
 
 package org.apache.pekko.persistence.r2dbc.state.javadsl
 
+import java.util.Objects
+
 import org.apache.pekko
 import pekko.annotation.ApiMayChange
 import pekko.annotation.InternalApi
 
 @ApiMayChange
 object AdditionalColumn {
-  final case class Upsert[A](persistenceId: String, entityType: String, slice: Int, revision: Long, value: A)
+  final class Upsert[A](
+      val persistenceId: String,
+      val entityType: String,
+      val slice: Int,
+      val revision: Long,
+      val value: A) {
+
+    override def equals(other: Any): Boolean = other match {
+      case that: Upsert[?] =>
+        persistenceId == that.persistenceId && entityType == that.entityType && slice == that.slice &&
+        revision == that.revision && value == that.value
+      case _ => false
+    }
+
+    override def hashCode: Int =
+      Objects.hash(persistenceId, entityType, Int.box(slice), Long.box(revision), value.asInstanceOf[AnyRef])
+
+    override def toString: String =
+      s"Upsert($persistenceId,$entityType,$slice,$revision,$value)"
+  }
 
   sealed trait Binding[+B]
 
