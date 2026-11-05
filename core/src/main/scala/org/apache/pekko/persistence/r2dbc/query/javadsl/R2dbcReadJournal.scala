@@ -24,6 +24,7 @@ import scala.jdk.OptionConverters._
 
 import org.apache.pekko
 import pekko.NotUsed
+import pekko.annotation.InternalApi
 import pekko.japi.Pair
 import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.query.Offset
@@ -48,7 +49,11 @@ object R2dbcReadJournal {
   val Identifier: String = scaladsl.R2dbcReadJournal.Identifier
 }
 
-final class R2dbcReadJournal(delegate: scaladsl.R2dbcReadJournal)
+/**
+ * @constructor
+ *   INTERNAL API: use `PersistenceQuery` to get an instance of the read journal.
+ */
+final class R2dbcReadJournal @InternalApi() (delegate: scaladsl.R2dbcReadJournal)
     extends ReadJournal
     with CurrentEventsBySliceQuery
     with EventsBySliceQuery
