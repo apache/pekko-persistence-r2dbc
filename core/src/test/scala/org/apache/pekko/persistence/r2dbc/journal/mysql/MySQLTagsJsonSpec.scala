@@ -51,8 +51,26 @@ class MySQLTagsJsonSpec extends AnyWordSpec with Matchers {
       json shouldBe """["path\\to\\file"]"""
     }
 
+    "escape control characters with their short forms" in {
+      MySQLJournalDao.tagsToJson(Set("a\nb\rc\td\be\ff")) shouldBe """["a\nb\rc\td\be\ff"]"""
+    }
+
+    "escape other control characters as unicode escapes" in {
+      MySQLJournalDao.tagsToJson(Set("a\u0001b\u001fc")) shouldBe "[\"a\\u0001b\\u001fc\"]"
+    }
+
+    "not escape characters outside the control range" in {
+      MySQLJournalDao.tagsToJson(Set("a b/c~é")) shouldBe "[\"a b/c~é\"]"
+    }
+
     "round-trip through tagsFromJson" in {
       val tags = Set("alpha", "beta", "gamma")
+      MySQLJournalDao.tagsFromJson(MySQLJournalDao.tagsToJson(tags)) shouldBe tags
+    }
+
+    "round-trip control characters through tagsFromJson" in {
+      val tags =
+        Set("line\nbreak", "carriage\rreturn", "tab\there", "back\bspace", "form\ffeed", "bell\u0007", "\u001f")
       MySQLJournalDao.tagsFromJson(MySQLJournalDao.tagsToJson(tags)) shouldBe tags
     }
   }
@@ -97,6 +115,26 @@ class MySQLTagsJsonSpec extends AnyWordSpec with Matchers {
 
     "parse tags that contain escaped backslashes" in {
       MySQLJournalDao.tagsFromJson("""["path\\to\\file"]""") shouldBe Set("""path\to\file""")
+    }
+
+    "parse tags that contain short control character escapes" in {
+      MySQLJournalDao.tagsFromJson("""["a\nb\rc\td\be\ff"]""") shouldBe Set("a\nb\rc\td\be\ff")
+    }
+
+    "parse tags that contain unicode escapes" in {
+      MySQLJournalDao.tagsFromJson("[\"a\\u0007b\\u00E9c\"]") shouldBe Set("a\u0007béc")
+    }
+
+    "throw IllegalStateException when a unicode escape is truncated" in {
+      an[IllegalStateException] should be thrownBy {
+        MySQLJournalDao.tagsFromJson("[\"a\\u00\"]")
+      }
+    }
+
+    "throw IllegalStateException when a unicode escape is not hexadecimal" in {
+      an[IllegalStateException] should be thrownBy {
+        MySQLJournalDao.tagsFromJson("[\"a\\u00zzb\"]")
+      }
     }
 
     "throw IllegalStateException when input is not a JSON array (plain string)" in {
