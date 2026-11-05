@@ -28,6 +28,7 @@ import pekko.event.Logging
 import pekko.persistence.AtomicWrite
 import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
+import pekko.persistence.SerializedEvent
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
 import pekko.persistence.r2dbc.Dialect
@@ -72,6 +73,16 @@ private[r2dbc] object R2dbcJournal {
     }
     reprWithMeta
   }
+
+  def serializeEvent(serialization: Serialization, event: AnyRef): SerializedEvent =
+    event match {
+      case s: SerializedEvent => s // already serialized
+      case _                  =>
+        val bytes = serialization.serialize(event).get
+        val serializer = serialization.findSerializerFor(event)
+        val manifest = Serializers.manifestFor(serializer, event)
+        new SerializedEvent(bytes, serializer.identifier, manifest)
+    }
 }
 
 /**
@@ -81,6 +92,7 @@ private[r2dbc] object R2dbcJournal {
 private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends AsyncWriteJournal {
   import R2dbcJournal.WriteFinished
   import R2dbcJournal.deserializeRow
+  import R2dbcJournal.serializeEvent
 
   implicit val system: ActorSystem[?] = context.system.toTyped
   implicit val ec: ExecutionContext = context.dispatcher
@@ -126,10 +138,7 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
           val entityType = PersistenceId.extractEntityType(pr.persistenceId)
           val slice = persistenceExt.sliceForPersistenceId(pr.persistenceId)
 
-          val serialized = serialization.serialize(event).get
-          val serializer = serialization.findSerializerFor(event)
-          val manifest = Serializers.manifestFor(serializer, event)
-          val id: Int = serializer.identifier
+          val serializedEvent = serializeEvent(serialization, event)
 
           val metadata = pr.metadata.map { meta =>
             val m = meta.asInstanceOf[AnyRef]
@@ -147,9 +156,9 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
             pr.sequenceNr,
             timestamp,
             JournalDao.EmptyDbTimestamp,
-            Some(serialized),
-            id,
-            manifest,
+            Some(serializedEvent.bytes),
+            serializedEvent.serializerId,
+            serializedEvent.serializerManifest,
             pr.writerUuid,
             tags,
             metadata)
