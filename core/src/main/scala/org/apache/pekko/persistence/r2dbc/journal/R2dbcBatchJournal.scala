@@ -128,6 +128,7 @@ private[r2dbc] object R2dbcBatchJournal {
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
   import R2dbcJournal.WriteFinished
   import R2dbcJournal.deserializeRow
+  import R2dbcJournal.serializeEvent
   import R2dbcBatchJournal.Flush
   import R2dbcBatchJournal.FlushDone
   import R2dbcBatchJournal.WriteRequest
@@ -242,10 +243,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
             val entityType = PersistenceId.extractEntityType(pr.persistenceId)
             val slice = persistenceExt.sliceForPersistenceId(pr.persistenceId)
 
-            val serialized = serialization.serialize(event).get
-            val serializer = serialization.findSerializerFor(event)
-            val manifest = Serializers.manifestFor(serializer, event)
-            val id: Int = serializer.identifier
+            val serializedEvent = serializeEvent(serialization, event)
 
             val metadata = pr.metadata.map { meta =>
               val m = meta.asInstanceOf[AnyRef]
@@ -263,9 +261,9 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
               pr.sequenceNr,
               JournalDao.EmptyDbTimestamp,
               JournalDao.EmptyDbTimestamp,
-              Some(serialized),
-              id,
-              manifest,
+              Some(serializedEvent.bytes),
+              serializedEvent.serializerId,
+              serializedEvent.serializerManifest,
               pr.writerUuid,
               tags,
               metadata)

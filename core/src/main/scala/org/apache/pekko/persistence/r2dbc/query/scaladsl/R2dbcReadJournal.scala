@@ -30,6 +30,7 @@ import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
 import pekko.persistence.FilteredPayload
 import pekko.persistence.Persistence
+import pekko.persistence.SerializedEvent
 import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.query.Offset
 import pekko.persistence.query.TimestampOffset
@@ -408,8 +409,18 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
         val slice = sliceForPersistenceId(env.persistenceId)
         minSlice <= slice && slice <= maxSlice
       }
+      .map { env =>
+        env.eventOption match {
+          case Some(se: SerializedEvent) =>
+            env.withEvent(deserializeEvent(se))
+          case _ => env
+        }
+      }
       .mapMaterializedValue(_ => NotUsed)
   }
+
+  private def deserializeEvent[Event](se: SerializedEvent): Event =
+    serialization.deserialize(se.bytes, se.serializerId, se.serializerManifest).get.asInstanceOf[Event]
 
   private def mergeDbAndPubSubSources[Event](
       dbSource: Source[EventEnvelope[Event], NotUsed],
