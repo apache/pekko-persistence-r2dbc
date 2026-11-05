@@ -97,15 +97,10 @@ object RuntimePluginConfigSpec {
       EventSourcedBehavior[Command, String, String](
         PersistenceId.ofUniqueId(persistenceId),
         "",
-        (state, cmd) =>
+        (_, cmd) =>
           cmd match {
             case Save(text, replyTo) =>
               Effect.persist(text).thenRun(_ => replyTo ! Done)
-            case ShowMeWhatYouGot(replyTo) =>
-              replyTo ! state
-              Effect.none
-            case Stop =>
-              Effect.stop()
           },
         (state, evt) => Seq(state, evt).filter(_.nonEmpty).mkString("|"))
         .withRetention(RetentionCriteria.snapshotEvery(1, Int.MaxValue))
@@ -117,8 +112,6 @@ object RuntimePluginConfigSpec {
   object EventSourced {
     sealed trait Command
     case class Save(text: String, replyTo: ActorRef[Done]) extends Command
-    case class ShowMeWhatYouGot(replyTo: ActorRef[String]) extends Command
-    case object Stop extends Command
   }
 
   trait DurableState {
@@ -158,11 +151,6 @@ object RuntimePluginConfigSpec {
           cmd match {
             case Save(text, replyTo) =>
               Effect.persist(Seq(state, text).filter(_.nonEmpty).mkString("|")).thenRun(_ => replyTo ! Done)
-            case ShowMeWhatYouGot(replyTo) =>
-              replyTo ! state
-              Effect.none
-            case Stop =>
-              Effect.stop()
           })
         .withDurableStateStorePluginId(s"$configKey.state")
         .withDurableStateStorePluginConfig(Some(config))
@@ -170,8 +158,6 @@ object RuntimePluginConfigSpec {
   object DurableState {
     sealed trait Command
     case class Save(text: String, replyTo: ActorRef[Done]) extends Command
-    case class ShowMeWhatYouGot(replyTo: ActorRef[String]) extends Command
-    case object Stop extends Command
   }
 }
 
