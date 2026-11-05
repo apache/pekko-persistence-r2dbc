@@ -41,6 +41,17 @@ class PersistTagsSpec
 
   case class Row(pid: String, seqNr: Long, tags: Set[String])
 
+  private def selectRows(): Seq[Row] =
+    r2dbcExecutor
+      .select[Row]("test")(
+        connection => connection.createStatement(s"select * from ${settings.journalTableWithSchema}"),
+        row =>
+          Row(
+            pid = row.get("persistence_id", classOf[String]),
+            seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
+            tags = readTags(row)))
+      .futureValue
+
   "Persist tags" should {
     "be the same for events stored in same transaction" in {
       val numberOfEntities = 9
@@ -62,22 +73,23 @@ class PersistTagsSpec
       }
       pingProbe.receiveMessages(entities.size, 20.seconds)
 
-      val rows =
-        r2dbcExecutor
-          .select[Row]("test")(
-            connection => connection.createStatement(s"select * from ${settings.journalTableWithSchema}"),
-            row =>
-              Row(
-                pid = row.get("persistence_id", classOf[String]),
-                seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
-                tags = readTags(row)))
-          .futureValue
-
-      rows.foreach { case Row(pid, _, tags) =>
+      selectRows().foreach { case Row(pid, _, tags) =>
         withClue(s"pid [$pid}]: ") {
           tags shouldBe Set(PersistenceId.extractEntityType(pid), s"tag-${PersistenceId.extractEntityId(pid)}")
         }
       }
+    }
+
+    "round-trip tags containing control characters" in {
+      val persistenceId = PersistenceId(nextEntityType(), "control-chars")
+      val tags = Set("line\nbreak", "carriage\rreturn", "tab\there", "back\bspace", "form\ffeed", "bell\u0007")
+      val entity = spawn(Persister(persistenceId, tags), "control-chars")
+
+      val doneProbe = createTestProbe[Done]()
+      entity ! Persister.PersistWithAck("e1", doneProbe.ref)
+      doneProbe.receiveMessage(20.seconds)
+
+      selectRows().filter(_.pid == persistenceId.id).map(_.tags) shouldBe Seq(tags)
     }
 
   }
