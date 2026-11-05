@@ -15,7 +15,6 @@ sourceDistIncubating := false
 
 ThisBuild / resolvers += Resolver.ApacheMavenSnapshotsRepo
 ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
-ThisBuild / resolvers += Resolver.ApacheMavenStagingRepo
 ThisBuild / evictionErrorLevel := Level.Info
 ThisBuild / javafmtFormatterCompatibleJavaVersion := 17
 ThisBuild / javafmtSortImports := false
