@@ -59,8 +59,7 @@ class R2dbcBatchJournalFailureIsolationSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 

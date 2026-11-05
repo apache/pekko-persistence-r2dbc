@@ -124,27 +124,12 @@ object R2dbcBatchJournalValidationSpec {
         }
       }""")
     .withFallback(TestConfig.config)
-
-  val mysqlDialectConfig: Config = ConfigFactory
-    .parseString("""
-      pekko.persistence.r2dbc {
-        use-app-timestamp = on
-        db-timestamp-monotonic-increasing = on
-        batched-journal {
-          class = "org.apache.pekko.persistence.r2dbc.journal.R2dbcBatchJournal"
-          use-app-timestamp = on
-          db-timestamp-monotonic-increasing = on
-          dialect = mysql
-        }
-      }""")
-    .withFallback(TestConfig.config)
 }
 
 class R2dbcBatchJournalZeroBatchSizeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.zeroBatchSizeConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
@@ -159,8 +144,7 @@ class R2dbcBatchJournalZeroBatchSizeSpec
 class R2dbcBatchJournalZeroQueueSizeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.zeroQueueSizeConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
@@ -175,8 +159,7 @@ class R2dbcBatchJournalZeroQueueSizeSpec
 class R2dbcBatchJournalBatchSizeExceedsQueueSizeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.batchSizeExceedsQueueSizeConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
@@ -191,8 +174,7 @@ class R2dbcBatchJournalBatchSizeExceedsQueueSizeSpec
 class R2dbcBatchJournalZeroBatchTimeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.zeroBatchTimeConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
@@ -207,8 +189,7 @@ class R2dbcBatchJournalZeroBatchTimeSpec
 class R2dbcBatchJournalNegativeBatchTimeSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.negativeBatchTimeConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
@@ -223,8 +204,7 @@ class R2dbcBatchJournalNegativeBatchTimeSpec
 class R2dbcBatchJournalAppTimestampOffSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.appTimestampOffConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
@@ -239,28 +219,12 @@ class R2dbcBatchJournalAppTimestampOffSpec
 class R2dbcBatchJournalMonotonicIncreasingOffSpec
     extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.monotonicIncreasingOffConfig)
     with AnyWordSpecLike
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   "R2dbcBatchJournal validation" should {
 
     "fail fast when db-timestamp-monotonic-increasing is off" in {
       LoggingTestKit.error("db-timestamp-monotonic-increasing must be 'on'").expect {
-        Persistence(system).journalFor("pekko.persistence.r2dbc.batched-journal")
-      }
-    }
-  }
-}
-
-class R2dbcBatchJournalMysqlDialectSpec
-    extends ScalaTestWithActorTestKit(R2dbcBatchJournalValidationSpec.mysqlDialectConfig)
-    with AnyWordSpecLike
-    with LogCapturing {
-
-  "R2dbcBatchJournal validation" should {
-
-    "fail fast when the dialect does not support batching" in {
-      LoggingTestKit.error("Batching is only supported for Postgres and Yugabyte").expect {
         Persistence(system).journalFor("pekko.persistence.r2dbc.batched-journal")
       }
     }

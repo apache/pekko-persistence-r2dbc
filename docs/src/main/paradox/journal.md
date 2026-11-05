@@ -58,7 +58,7 @@ JVM (a single request can still contain several events with `persistAll` or `per
 the `eventsBySlices` query can page through any batch regardless of its buffer size. The stamps can lead
 the wall clock by at most `max-batch-size` microseconds per flush. The lag between the timestamp and the
 commit is bounded by the connection acquisition plus one transaction. Keep `query.behind-current-time`
-comfortably above that lag. Batching is only supported and tested for the Postgres and Yugabyte dialects.
+comfortably above that lag.
 
 ### Batched Journal Configuration
 
