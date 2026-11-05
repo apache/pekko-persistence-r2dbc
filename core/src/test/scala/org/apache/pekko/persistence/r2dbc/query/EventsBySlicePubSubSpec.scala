@@ -29,6 +29,7 @@ import pekko.actor.typed.internal.pubsub.TopicImpl
 import pekko.persistence.FilteredPayload
 import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
+import pekko.persistence.SerializedEvent
 import pekko.persistence.journal.Tagged
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
@@ -45,6 +46,8 @@ import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
+import pekko.serialization.SerializationExtension
+import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Keep
 import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
@@ -126,6 +129,11 @@ class EventsBySlicePubSubSpec
       env.slice,
       filtered = false,
       source = EnvelopeOrigin.SourceBacktracking)
+
+  private def serializedEvent(event: AnyRef): SerializedEvent = {
+    val serializer = SerializationExtension(system).findSerializerFor(event)
+    new SerializedEvent(serializer.toBinary(event), serializer.identifier, Serializers.manifestFor(serializer, event))
+  }
 
   private val entityType = nextEntityType()
   private val pidA = PersistenceId(entityType, "A")
@@ -391,6 +399,48 @@ class EventsBySlicePubSubSpec
       }
 
       queries.foreach(_.cancel())
+    }
+
+    "publish SerializedEvent" in new Setup {
+      val result: TestSubscriber.Probe[EventEnvelope[String]] =
+        query.eventsBySlices[String](setupEntityType, slice, slice, NoOffset).runWith(sinkProbe).request(10)
+
+      val topicStatsProbe = createTestProbe[TopicImpl.TopicStats]()
+      eventually {
+        PubSub(typedSystem).eventTopic[String](setupEntityType, slice) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
+        topicStatsProbe.receiveMessage().localSubscriberCount shouldBe 1
+      }
+
+      persister ! PersistWithAck(serializedEvent("e1"), probe.ref)
+      probe.expectMessage(Done)
+
+      val env = result.expectNext()
+      env.event shouldBe "e1"
+      env.source shouldBe EnvelopeOrigin.SourcePubSub
+
+      result.cancel()
+    }
+
+    "keep tags when publishing tagged SerializedEvent" in new Setup {
+      val result: TestSubscriber.Probe[EventEnvelope[String]] =
+        query.eventsBySlices[String](setupEntityType, slice, slice, NoOffset).runWith(sinkProbe).request(10)
+
+      val topicStatsProbe = createTestProbe[TopicImpl.TopicStats]()
+      eventually {
+        PubSub(typedSystem).eventTopic[String](setupEntityType, slice) ! TopicImpl.GetTopicStats(topicStatsProbe.ref)
+        topicStatsProbe.receiveMessage().localSubscriberCount shouldBe 1
+      }
+
+      PubSub(typedSystem).publish(
+        PersistentRepr(Tagged(serializedEvent("e1"), Set("t1")), 1L, persistenceId),
+        Instant.now())
+
+      val env = result.expectNext()
+      env.event shouldBe "e1"
+      env.filtered shouldBe false
+      env.tags shouldBe Set("t1")
+
+      result.cancel()
     }
 
   }
