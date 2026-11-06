@@ -59,5 +59,12 @@ import io.r2dbc.spi.Statement
   }
   implicit class RichRow(val row: Row)(implicit codec: PayloadCodec) extends AnyRef {
     def getPayload(name: String): Array[Byte] = codec.decode(row.get(name, codec.payloadClass))
+
+    /** For payload columns that can hold empty payloads, which Oracle stores as `NULL`. */
+    def getPayloadOrEmpty(name: String): Array[Byte] =
+      getPayload(name) match {
+        case null    => Array.emptyByteArray
+        case payload => payload
+      }
   }
 }

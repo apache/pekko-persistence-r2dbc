@@ -21,6 +21,7 @@ import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.JournalSettings
@@ -82,9 +83,9 @@ class PersistTimestampSpec
             row => {
               val event = serialization
                 .deserialize(
-                  row.getPayload("event_payload"),
+                  row.getPayloadOrEmpty("event_payload"),
                   row.get[Integer]("event_ser_id", classOf[Integer]),
-                  row.get("event_ser_manifest", classOf[String]))
+                  EmptyValues.string(row, "event_ser_manifest"))
                 .get
                 .asInstanceOf[String]
               Row(

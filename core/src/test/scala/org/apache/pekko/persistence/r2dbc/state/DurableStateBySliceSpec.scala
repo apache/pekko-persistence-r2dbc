@@ -37,6 +37,7 @@ import pekko.persistence.r2dbc.TestActors.DurableStatePersister.PersistWithAck
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.stream.KillSwitches
@@ -93,6 +94,24 @@ class DurableStateBySliceSpec
       else
         FishingOutcomes.continueAndIgnore
     }
+
+  "Durable state rows for backtracking" should {
+    "include the revision" in {
+      val entityType = nextEntityType()
+      val persistenceId = nextPid(entityType)
+      val slice = query.sliceForPersistenceId(persistenceId)
+      query.upsertObject(persistenceId, 1L, "s1", "").futureValue
+      query.upsertObject(persistenceId, 2L, "s2", "").futureValue
+
+      val dao = DurableStateDao.fromConfig(stateSettings, ConfigFactory.empty())(system, system.executionContext)
+      dao
+        .rowsBySlices(entityType, slice, slice, java.time.Instant.EPOCH, None, scala.concurrent.duration.Duration.Zero,
+          backtracking = true)
+        .runWith(Sink.seq)
+        .futureValue
+        .map(row => (row.persistenceId, row.revision)) shouldBe Seq(persistenceId -> 2L)
+    }
+  }
 
   List[QueryType](Current, Live).foreach { queryType =>
     def doQuery(

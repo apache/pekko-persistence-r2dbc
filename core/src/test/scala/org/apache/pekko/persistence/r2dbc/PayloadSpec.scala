@@ -106,7 +106,7 @@ class PayloadSpec
           connection.createStatement(
             s"select * from ${journalSettings.journalTableWithSchema} where persistence_id = '$persistenceId'"),
         row => {
-          val payload = row.getPayload("event_payload")
+          val payload = row.getPayloadOrEmpty("event_payload")
           TestRow(
             pid = row.get("persistence_id", classOf[String]),
             seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
@@ -125,7 +125,7 @@ class PayloadSpec
           connection.createStatement(
             s"select * from ${snapshotSettings.snapshotsTableWithSchema} where persistence_id = '$persistenceId'"),
         row => {
-          val payload = row.getPayload("snapshot")
+          val payload = row.getPayloadOrEmpty("snapshot")
           TestRow(
             pid = row.get("persistence_id", classOf[String]),
             seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
@@ -144,7 +144,7 @@ class PayloadSpec
           connection.createStatement(
             s"select * from ${stateSettings.durableStateTableWithSchema} where persistence_id = '$persistenceId'"),
         row => {
-          val payload = row.getPayload("state_payload")
+          val payload = row.getPayloadOrEmpty("state_payload")
           TestRow(
             pid = row.get("persistence_id", classOf[String]),
             seqNr = row.get[java.lang.Long]("revision", classOf[java.lang.Long]),

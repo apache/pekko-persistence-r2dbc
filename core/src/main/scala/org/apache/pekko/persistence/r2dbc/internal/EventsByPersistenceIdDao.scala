@@ -144,15 +144,15 @@ private[r2dbc] trait EventsByPersistenceIdDao {
       row =>
         SerializedJournalRow(
           slice = row.get[Integer]("slice", classOf[Integer]),
-          entityType = row.get("entity_type", classOf[String]),
+          entityType = EmptyValues.string(row, "entity_type"),
           persistenceId = row.get("persistence_id", classOf[String]),
           seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
           dbTimestamp = row.get("db_timestamp", classOf[Instant]),
           readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
-          payload = Some(row.getPayload("event_payload")),
+          payload = Some(row.getPayloadOrEmpty("event_payload")),
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
-          serManifest = row.get("event_ser_manifest", classOf[String]),
-          writerUuid = row.get("writer", classOf[String]),
+          serManifest = EmptyValues.string(row, "event_ser_manifest"),
+          writerUuid = EmptyValues.string(row, "writer"),
           tags = tagsFromRow(row),
           metadata = readMetadata(row)))
 

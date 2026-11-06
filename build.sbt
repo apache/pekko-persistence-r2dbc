@@ -116,6 +116,7 @@ lazy val docs = project
       "r2dbc-mariadb.version" -> Dependencies.R2dbcMariadbVersion,
       "h2.version" -> Dependencies.H2Version,
       "r2dbc-h2.version" -> Dependencies.R2dbcH2Version,
+      "oracle-r2dbc.version" -> Dependencies.OracleR2dbcVersion,
       "scala.version" -> scalaVersion.value,
       "scala.binary.version" -> scalaBinaryVersion.value,
       "extref.pekko.base_url" -> s"https://pekko.apache.org/docs/pekko/${Dependencies.PekkoVersionInDocs}/%s",

@@ -30,6 +30,7 @@ import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -39,6 +40,7 @@ import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.snapshot.mariadb.MariaDBSnapshotDao
 import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
+import pekko.persistence.r2dbc.snapshot.oracle.OracleSnapshotDao
 import pekko.persistence.r2dbc.snapshot.h2.H2SnapshotDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
@@ -97,6 +99,8 @@ private[r2dbc] object SnapshotDao {
         new MySQLSnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MariaDB =>
         new MariaDBSnapshotDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleSnapshotDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tablesConnectionFactory = H2Connections.creatingTables(
           connectionFactory,
@@ -144,6 +148,18 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
     if (tags.isEmpty) stmt.bindNull(index, classOf[Array[String]])
     else stmt.bind(index, tags.toArray)
 
+  protected def entityTypeCondition: String = "entity_type = ?"
+
+  // the snapshot and its metadata, which Oracle binds as BLOBs
+  protected def bindSnapshotPayload(stmt: Statement, index: Int, payload: Array[Byte]): Statement =
+    stmt.bindPayload(index, payload)
+
+  protected def bindMetadataPayload(stmt: Statement, index: Int, payload: Option[Array[Byte]]): Statement =
+    payload match {
+      case Some(bytes) => stmt.bind(index, bytes)
+      case None        => stmt.bindNull(index, classOf[Array[Byte]])
+    }
+
   protected def sliceCondition(minSlice: Int, maxSlice: Int): String =
     settings.dialect match {
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
@@ -171,9 +187,9 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
       seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
       dbTimestamp,
       writeTimestamp,
-      snapshot = row.getPayload("snapshot"),
+      snapshot = row.getPayloadOrEmpty("snapshot"),
       serializerId = row.get[Integer]("ser_id", classOf[Integer]),
-      serializerManifest = row.get("ser_manifest", classOf[String]),
+      serializerManifest = EmptyValues.string(row, "ser_manifest"),
       tags,
       metadata = {
         val metaSerializerId = row.get[Integer]("meta_ser_id", classOf[Integer])
@@ -181,9 +197,9 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
         else
           Some(
             SerializedSnapshotMetadata(
-              row.get("meta_payload", classOf[Array[Byte]]),
+              EmptyValues.bytes(row, "meta_payload"),
               metaSerializerId,
-              row.get("meta_ser_manifest", classOf[String])))
+              EmptyValues.string(row, "meta_ser_manifest")))
       })
   }
 
@@ -282,7 +298,7 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
     sql"""
       SELECT $selectColumns
       FROM $snapshotTable
-      WHERE entity_type = ?
+      WHERE $entityTypeCondition
       AND ${sliceCondition(minSlice, maxSlice)}
       AND db_timestamp >= ? $toDbTimestampParamCondition
       ORDER BY db_timestamp, seq_nr
@@ -293,7 +309,7 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
     sql"""
       SELECT extract(EPOCH from db_timestamp)::BIGINT / 10 AS bucket, count(*) AS count
       FROM $snapshotTable
-      WHERE entity_type = ?
+      WHERE $entityTypeCondition
       AND ${sliceCondition(minSlice, maxSlice)}
       AND db_timestamp >= ? AND db_timestamp <= ?
       GROUP BY bucket ORDER BY bucket LIMIT ?
@@ -350,19 +366,17 @@ private[r2dbc] class SnapshotDao(settings: SnapshotSettings, connectionFactory: 
               .bind(2, serializedRow.persistenceId)
               .bind(3, serializedRow.seqNr)
               .bind(4, serializedRow.writeTimestamp)
-              .bindPayload(5, serializedRow.snapshot)
-              .bind(6, serializedRow.serializerId)
-              .bind(7, serializedRow.serializerManifest)
+          bindSnapshotPayload(statement, 5, serializedRow.snapshot)
+            .bind(6, serializedRow.serializerId)
+            .bind(7, serializedRow.serializerManifest)
 
           serializedRow.metadata match {
             case Some(SerializedSnapshotMetadata(serializedMeta, serializerId, serializerManifest)) =>
-              statement
-                .bind(8, serializedMeta)
+              bindMetadataPayload(statement, 8, Some(serializedMeta))
                 .bind(9, serializerId)
                 .bind(10, serializerManifest)
             case None =>
-              statement
-                .bindNull(8, classOf[Array[Byte]])
+              bindMetadataPayload(statement, 8, None)
                 .bindNull(9, classOf[Integer])
                 .bindNull(10, classOf[String])
           }

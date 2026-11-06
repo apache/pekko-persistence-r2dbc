@@ -26,6 +26,7 @@ import pekko.actor.typed.ActorSystem
 import pekko.persistence.query.DeletedDurableState
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.query.UpdatedDurableState
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -102,7 +103,10 @@ class DurableStateStoreChangeHandlerSpec
     Await.result(
       r2dbcExecutor.executeDdl("beforeAll create changes_test")(
         _.createStatement(
-          s"create table if not exists $anotherTable (pid varchar(256), rev bigint, the_value varchar(256))")),
+          if (TestConfig.dialect == Dialect.Oracle)
+            s"create table if not exists $anotherTable (pid varchar2(256), rev number(19), the_value varchar2(256))"
+          else
+            s"create table if not exists $anotherTable (pid varchar(256), rev bigint, the_value varchar(256))")),
       20.seconds)
     Await.result(
       r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $anotherTable")),

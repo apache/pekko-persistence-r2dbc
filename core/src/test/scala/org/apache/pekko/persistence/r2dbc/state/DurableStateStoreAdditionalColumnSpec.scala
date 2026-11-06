@@ -87,7 +87,23 @@ class DurableStateStoreAdditionalColumnSpec
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    if (DurableStateStoreAdditionalColumnSpec.dialect != "mysql") {
+    if (DurableStateStoreAdditionalColumnSpec.dialect == "oracle") {
+      // Oracle doesn't support ALTER TABLE ADD IF NOT EXISTS, so the columns are added when the table is created,
+      // and a table without them that was created by another test is dropped first
+      Await.result(
+        r2dbcExecutor.executeDdl("beforeAll drop durable_state_test")(
+          _.createStatement(s"drop table if exists $customTable")),
+        20.seconds)
+      Await.result(
+        r2dbcExecutor.executeDdl("beforeAll create durable_state_test")(
+          _.createStatement(
+            s"create table if not exists $customTable as select d.*, cast(null as varchar2(256)) as col1, " +
+            "cast(null as number(10)) as col2, cast(null as number(10)) as col3 from durable_state d where 1 = 0")),
+        20.seconds)
+      Await.result(
+        r2dbcExecutor.updateOne("beforeAll delete")(_.createStatement(s"delete from $customTable")),
+        10.seconds)
+    } else if (DurableStateStoreAdditionalColumnSpec.dialect != "mysql") {
       Await.result(
         r2dbcExecutor.executeDdl("beforeAll create durable_state_test")(
           _.createStatement(

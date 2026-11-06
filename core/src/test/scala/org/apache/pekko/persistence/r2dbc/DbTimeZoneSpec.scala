@@ -44,8 +44,9 @@ class DbTimeZoneSpec
 
   override def withFixture(test: NoArgTest): Outcome =
     TestConfig.dialect match {
-      case Dialect.MySQL | Dialect.MariaDB                  => super.withFixture(test)
-      case Dialect.Postgres | Dialect.Yugabyte | Dialect.H2 => Pending // the session time zone doesn't matter
+      case Dialect.MySQL | Dialect.MariaDB => super.withFixture(test)
+      // the session time zone doesn't matter, the Oracle TIMESTAMP columns have no time zone
+      case Dialect.Postgres | Dialect.Yugabyte | Dialect.Oracle | Dialect.H2 => Pending
     }
 
   "Database connections" should {
