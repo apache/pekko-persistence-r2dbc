@@ -23,6 +23,9 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Statement
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -32,8 +35,6 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.internal.oracle.OracleUtils
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Statement
 
 /**
  * INTERNAL API
@@ -46,6 +47,7 @@ private[r2dbc] class OracleDurableStateDao(
 )(implicit ec: ExecutionContext, system: ActorSystem[?])
     extends DurableStateDao(settings, connectionFactory, closeCallsExceeding) {
   OracleUtils.settingRequirements(settings)
+  OracleUtils.requireByteArrayPayload(settings.durableStatePayloadCodec, "durable state store")
 
   override protected def transactionTimestampSql: String = OracleUtils.currentTimestampSql
 
@@ -58,7 +60,7 @@ private[r2dbc] class OracleDurableStateDao(
     sql"""
      SELECT ${OracleUtils.bucketSql} AS bucket, count(*) AS count
      FROM $stateTable
-     WHERE entity_type = ?
+     WHERE ${OracleUtils.entityTypeCondition}
      AND slice BETWEEN $minSlice AND $maxSlice
      AND db_timestamp >= ? AND db_timestamp <= ?
      GROUP BY bucket ORDER BY bucket LIMIT ?
@@ -83,7 +85,7 @@ private[r2dbc] class OracleDurableStateDao(
     sql"""
       $selectColumns
       FROM $stateTable
-      WHERE entity_type = ?
+      WHERE ${OracleUtils.entityTypeCondition}
       AND slice BETWEEN $minSlice AND $maxSlice
       AND db_timestamp >= ? $maxDbTimestampParamCondition ${OracleUtils.behindCurrentTimeIntervalCondition(
         behindCurrentTime)}

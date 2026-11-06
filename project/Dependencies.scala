@@ -44,7 +44,7 @@ object Dependencies {
     val r2dbcMysql = "io.asyncer" % "r2dbc-mysql" % "1.4.3"
     val r2dbcMariadb = "org.mariadb" % "r2dbc-mariadb" % R2dbcMariadbVersion // ApacheV2
     val r2dbcH2 = "io.r2dbc" % "r2dbc-h2" % R2dbcH2Version // ApacheV2
-    // UPL 1.0 or ApacheV2, but it depends on ojdbc11 (Oracle Free Use Terms and Conditions), so it is test-only:
+    // UPL 1.0 or ApacheV2, but it depends on ojdbc11 (Oracle Free Use Terms and Conditions), so it is provided:
     // users add the driver themselves
     val r2dbcOracle = "com.oracle.database.r2dbc" % "oracle-r2dbc" % OracleR2dbcVersion
     val h2 = "com.h2database" % "h2" % H2Version // EPL 1.0 or MPL 2.0
@@ -87,7 +87,7 @@ object Dependencies {
     r2dbcMariadb % "provided,test",
     r2dbcH2 % "provided,test",
     h2 % "provided,test",
-    r2dbcOracle % Test,
+    r2dbcOracle % "provided,test",
     TestDeps.pekkoPersistenceTck,
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoStreamTyped,

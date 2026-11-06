@@ -22,6 +22,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import org.apache.pekko
 import pekko.annotation.InternalApi
+import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.persistence.r2dbc.internal.SettingsTypes
 
 /**
@@ -43,6 +44,13 @@ private[r2dbc] object OracleUtils {
   val bucketSql: String =
     "ROUND((TRUNC(db_timestamp, 'MI') - DATE '1970-01-01') * 8640) + FLOOR(EXTRACT(SECOND FROM db_timestamp) / 10)"
 
+  /**
+   * Oracle stores the empty entity type of a persistence id without an entity type separator as `NULL`, and an empty
+   * string bound to the parameter is `NULL` too, so `entity_type = ?` would never match it. `DECODE` treats two `NULL`
+   * values as equal.
+   */
+  val entityTypeCondition: String = "DECODE(entity_type, ?, 1, 0) = 1"
+
   def behindCurrentTimeIntervalCondition(behindCurrentTime: FiniteDuration): String =
     if (behindCurrentTime > Duration.Zero)
       s"AND db_timestamp < $currentTimestampSql - NUMTODSINTERVAL(${behindCurrentTime.toMicros} / 1000000, 'SECOND')"
@@ -56,4 +64,12 @@ private[r2dbc] object OracleUtils {
       settings.dbTimestampMonotonicIncreasing,
       "db-timestamp-monotonic-increasing config must be on for Oracle support")
   }
+
+  /**
+   * The Oracle DDL stores payloads in `BLOB` columns, a JSON payload column type is not supported.
+   */
+  def requireByteArrayPayload(codec: PayloadCodec, plugin: String): Unit =
+    require(
+      codec == PayloadCodec.ByteArrayCodec,
+      s"payload-column-type of the $plugin must be BYTEA for Oracle support, JSON payloads are not supported")
 }

@@ -20,6 +20,10 @@ package org.apache.pekko.persistence.r2dbc.journal.oracle
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -28,9 +32,6 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.internal.oracle.OracleUtils
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
 
 /**
  * INTERNAL API
@@ -43,6 +44,7 @@ private[r2dbc] class OracleJournalDao(
     implicit ec: ExecutionContext, system: ActorSystem[?]
 ) extends JournalDao(journalSettings, connectionFactory, closeCallsExceeding) {
   OracleUtils.settingRequirements(journalSettings)
+  OracleUtils.requireByteArrayPayload(journalSettings.journalPayloadCodec, "journal")
 
   override lazy val timestampSql: String = OracleUtils.currentTimestampSql
   override lazy val statementTimestampSql: String = OracleUtils.currentTimestampSql
