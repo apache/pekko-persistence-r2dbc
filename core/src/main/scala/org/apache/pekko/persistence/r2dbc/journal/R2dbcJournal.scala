@@ -221,6 +221,8 @@ private[r2dbc] final class R2dbcJournal(config: Config, cfgPath: String) extends
 
   override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {
     log.debug("asyncReadHighestSequenceNr [{}] [{}]", persistenceId, fromSequenceNr)
+    // recovery comes before an entity's first write, so its pub-sub topic is there before its first event is published
+    pubSub.foreach(_.createTopic(persistenceId))
     val pendingWrite = Option(writesInProgress.get(persistenceId)) match {
       case Some(f) =>
         log.debug("Write in progress for [{}], deferring highest seq nr until write completed", persistenceId)
