@@ -27,6 +27,7 @@ import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
 import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
@@ -77,14 +78,15 @@ private[r2dbc] object JournalDao {
   final case class SerializedEventMetadata(serId: Int, serManifest: String, payload: Array[Byte])
 
   def readMetadata(row: Row): Option[SerializedEventMetadata] = {
-    row.get("meta_payload", classOf[Array[Byte]]) match {
-      case null        => None
-      case metaPayload =>
+    // by the serializer id, because Oracle stores an empty metadata payload as NULL
+    row.get[Integer]("meta_ser_id", classOf[Integer]) match {
+      case null      => None
+      case metaSerId =>
         Some(
           SerializedEventMetadata(
-            serId = row.get[Integer]("meta_ser_id", classOf[Integer]),
-            serManifest = row.get("meta_ser_manifest", classOf[String]),
-            metaPayload))
+            serId = metaSerId,
+            serManifest = EmptyValues.string(row, "meta_ser_manifest"),
+            EmptyValues.bytes(row, "meta_payload")))
     }
   }
 

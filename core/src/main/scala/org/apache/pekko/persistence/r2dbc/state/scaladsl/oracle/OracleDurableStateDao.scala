@@ -46,6 +46,7 @@ private[r2dbc] class OracleDurableStateDao(
 )(implicit ec: ExecutionContext, system: ActorSystem[?])
     extends DurableStateDao(settings, connectionFactory, closeCallsExceeding) {
   OracleUtils.settingRequirements(settings)
+  OracleUtils.requireByteArrayPayload(settings.durableStatePayloadCodec, "durable state store")
 
   override protected def transactionTimestampSql: String = OracleUtils.currentTimestampSql
 
@@ -58,7 +59,7 @@ private[r2dbc] class OracleDurableStateDao(
     sql"""
      SELECT ${OracleUtils.bucketSql} AS bucket, count(*) AS count
      FROM $stateTable
-     WHERE entity_type = ?
+     WHERE ${OracleUtils.entityTypeCondition}
      AND slice BETWEEN $minSlice AND $maxSlice
      AND db_timestamp >= ? AND db_timestamp <= ?
      GROUP BY bucket ORDER BY bucket LIMIT ?
@@ -83,7 +84,7 @@ private[r2dbc] class OracleDurableStateDao(
     sql"""
       $selectColumns
       FROM $stateTable
-      WHERE entity_type = ?
+      WHERE ${OracleUtils.entityTypeCondition}
       AND slice BETWEEN $minSlice AND $maxSlice
       AND db_timestamp >= ? $maxDbTimestampParamCondition ${OracleUtils.behindCurrentTimeIntervalCondition(
         behindCurrentTime)}

@@ -30,6 +30,7 @@ import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.r2dbc.internal.EventsByPersistenceIdDao
 import pekko.persistence.r2dbc.internal.HighestSequenceNrDao
 import pekko.persistence.r2dbc.internal.InstantFactory
@@ -118,6 +119,8 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
     else
       "SELECT slice, persistence_id, seq_nr, db_timestamp, statement_timestamp() AS read_db_timestamp, tags, event_ser_id, event_ser_manifest, event_payload, meta_ser_id, meta_ser_manifest, meta_payload "
 
+  protected def entityTypeCondition: String = "entity_type = ?"
+
   protected def toDbTimestampParamCondition(toDbTimestampParam: Boolean): String =
     if (toDbTimestampParam) "AND db_timestamp <= ?" else ""
 
@@ -135,7 +138,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
     sql"""
       ${selectColumns(backtracking)}
       FROM $journalTable
-      WHERE entity_type = ?
+      WHERE $entityTypeCondition
       AND ${sliceCondition(minSlice, maxSlice)}
       AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(
         behindCurrentTime)}
@@ -145,9 +148,8 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
 
   private def sliceCondition(minSlice: Int, maxSlice: Int): String = {
     settings.dialect match {
-      case Dialect.Yugabyte => s"slice BETWEEN $minSlice AND $maxSlice"
       case Dialect.Postgres => s"slice in (${(minSlice to maxSlice).mkString(",")})"
-      case unhandled        => throw new IllegalArgumentException(s"Unable to handle dialect [$unhandled]")
+      case _                => s"slice BETWEEN $minSlice AND $maxSlice"
     }
   }
 
@@ -155,7 +157,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
     sql"""
       SELECT extract(EPOCH from db_timestamp)::BIGINT / 10 AS bucket, count(*) AS count
       FROM $journalTable
-      WHERE entity_type = ?
+      WHERE $entityTypeCondition
       AND ${sliceCondition(minSlice, maxSlice)}
       AND db_timestamp >= ? AND db_timestamp <= ?
       AND deleted = false
@@ -238,7 +240,7 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             payload = None, // lazy loaded for backtracking
             serId = row.get[Integer]("event_ser_id", classOf[Integer]),
-            serManifest = row.get("event_ser_manifest", classOf[String]),
+            serManifest = EmptyValues.string(row, "event_ser_manifest"),
             writerUuid = "", // not need in this query
             tags = Set.empty, // tags not fetched in backtracking
             metadata = None)
@@ -250,9 +252,9 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
             seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
-            payload = Some(row.getPayload("event_payload")),
+            payload = Some(row.getPayloadOrEmpty("event_payload")),
             serId = row.get[Integer]("event_ser_id", classOf[Integer]),
-            serManifest = row.get("event_ser_manifest", classOf[String]),
+            serManifest = EmptyValues.string(row, "event_ser_manifest"),
             writerUuid = "", // not need in this query
             tags = tagsFromRow(row),
             metadata = readMetadata(row)))
@@ -331,14 +333,14 @@ private[r2dbc] class QueryDao(val settings: QuerySettings, connectionFactory: Co
       row =>
         SerializedJournalRow(
           slice = row.get[Integer]("slice", classOf[Integer]),
-          entityType = row.get("entity_type", classOf[String]),
+          entityType = EmptyValues.string(row, "entity_type"),
           persistenceId,
           seqNr,
           dbTimestamp = row.get("db_timestamp", classOf[Instant]),
           readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
-          payload = Some(row.getPayload("event_payload")),
+          payload = Some(row.getPayloadOrEmpty("event_payload")),
           serId = row.get[Integer]("event_ser_id", classOf[Integer]),
-          serManifest = row.get("event_ser_manifest", classOf[String]),
+          serManifest = EmptyValues.string(row, "event_ser_manifest"),
           writerUuid = "", // not need in this query
           tags = tagsFromRow(row),
           metadata = readMetadata(row)))

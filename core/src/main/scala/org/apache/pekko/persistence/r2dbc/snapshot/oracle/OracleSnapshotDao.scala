@@ -17,6 +17,7 @@
 
 package org.apache.pekko.persistence.r2dbc.snapshot.oracle
 
+import java.nio.ByteBuffer
 import java.time.Instant
 
 import scala.concurrent.ExecutionContext
@@ -32,9 +33,13 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.internal.oracle.OracleUtils
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.r2dbc.snapshot.SnapshotDao
+import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotRow
+import io.r2dbc.spi.Blob
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
+import reactor.core.publisher.Mono
 
 /**
  * INTERNAL API
@@ -45,6 +50,31 @@ private[r2dbc] class OracleSnapshotDao(
     closeCallsExceeding: Option[FiniteDuration] = None
 )(implicit ec: ExecutionContext, system: ActorSystem[?])
     extends SnapshotDao(settings, connectionFactory, closeCallsExceeding) {
+  OracleUtils.requireByteArrayPayload(settings.snapshotPayloadCodec, "snapshot store")
+
+  /**
+   * `MERGE` isn't atomic against concurrent inserts: two first saves of a snapshot for the same persistence id can both
+   * insert, and one of them fails on the primary key with ORA-00001. The `MERGE` is then tried again, which updates the
+   * row, so that the last save wins as with the upserts of the other databases.
+   */
+  override def store(serializedRow: SerializedSnapshotRow): Future[Unit] =
+    super.store(serializedRow).recoverWith {
+      case e: R2dbcDataIntegrityViolationException if e.getErrorCode == OracleSnapshotDao.UniqueConstraintViolated =>
+        super.store(serializedRow)
+    }
+
+  // The driver binds byte arrays as RAW values, which are limited to 32767 bytes in the SELECT of the MERGE (ORA-01461),
+  // so the snapshot and its metadata are bound as BLOBs.
+  override protected def bindSnapshotPayload(stmt: Statement, index: Int, payload: Array[Byte]): Statement =
+    stmt.bind(index, OracleSnapshotDao.blob(payload))
+
+  override protected def bindMetadataPayload(stmt: Statement, index: Int, payload: Option[Array[Byte]]): Statement =
+    payload match {
+      case Some(bytes) => stmt.bind(index, OracleSnapshotDao.blob(bytes))
+      case None        => stmt.bindNull(index, classOf[Blob])
+    }
+
+  override protected def entityTypeCondition: String = OracleUtils.entityTypeCondition
 
   override protected def createUpsertSql: String =
     if (settings.startFromSnapshotEnabled)
@@ -103,11 +133,22 @@ private[r2dbc] class OracleSnapshotDao(
     sql"""
       SELECT ${OracleUtils.bucketSql} AS bucket, count(*) AS count
       FROM $snapshotTable
-      WHERE entity_type = ?
+      WHERE ${OracleUtils.entityTypeCondition}
       AND ${sliceCondition(minSlice, maxSlice)}
       AND db_timestamp >= ? AND db_timestamp <= ?
       GROUP BY bucket ORDER BY bucket LIMIT ?
       """
 
   override def currentDbTimestamp(): Future[Instant] = Future.successful(InstantFactory.now())
+}
+
+/**
+ * INTERNAL API
+ */
+@InternalApi
+private[r2dbc] object OracleSnapshotDao {
+  // ORA-00001: unique constraint violated
+  private val UniqueConstraintViolated = 1
+
+  private def blob(bytes: Array[Byte]): Blob = Blob.from(Mono.just(ByteBuffer.wrap(bytes)))
 }

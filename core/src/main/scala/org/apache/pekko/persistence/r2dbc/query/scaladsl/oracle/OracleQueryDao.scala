@@ -45,6 +45,7 @@ private[r2dbc] class OracleQueryDao(
     closeCallsExceeding: Option[FiniteDuration] = None
 )(implicit ec: ExecutionContext, system: ActorSystem[?])
     extends QueryDao(querySettings, connectionFactory, closeCallsExceeding) {
+  OracleUtils.requireByteArrayPayload(querySettings.journalPayloadCodec, "query")
 
   override lazy val statementTimestampSql: String = OracleUtils.currentTimestampSql
 
@@ -60,28 +61,13 @@ private[r2dbc] class OracleQueryDao(
   override protected def behindCurrentTimeIntervalCondition(behindCurrentTime: FiniteDuration): String =
     OracleUtils.behindCurrentTimeIntervalCondition(behindCurrentTime)
 
-  override def eventsBySlicesRangeSql(
-      toDbTimestampParam: Boolean,
-      behindCurrentTime: FiniteDuration,
-      backtracking: Boolean,
-      minSlice: Int,
-      maxSlice: Int): String =
-    sql"""
-      ${selectColumns(backtracking)}
-      FROM $journalTable
-      WHERE entity_type = ?
-      AND slice BETWEEN $minSlice AND $maxSlice
-      AND db_timestamp >= ? ${toDbTimestampParamCondition(toDbTimestampParam)} ${behindCurrentTimeIntervalCondition(
-        behindCurrentTime)}
-      AND deleted = false
-      ORDER BY db_timestamp, seq_nr
-      LIMIT ?"""
+  override protected def entityTypeCondition: String = OracleUtils.entityTypeCondition
 
   override def selectBucketsSql(minSlice: Int, maxSlice: Int): String =
     sql"""
       SELECT ${OracleUtils.bucketSql} AS bucket, count(*) AS count
       FROM $journalTable
-      WHERE entity_type = ?
+      WHERE ${OracleUtils.entityTypeCondition}
       AND slice BETWEEN $minSlice AND $maxSlice
       AND db_timestamp >= ? AND db_timestamp <= ?
       AND deleted = false

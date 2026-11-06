@@ -73,15 +73,15 @@ class StartFromSnapshotDisabledSpec
     if (snapshotSettings.dialect == Dialect.Oracle)
       s"""CREATE TABLE IF NOT EXISTS $legacyTable(
         slice NUMBER(10) NOT NULL,
-        entity_type VARCHAR2(255),
-        persistence_id VARCHAR2(255) NOT NULL,
+        entity_type VARCHAR2(255 CHAR),
+        persistence_id VARCHAR2(255 CHAR) NOT NULL,
         seq_nr NUMBER(19) NOT NULL,
         write_timestamp NUMBER(19) NOT NULL,
         ser_id NUMBER(10) NOT NULL,
-        ser_manifest VARCHAR2(255),
+        ser_manifest VARCHAR2(255 CHAR),
         snapshot BLOB NOT NULL,
         meta_ser_id NUMBER(10),
-        meta_ser_manifest VARCHAR2(255),
+        meta_ser_manifest VARCHAR2(255 CHAR),
         meta_payload BLOB,
         PRIMARY KEY(persistence_id))"""
     else

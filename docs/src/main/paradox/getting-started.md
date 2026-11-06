@@ -183,9 +183,10 @@ docker exec -i docker-oracle-db-1 sqlplus -s pekko/pekko@//localhost/FREEPDB1 < 
 ```
 
 Oracle stores empty strings and empty byte arrays as `NULL`. The entity type, serializer manifest, writer and payload
-columns are therefore nullable, and the plugin reads `NULL` in those columns back as empty values. Events, snapshots and
-durable state are stored in `BLOB` columns, the `JSONB` payload column type is not supported, and tags are stored as a
-JSON array in a `CLOB` column.
+columns are therefore nullable, and the plugin reads `NULL` in those columns back as empty values. Your own queries of
+these tables, for example with `R2dbcSession`, get `NULL` for them. Events, snapshots and durable state are stored in
+`BLOB` columns, a `JSONB` payload column type is not supported and fails at startup, and tags are stored as a JSON
+array in a `CLOB` column.
 
 <a id="h2"></a>
 ### H2

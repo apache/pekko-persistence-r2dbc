@@ -40,6 +40,7 @@ import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.ChangeHandlerFactory
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -352,7 +353,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
           readDbTimestamp = Instant.EPOCH, // not needed here
           getPayload(row),
           serId = row.get[Integer]("state_ser_id", classOf[Integer]),
-          serManifest = row.get("state_ser_manifest", classOf[String]),
+          serManifest = EmptyValues.string(row, "state_ser_manifest"),
           tags = Set.empty // tags not fetched in queries (yet)
         ))
   }
@@ -362,8 +363,10 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     val rowPayload = row.getPayload("state_payload")
     if (serId == 0 && (rowPayload == null || util.Arrays.equals(statePayloadCodec.nonePayload, rowPayload)))
       None // delete marker
+    else if (rowPayload == null)
+      Some(Array.emptyByteArray) // Oracle stores an empty payload as NULL
     else
-      Option(rowPayload)
+      Some(rowPayload)
   }
 
   def upsertState(state: SerializedStateRow, value: Any): Future[Done] = {
@@ -704,7 +707,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
           SerializedStateRow(
             persistenceId = row.get("persistence_id", classOf[String]),
-            revision = row.get("revision", classOf[Long]),
+            revision = row.get[java.lang.Long]("revision", classOf[java.lang.Long]),
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             // payload = null => lazy loaded for backtracking (ugly, but not worth changing UpdatedDurableState in Akka)
@@ -722,7 +725,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             payload = getPayload(row),
             serId = row.get[Integer]("state_ser_id", classOf[Integer]),
-            serManifest = row.get("state_ser_manifest", classOf[String]),
+            serManifest = EmptyValues.string(row, "state_ser_manifest"),
             tags = Set.empty // tags not fetched in queries (yet)
           ))
 

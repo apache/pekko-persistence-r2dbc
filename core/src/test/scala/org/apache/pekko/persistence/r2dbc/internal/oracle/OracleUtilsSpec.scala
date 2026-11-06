@@ -20,6 +20,7 @@ package org.apache.pekko.persistence.r2dbc.internal.oracle
 import org.apache.pekko
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.JournalSettings
+import pekko.persistence.r2dbc.internal.PayloadCodec
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
 import org.scalatest.TestSuite
@@ -60,6 +61,14 @@ class OracleUtilsSpec extends AnyWordSpec with TestSuite with Matchers {
       intercept[IllegalArgumentException] {
         OracleUtils.settingRequirements(journalSettings(useAppTimestamp = true, dbTimestampMonotonicIncreasing = false))
       }.getMessage should include("db-timestamp-monotonic-increasing")
+    }
+
+    "reject JSON payload columns" in {
+      OracleUtils.requireByteArrayPayload(PayloadCodec.ByteArrayCodec, "journal")
+
+      intercept[IllegalArgumentException] {
+        OracleUtils.requireByteArrayPayload(PayloadCodec.JsonCodec, "journal")
+      }.getMessage should include("payload-column-type of the journal must be BYTEA")
     }
   }
 

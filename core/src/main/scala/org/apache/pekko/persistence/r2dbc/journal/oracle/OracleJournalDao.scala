@@ -43,6 +43,7 @@ private[r2dbc] class OracleJournalDao(
     implicit ec: ExecutionContext, system: ActorSystem[?]
 ) extends JournalDao(journalSettings, connectionFactory, closeCallsExceeding) {
   OracleUtils.settingRequirements(journalSettings)
+  OracleUtils.requireByteArrayPayload(journalSettings.journalPayloadCodec, "journal")
 
   override lazy val timestampSql: String = OracleUtils.currentTimestampSql
   override lazy val statementTimestampSql: String = OracleUtils.currentTimestampSql

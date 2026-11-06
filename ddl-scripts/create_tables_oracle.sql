@@ -21,19 +21,19 @@
 
 CREATE TABLE IF NOT EXISTS event_journal(
   slice NUMBER(10) NOT NULL,
-  entity_type VARCHAR2(255),
-  persistence_id VARCHAR2(255) NOT NULL,
+  entity_type VARCHAR2(255 CHAR),
+  persistence_id VARCHAR2(255 CHAR) NOT NULL,
   seq_nr NUMBER(19) NOT NULL,
   db_timestamp TIMESTAMP(6) NOT NULL,
   event_ser_id NUMBER(10) NOT NULL,
-  event_ser_manifest VARCHAR2(255),
+  event_ser_manifest VARCHAR2(255 CHAR),
   event_payload BLOB,
   deleted BOOLEAN DEFAULT FALSE NOT NULL,
-  writer VARCHAR2(255),
-  adapter_manifest VARCHAR2(255),
+  writer VARCHAR2(255 CHAR),
+  adapter_manifest VARCHAR2(255 CHAR),
   tags CLOB CHECK (tags IS JSON), -- stored as a JSON array of strings
   meta_ser_id NUMBER(10),
-  meta_ser_manifest VARCHAR2(255),
+  meta_ser_manifest VARCHAR2(255 CHAR),
   meta_payload BLOB,
   PRIMARY KEY(persistence_id, seq_nr)
 );
@@ -42,15 +42,15 @@ CREATE INDEX IF NOT EXISTS event_journal_slice_idx ON event_journal(slice, entit
 
 CREATE TABLE IF NOT EXISTS snapshot(
   slice NUMBER(10) NOT NULL,
-  entity_type VARCHAR2(255),
-  persistence_id VARCHAR2(255) NOT NULL,
+  entity_type VARCHAR2(255 CHAR),
+  persistence_id VARCHAR2(255 CHAR) NOT NULL,
   seq_nr NUMBER(19) NOT NULL,
   write_timestamp NUMBER(19) NOT NULL,
   ser_id NUMBER(10) NOT NULL,
-  ser_manifest VARCHAR2(255),
+  ser_manifest VARCHAR2(255 CHAR),
   snapshot BLOB,
   meta_ser_id NUMBER(10),
-  meta_ser_manifest VARCHAR2(255),
+  meta_ser_manifest VARCHAR2(255 CHAR),
   meta_payload BLOB,
   db_timestamp TIMESTAMP(6),
   tags CLOB CHECK (tags IS JSON), -- stored as a JSON array of strings
@@ -62,12 +62,12 @@ CREATE INDEX IF NOT EXISTS snapshot_slice_idx ON snapshot(slice, entity_type, db
 
 CREATE TABLE IF NOT EXISTS durable_state (
   slice NUMBER(10) NOT NULL,
-  entity_type VARCHAR2(255),
-  persistence_id VARCHAR2(255) NOT NULL,
+  entity_type VARCHAR2(255 CHAR),
+  persistence_id VARCHAR2(255 CHAR) NOT NULL,
   revision NUMBER(19) NOT NULL,
   db_timestamp TIMESTAMP(6) NOT NULL,
   state_ser_id NUMBER(10) NOT NULL,
-  state_ser_manifest VARCHAR2(255),
+  state_ser_manifest VARCHAR2(255 CHAR),
   state_payload BLOB,
   tags CLOB CHECK (tags IS JSON), -- stored as a JSON array of strings
   PRIMARY KEY(persistence_id, revision)
