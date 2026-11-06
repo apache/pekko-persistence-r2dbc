@@ -16,13 +16,21 @@ package org.apache.pekko.persistence.r2dbc
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import org.apache.pekko
+import pekko.actor.typed.ActorRef
 import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.scaladsl.adapter._
+import pekko.persistence.AtomicWrite
+import pekko.persistence.JournalProtocol.WriteMessages
 import pekko.persistence.Persistence
+import pekko.persistence.PersistentRepr
 import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.h2.H2Utils
+import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import com.typesafe.config.Config
 import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite
 import org.slf4j.LoggerFactory
@@ -84,6 +92,27 @@ trait TestDbLifecycle extends BeforeAndAfterAll { this: Suite =>
   }
 
   lazy val persistenceExt: Persistence = Persistence(typedSystem)
+
+  /** Read the tags column of a journal row into a set, honoring the per-dialect storage format. */
+  protected def readTags(row: Row): Set[String] =
+    journalSettings.dialect match {
+      case Dialect.MySQL | Dialect.MariaDB =>
+        MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
+      case Dialect.H2 =>
+        H2Utils.tagsFromDb(row, "tags")
+      case Dialect.Postgres | Dialect.Yugabyte =>
+        row.get("tags", classOf[Array[String]]) match {
+          case null      => Set.empty[String]
+          case tagsArray => tagsArray.toSet
+        }
+    }
+
+  /** The classic WriteMessages envelope used by the batched journal specs for a single event. */
+  protected def batchedJournalWrite(repr: PersistentRepr, replyTo: ActorRef[Any]): WriteMessages =
+    WriteMessages(Seq(AtomicWrite(repr)), replyTo.toClassic, actorInstanceId = 1)
+
+  protected def batchedJournalWrite(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): WriteMessages =
+    batchedJournalWrite(PersistentRepr(event, seqNr, pid), replyTo)
 
   override protected def beforeAll(): Unit = {
     TestDbLifecycle.createH2Tables(r2dbcExecutor, journalSettings, snapshotSettings, stateSettings)

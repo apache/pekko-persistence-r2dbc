@@ -21,12 +21,9 @@ import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.TestActors.Persister
-import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
-import pekko.persistence.r2dbc.internal.h2.H2Utils
-import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
 import pekko.persistence.typed.PersistenceId
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -67,24 +64,11 @@ class PersistTagsSpec
         r2dbcExecutor
           .select[Row]("test")(
             connection => connection.createStatement(s"select * from ${settings.journalTableWithSchema}"),
-            row => {
-              val tags =
-                settings.dialect match {
-                  case Dialect.MySQL | Dialect.MariaDB =>
-                    MySQLJournalDao.tagsFromJson(row.get("tags", classOf[String]))
-                  case Dialect.H2 =>
-                    H2Utils.tagsFromDb(row, "tags")
-                  case Dialect.Postgres | Dialect.Yugabyte =>
-                    row.get("tags", classOf[Array[String]]) match {
-                      case null      => Set.empty[String]
-                      case tagsArray => tagsArray.toSet
-                    }
-                }
+            row =>
               Row(
                 pid = row.get("persistence_id", classOf[String]),
                 seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
-                tags)
-            })
+                tags = readTags(row)))
           .futureValue
 
       rows.foreach { case Row(pid, _, tags) =>
