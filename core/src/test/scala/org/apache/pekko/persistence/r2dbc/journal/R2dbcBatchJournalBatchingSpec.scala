@@ -22,15 +22,10 @@ import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import pekko.actor.typed.ActorRef
 import pekko.actor.typed.ActorSystem
-import pekko.actor.typed.scaladsl.adapter._
-import pekko.persistence.AtomicWrite
 import pekko.persistence.JournalProtocol.WriteMessageRejected
 import pekko.persistence.JournalProtocol.WriteMessageSuccess
-import pekko.persistence.JournalProtocol.WriteMessages
 import pekko.persistence.JournalProtocol.WriteMessagesSuccessful
-import pekko.persistence.PersistentRepr
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -98,12 +93,6 @@ object R2dbcBatchJournalBatchingSpec {
       }""")
     .withFallback(R2dbcBatchJournalSpec.config)
     .resolve()
-
-  def writeMessages(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): WriteMessages =
-    WriteMessages(
-      Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
-      replyTo.toClassic,
-      actorInstanceId = 1)
 }
 
 class R2dbcBatchJournalSizeFlushSpec
@@ -111,9 +100,7 @@ class R2dbcBatchJournalSizeFlushSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
-  import R2dbcBatchJournalBatchingSpec.writeMessages
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 
@@ -129,12 +116,12 @@ class R2dbcBatchJournalSizeFlushSpec
       // max-batch-time is 10s so the first two writes cannot complete on their own
       pids.take(2).zip(probes).foreach {
         case (pid, probe) =>
-          journal ! writeMessages(pid, 1L, s"e-$pid", probe.ref)
+          journal ! batchedJournalWrite(pid, 1L, s"e-$pid", probe.ref)
       }
       probes.take(2).foreach(_.expectNoMessage(1.second))
 
       // the third write reaches max-batch-size = 3 and triggers the flush of the whole batch
-      journal ! writeMessages(pids(2), 1L, s"e-${pids(2)}", probes(2).ref)
+      journal ! batchedJournalWrite(pids(2), 1L, s"e-${pids(2)}", probes(2).ref)
 
       pids.zip(probes).foreach {
         case (pid, probe) =>
@@ -152,9 +139,7 @@ class R2dbcBatchJournalTimerFlushSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
-  import R2dbcBatchJournalBatchingSpec.writeMessages
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 
@@ -167,7 +152,7 @@ class R2dbcBatchJournalTimerFlushSpec
       val pid = nextPid(entityType)
       val probe = createTestProbe[Any]()
 
-      journal ! writeMessages(pid, 1L, s"e-$pid", probe.ref)
+      journal ! batchedJournalWrite(pid, 1L, s"e-$pid", probe.ref)
 
       // max-batch-size is 100 so the write cannot complete before the 500ms batch window expires
       probe.expectNoMessage(200.millis)
@@ -184,9 +169,7 @@ class R2dbcBatchJournalStaleFlushDoneSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
-  import R2dbcBatchJournalBatchingSpec.writeMessages
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 
@@ -207,14 +190,14 @@ class R2dbcBatchJournalStaleFlushDoneSpec
 
       // the first write starts a flush that is blocked waiting for the held connection
       LoggingTestKit.debug("flushing [1] write requests").expect {
-        journal ! writeMessages(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
+        journal ! batchedJournalWrite(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
       }
 
       // a FlushDone carrying a generation from a previous incarnation must be ignored:
       // no second flush may start while the first one is still in progress
       journal ! R2dbcBatchJournal.FlushDone(-1L)
       LoggingTestKit.debug("flushing").withOccurrences(0).expect {
-        journal ! writeMessages(pids(1), 1L, s"e-${pids(1)}", probes(1).ref)
+        journal ! batchedJournalWrite(pids(1), 1L, s"e-${pids(1)}", probes(1).ref)
       }
 
       // release the connection so the blocked flush and then the second write can complete
@@ -236,9 +219,7 @@ class R2dbcBatchJournalQueueLimitSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
-  import R2dbcBatchJournalBatchingSpec.writeMessages
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 
@@ -261,12 +242,12 @@ class R2dbcBatchJournalQueueLimitSpec
       // exactly max-queue-size (3) more writes, so writes 2 - 4 are accepted and
       // writes 5 and 6 are rejected
       LoggingTestKit.debug("flushing [1] write requests").expect {
-        journal ! writeMessages(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
+        journal ! batchedJournalWrite(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
       }
 
       pids.drop(1).zip(probes.drop(1)).foreach {
         case (pid, probe) =>
-          journal ! writeMessages(pid, 1L, s"e-$pid", probe.ref)
+          journal ! batchedJournalWrite(pid, 1L, s"e-$pid", probe.ref)
       }
 
       // release the connection so the accepted writes can complete
@@ -297,7 +278,7 @@ class R2dbcBatchJournalQueueLimitSpec
 
       // wait until the flush has dequeued the first write
       LoggingTestKit.debug("flushing [1] write requests").expect {
-        journal ! writeMessages(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
+        journal ! batchedJournalWrite(pids(0), 1L, s"e-${pids(0)}", probes(0).ref)
       }
 
       // writes 2 - 4 fill the queue; writes 5 - 16 are rejected, which is more than the
@@ -309,7 +290,7 @@ class R2dbcBatchJournalQueueLimitSpec
       // blocked write 1 has completed.
       pids.slice(1, 16).zip(probes.slice(1, 16)).foreach {
         case (pid, probe) =>
-          journal ! writeMessages(pid, 1L, s"e-$pid", probe.ref)
+          journal ! batchedJournalWrite(pid, 1L, s"e-$pid", probe.ref)
       }
 
       // release the connection so the accepted writes complete
@@ -330,7 +311,7 @@ class R2dbcBatchJournalQueueLimitSpec
       }
 
       // if the rejections had tripped the circuit breaker, this write would fail
-      journal ! writeMessages(pids(16), 1L, s"e-${pids(16)}", probes(16).ref)
+      journal ! batchedJournalWrite(pids(16), 1L, s"e-${pids(16)}", probes(16).ref)
       probes(16).expectMessage(10.seconds, WriteMessagesSuccessful)
       probes(16).expectMessageType[WriteMessageSuccess](10.seconds).persistent.persistenceId shouldBe pids(16)
     }

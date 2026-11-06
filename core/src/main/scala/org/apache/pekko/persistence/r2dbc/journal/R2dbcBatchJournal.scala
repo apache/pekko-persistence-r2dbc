@@ -22,7 +22,10 @@ import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
 import com.typesafe.config.Config
+import io.r2dbc.spi.R2dbcBadGrammarException
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.R2dbcException
+import io.r2dbc.spi.R2dbcNonTransientResourceException
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.Timers
@@ -35,7 +38,6 @@ import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
 import pekko.persistence.journal.AsyncWriteJournal
 import pekko.persistence.journal.Tagged
-import pekko.persistence.r2dbc.Dialect.{ Postgres, Yugabyte }
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PubSub
@@ -67,6 +69,17 @@ private[r2dbc] object R2dbcBatchJournal {
   private[r2dbc] def nextGeneration(): Long = generationCounter.incrementAndGet()
 
   private[r2dbc] def nextTimestamp(): Instant = InstantFactory.nowStrictlyIncreasing()
+
+  private[r2dbc] def isNonTransientStatementError(exception: Throwable): Boolean =
+    exception match {
+      case _: R2dbcDataIntegrityViolationException | _: R2dbcBadGrammarException => true
+      case e: R2dbcNonTransientResourceException                                 =>
+        e.getErrorCode != 0 && (e.getSqlState == null || !e.getSqlState.startsWith("08"))
+      case e: R2dbcException =>
+        // r2dbc-h2 wraps SQLDataException (SQLSTATE class 22) in a direct R2dbcException subclass
+        e.getSqlState != null && (e.getSqlState.startsWith("22") || e.getSqlState.startsWith("23"))
+      case _ => false
+    }
 }
 
 /**
@@ -80,7 +93,6 @@ private[r2dbc] object R2dbcBatchJournal {
  * `use-app-timestamp = on` and `db-timestamp-monotonic-increasing = on`: in that mode
  * [[JournalDao]] does not bind the per-persistence-id previous sequence number subselect, and
  * timestamps come from the application clock, which therefore must not move backwards.
- * Batching is only supported and tested for the Postgres and Yugabyte dialects.
  *
  * Writes are buffered in a bounded queue (`max-queue-size`); incoming writes are rejected per
  * message once the queue is full. The rejection is returned in the per-message `Try` results,
@@ -98,10 +110,11 @@ private[r2dbc] object R2dbcBatchJournal {
  * request can still contain many events when the caller uses `persistAll` or `persistAsync`
  * bursts, the same as the default journal.
  *
- * A batch that fails with a database integrity violation is retried in halves so that only the
- * offending persistence ids fail. Infrastructure errors fail the whole batch. The retried
- * halves are written concurrently and can use several pool connections at once. Each half
- * re-stamps its requests with new, later timestamps. A single split preserves order, but if the
+ * A batch that fails with a non-transient statement error, for example a database integrity
+ * violation or a value that violates a dialect payload limit, is retried in halves so that only
+ * the offending persistence ids fail. Transient errors and infrastructure errors fail the whole
+ * batch. The retried halves are written concurrently and can use several pool connections at
+ * once. Each half re-stamps its requests with new, later timestamps. A single split preserves order, but if the
  * half holding the earlier sequence numbers is retried after its sibling committed, its
  * re-stamped rows can invert the `db_timestamp` order of two same-persistence-id writes.
  * Replay still orders by sequence number; only timestamp-ordered read sides see the inversion.
@@ -125,8 +138,6 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   private val serialization: Serialization = SerializationExtension(context.system)
   private val journalSettings = JournalSettings(config)
 
-  require(journalSettings.dialect == Postgres || journalSettings.dialect == Yugabyte,
-    "Batching is only supported for Postgres and Yugabyte")
   require(journalSettings.useAppTimestamp, "use-app-timestamp must be 'on' when using R2dbcBatchJournal")
   require(journalSettings.dbTimestampMonotonicIncreasing,
     "db-timestamp-monotonic-increasing must be 'on' when using R2dbcBatchJournal")
@@ -175,7 +186,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
           publish(stampedRequests)
         }
         .recoverWith {
-          case _: R2dbcDataIntegrityViolationException if requests.size > 1 =>
+          case exception if requests.size > 1 && R2dbcBatchJournal.isNonTransientStatementError(exception) =>
             val (left, right) = requests.splitAt(requests.size / 2)
             write(left).zipWith(write(right))((_, _) => ())
           case exception =>
