@@ -114,6 +114,19 @@ class EventsBySlicePubSubSpec
       source = EnvelopeOrigin.SourcePubSub)
   }
 
+  def progressEnvelope(entityType: String, time: Instant): EventEnvelope[String] =
+    new EventEnvelope[String](
+      TimestampOffset(time, time, Map.empty),
+      PersistenceId(entityType, "_backtracking-progress").id,
+      0L,
+      eventOption = None,
+      time.toEpochMilli,
+      eventMetadata = None,
+      entityType,
+      slice = 0,
+      filtered = true,
+      source = EnvelopeOrigin.SourceBacktrackingProgress)
+
   def backtrackingEnvelope(env: EventEnvelope[String]): EventEnvelope[String] =
     new EventEnvelope[String](
       env.offset,
@@ -290,6 +303,46 @@ class EventsBySlicePubSubSpec
       out.expectNext(backtrackingEnvelope(envB1))
       in.sendNext(envC2)
       out.expectNext(envC2)
+    }
+
+    "skipPubSubTooFarAhead with backtracking progress markers" in {
+      val backtrackingWindow = querySettings.backtrackingWindow.toJava
+      val (in, out) =
+        TestSource[EventEnvelope[String]]()
+          .via(
+            query.skipPubSubTooFarAhead(
+              enabled = true,
+              maxAheadOfBacktracking = backtrackingWindow))
+          .toMat(TestSink[EventEnvelope[String]]())(Keep.both)
+          .run()
+      out.request(100)
+
+      in.sendNext(envA1)
+      // dropped, no backtracking progress yet
+      out.expectNoMessage(300.millis)
+
+      // backtracking has read everything before progressTime, far more than the window after any backtracking event
+      val progressTime = now.plus(backtrackingWindow).plusSeconds(60)
+      in.sendNext(progressEnvelope(entityType, progressTime))
+      // the marker itself is never emitted
+      out.expectNoMessage(300.millis)
+
+      val pidC = PersistenceId(entityType, "C")
+      val envC1 = createEnvelope(pidC, 1L, "c1", progressTime.plusSeconds(1))
+      in.sendNext(envC1)
+      out.expectNext(envC1)
+
+      // an older backtracking event doesn't move the backtracking position back
+      in.sendNext(backtrackingEnvelope(envA1))
+      out.expectNext(backtrackingEnvelope(envA1))
+      val envC2 = createEnvelope(pidC, 2L, "c2", progressTime.plusSeconds(2))
+      in.sendNext(envC2)
+      out.expectNext(envC2)
+
+      // still dropped when more than the window ahead of the progress
+      val envC3 = createEnvelope(pidC, 3L, "c3", progressTime.plus(backtrackingWindow).plusSeconds(1))
+      in.sendNext(envC3)
+      out.expectNoMessage(300.millis)
     }
 
     "dynamically enable/disable publishing based on throughput" in new Setup {

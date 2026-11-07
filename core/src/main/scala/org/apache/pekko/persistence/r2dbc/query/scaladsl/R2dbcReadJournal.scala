@@ -137,8 +137,34 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
 
     val extractOffset: EventEnvelope[Any] => TimestampOffset = env => env.offset.asInstanceOf[TimestampOffset]
 
-    new BySliceQuery(queryDao, createEnvelope, extractOffset, settings, log)(typedSystem.executionContext)
+    // Only skipPubSubTooFarAhead uses (and removes) the progress markers, so they are only emitted when it is in
+    // the stream.
+    val progressMarker =
+      if (settings.journalPublishEvents && settings.backtrackingEnabled)
+        Some(BySliceQuery.ProgressMarker[EventEnvelope[Any]](
+          createBacktrackingProgressEnvelope,
+          EnvelopeOrigin.fromBacktrackingProgress))
+      else None
+
+    new BySliceQuery(queryDao, createEnvelope, extractOffset, settings, log, progressMarker)(
+      typedSystem.executionContext)
   }
+
+  private def createBacktrackingProgressEnvelope(
+      entityType: String,
+      slice: Int,
+      timestamp: Instant): EventEnvelope[Any] =
+    new EventEnvelope[Any](
+      TimestampOffset(timestamp, timestamp, Map.empty),
+      PersistenceId(entityType, "_backtracking-progress").id,
+      0L,
+      None,
+      timestamp.toEpochMilli,
+      None,
+      entityType,
+      slice,
+      filtered = true,
+      source = EnvelopeOrigin.SourceBacktrackingProgress)
 
   private def bySlice[Event]: BySliceQuery[SerializedJournalRow, EventEnvelope[Event]] =
     _bySlice.asInstanceOf[BySliceQuery[SerializedJournalRow, EventEnvelope[Event]]]
@@ -474,8 +500,13 @@ final class R2dbcReadJournal(system: ExtendedActorSystem, config: Config, cfgPat
             env.offset match {
               case t: TimestampOffset =>
                 if (EnvelopeOrigin.fromBacktracking(env)) {
-                  latestBacktracking = t.timestamp
+                  // never move back: a backtracking round can re-read events from before a progress marker
+                  if (t.timestamp.isAfter(latestBacktracking)) latestBacktracking = t.timestamp
                   env :: Nil
+                } else if (EnvelopeOrigin.fromBacktrackingProgress(env)) {
+                  if (t.timestamp.isAfter(latestBacktracking)) latestBacktracking = t.timestamp
+                  log.trace("Backtracking has read all events before [{}].", t.timestamp)
+                  Nil // not an event, never emitted
                 } else if (EnvelopeOrigin.fromPubSub(env) && latestBacktracking == Instant.EPOCH) {
                   log.trace(
                     "Dropping pubsub event for persistenceId [{}] seqNr [{}] because no event from backtracking yet.",
