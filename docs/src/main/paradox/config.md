@@ -24,6 +24,10 @@ For H2 the connection is configured in the `h2` section of the connection factor
 @ref:[H2](getting-started.md#h2). For MySQL and MariaDB, see @ref:[MySQL](getting-started.md#mysql) and
 @ref:[MariaDB](getting-started.md#mariadb).
 
+For MySQL, `ssl.mode` takes the modes of the MySQL driver: `disabled`, `preferred`, `required`, `verify_ca` or
+`verify_identity`. `ssl.cert` and `ssl.key` are passed as the `sslCert` and `sslKey` options of the driver, and
+`ssl.root-cert` and `ssl.password` as its `sslCa` and `sslKeyPassword` options.
+
 ## Reference configuration 
 
 The following configuration can be overridden in your `application.conf`:
