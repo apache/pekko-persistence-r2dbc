@@ -183,6 +183,11 @@ class R2dbcBatchJournalFailureIsolationSpec
         new R2dbcNonTransientResourceException("Data too long for column", "22001", 1406)) shouldBe true
       R2dbcBatchJournal.isNonTransientStatementError(
         new R2dbcNonTransientResourceException("Invalid JSON text", "22032", 3140)) shouldBe true
+      // r2dbc-mysql reports some data exceptions without a SQLSTATE, for example 1406 from a batched insert
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Data too long for column", null, 1406)) shouldBe true
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Invalid JSON text", null, 3140)) shouldBe true
 
       // schema errors, server-wide errors, connection errors, permission errors, and transient errors
       // must fail the whole batch without bisection
