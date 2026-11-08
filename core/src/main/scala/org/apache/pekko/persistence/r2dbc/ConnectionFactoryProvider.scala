@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc
 
 import java.time.{ Duration => JDuration }
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.annotation.tailrec
@@ -40,8 +41,6 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.r2dbc.pool.ConnectionPool
 import io.r2dbc.pool.ConnectionPoolConfiguration
-import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
-import io.r2dbc.postgresql.client.SSLMode
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
@@ -80,6 +79,30 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   private object NoopCustomizer extends ConnectionFactoryOptionsCustomizer {
     override def apply(builder: ConnectionFactoryOptions.Builder, config: Config): ConnectionFactoryOptions.Builder =
       builder
+  }
+
+  // The names of the PostgreSQL driver (PostgresqlConnectionFactoryProvider), which YugabyteDB uses too.
+  private val PostgresDrivers = Set("postgresql", "postgres")
+
+  // Options of the PostgreSQL driver, referred to by name so that the other drivers don't need r2dbc-postgresql on the
+  // classpath.
+  private val ForceBinary = Option.valueOf[java.lang.Boolean]("forceBinary")
+  private val PreferAttachedBuffers = Option.valueOf[java.lang.Boolean]("preferAttachedBuffers")
+  private val PreparedStatementCacheQueries = Option.valueOf[Integer]("preparedStatementCacheQueries")
+  private val SslMode = Option.valueOf[String]("sslMode")
+  private val SslRootCert = Option.valueOf[String]("sslRootCert")
+  private val SslCert = Option.valueOf[String]("sslCert")
+  private val SslKey = Option.valueOf[String]("sslKey")
+  private val SslPassword = Option.valueOf[String]("sslPassword")
+
+  // The driver, set with the `driver` setting or in the `url`. A `r2dbc:pool:<driver>://` url has the driver as its
+  // protocol.
+  private def driverName(options: ConnectionFactoryOptions): scala.Option[String] = {
+    def lowerCase(option: Option[?]) = scala.Option(options.getValue(option)).map(_.toString.toLowerCase(Locale.ROOT))
+    lowerCase(ConnectionFactoryOptions.DRIVER).flatMap {
+      case "pool" => lowerCase(ConnectionFactoryOptions.PROTOCOL).map(_.takeWhile(_ != ':'))
+      case driver => Some(driver)
+    }
   }
 }
 
@@ -165,15 +188,9 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
             .option(ConnectionFactoryOptions.CONNECT_TIMEOUT, settings.connectTimeout.toJava)
       }
 
-    builder
-      .option(PostgresqlConnectionFactoryProvider.FORCE_BINARY, java.lang.Boolean.TRUE)
-      .option(PostgresqlConnectionFactoryProvider.PREFER_ATTACHED_BUFFERS, java.lang.Boolean.TRUE)
-      .option(
-        PostgresqlConnectionFactoryProvider.PREPARED_STATEMENT_CACHE_QUERIES,
-        Integer.valueOf(settings.statementCacheSize))
-
+    // the PostgreSQL driver's STATEMENT_TIMEOUT is the SPI's option
     settings.statementTimeout.foreach { timeout =>
-      builder.option(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT, timeout.toJava)
+      builder.option(ConnectionFactoryOptions.STATEMENT_TIMEOUT, timeout.toJava)
     }
 
     val driverOptions = builder.build()
@@ -181,26 +198,33 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
     // the driver can be set with the `driver` setting or in the `url`
     val mySQL = scala.Option(driverOptions.getValue(ConnectionFactoryOptions.DRIVER)).exists(_.toString == "mysql")
 
+    if (ConnectionFactoryProvider.driverName(driverOptions).exists(ConnectionFactoryProvider.PostgresDrivers))
+      builder
+        .option(ConnectionFactoryProvider.ForceBinary, java.lang.Boolean.TRUE)
+        .option(ConnectionFactoryProvider.PreferAttachedBuffers, java.lang.Boolean.TRUE)
+        .option(ConnectionFactoryProvider.PreparedStatementCacheQueries, Integer.valueOf(settings.statementCacheSize))
+
     if (settings.sslEnabled && mariaDB) {
       // the MariaDB driver ignores the SSL option and has its own names and values for the other options
       MariaDBConnections.sslOptions(settings).foreach { case (option, value) => builder.option(option, value) }
     } else if (settings.sslEnabled) {
       builder.option(ConnectionFactoryOptions.SSL, java.lang.Boolean.TRUE)
 
+      // the PostgreSQL driver converts the mode from its name with SSLMode.fromValue
       if (settings.sslMode.nonEmpty)
-        builder.option(PostgresqlConnectionFactoryProvider.SSL_MODE, SSLMode.fromValue(settings.sslMode))
+        builder.option(ConnectionFactoryProvider.SslMode, settings.sslMode)
 
       if (settings.sslRootCert.nonEmpty)
-        builder.option(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT, settings.sslRootCert)
+        builder.option(ConnectionFactoryProvider.SslRootCert, settings.sslRootCert)
 
       if (settings.sslCert.nonEmpty)
-        builder.option(PostgresqlConnectionFactoryProvider.SSL_CERT, settings.sslCert)
+        builder.option(ConnectionFactoryProvider.SslCert, settings.sslCert)
 
       if (settings.sslKey.nonEmpty)
-        builder.option(PostgresqlConnectionFactoryProvider.SSL_KEY, settings.sslKey)
+        builder.option(ConnectionFactoryProvider.SslKey, settings.sslKey)
 
       if (settings.sslPassword.nonEmpty)
-        builder.option(PostgresqlConnectionFactoryProvider.SSL_PASSWORD, settings.sslPassword)
+        builder.option(ConnectionFactoryProvider.SslPassword, settings.sslPassword)
     }
 
     if (mySQL) {
