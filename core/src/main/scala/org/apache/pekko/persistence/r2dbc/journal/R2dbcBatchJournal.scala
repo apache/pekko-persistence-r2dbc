@@ -24,7 +24,6 @@ import scala.util.control.NonFatal
 import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.R2dbcException
-import io.r2dbc.spi.R2dbcNonTransientResourceException
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.Timers
@@ -69,16 +68,10 @@ private[r2dbc] object R2dbcBatchJournal {
 
   private[r2dbc] def nextTimestamp(): Instant = InstantFactory.nowStrictlyIncreasing()
 
-  // r2dbc-mysql's ErrorMessage.toException passes null for sqlState on its fallback branch,
-  // so MySQL SQLSTATE 22xxx data exceptions arrive with getSqlState == null and the server error code
-  private final val MySqlDataExceptionErrorCodes = Set(1406, 3140)
-
   private[r2dbc] def isNonTransientStatementError(exception: Throwable): Boolean =
     exception match {
-      case _: R2dbcDataIntegrityViolationException                        => true
-      case e: R2dbcNonTransientResourceException if e.getSqlState == null =>
-        MySqlDataExceptionErrorCodes.contains(e.getErrorCode)
-      case e: R2dbcException =>
+      case _: R2dbcDataIntegrityViolationException => true
+      case e: R2dbcException                       =>
         e.getSqlState != null && (e.getSqlState.startsWith("22") || e.getSqlState.startsWith("23"))
       case _ => false
     }
