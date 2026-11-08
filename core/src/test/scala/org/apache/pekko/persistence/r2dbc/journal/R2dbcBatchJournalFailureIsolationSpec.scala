@@ -180,9 +180,21 @@ class R2dbcBatchJournalFailureIsolationSpec
       R2dbcBatchJournal.isNonTransientStatementError(
         new R2dbcBadGrammarException("Data too long for column", "22001", 1406)) shouldBe true
       R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Data too long for column", "22001", 1406)) shouldBe true
+      // r2dbc-mysql's ErrorMessage.toException passes null for sqlState on its fallback branch
+      R2dbcBatchJournal.isNonTransientStatementError(
         new R2dbcNonTransientResourceException("Data too long for column", null, 1406)) shouldBe true
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Invalid JSON text", null, 3140)) shouldBe true
 
-      // connection errors, permission errors, and transient errors must fail the whole batch without bisection
+      // schema errors, server-wide errors, connection errors, permission errors, and transient errors
+      // must fail the whole batch without bisection
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcBadGrammarException("Table doesn't exist", "42S02", 1146)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Running with --read-only", "HY000", 1290)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Running with --read-only", null, 1290)) shouldBe false
       R2dbcBatchJournal.isNonTransientStatementError(
         new R2dbcNonTransientResourceException("Connection unexpectedly closed")) shouldBe false
       R2dbcBatchJournal.isNonTransientStatementError(

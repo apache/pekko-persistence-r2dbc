@@ -123,11 +123,11 @@ persistent actor stops, a typed persistent actor restarts. Isolating a single of
 retry approach twice `max-batch-size` statements, which is the number of statements the default journal would
 have used for the same writes.
 
-The bisection retries non-transient statement errors. Transient errors, for example an InnoDB deadlock or a
-lock-wait timeout on MySQL and MariaDB, fail all writes of the batch without a retry. On MySQL and MariaDB an
-event or metadata payload that exceeds the 64 KiB limit of the `BLOB` columns is a non-transient statement
-error, so only the entity with the oversized payload fails. With the default journal each of these errors only
-affects the one entity that wrote.
+The bisection retries data integrity violations and per-row data exceptions. On MySQL and MariaDB an event or
+metadata payload that exceeds the 64 KiB limit of the `BLOB` columns is a data exception, so only the entity
+with the oversized payload fails. Transient errors, for example an InnoDB deadlock or a lock-wait timeout on
+MySQL and MariaDB, fail all writes of the batch without a retry. With the default journal a deadlock or
+lock-wait timeout only affects the one entity that wrote.
 
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited

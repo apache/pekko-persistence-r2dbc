@@ -53,7 +53,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 object R2dbcBatchJournalWriteSpec {
 
-  // long batch window so that the writes in the tests are guaranteed to be coalesced into one batch flush;
+  // long batch window so that the writes in the tests are guaranteed to be coalesced into one batch flush
   val config: Config = ConfigFactory
     .parseString("""
       pekko.persistence.r2dbc {

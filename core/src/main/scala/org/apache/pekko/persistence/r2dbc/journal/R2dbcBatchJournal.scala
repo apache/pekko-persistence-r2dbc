@@ -22,7 +22,6 @@ import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
 import com.typesafe.config.Config
-import io.r2dbc.spi.R2dbcBadGrammarException
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.R2dbcException
 import io.r2dbc.spi.R2dbcNonTransientResourceException
@@ -70,13 +69,16 @@ private[r2dbc] object R2dbcBatchJournal {
 
   private[r2dbc] def nextTimestamp(): Instant = InstantFactory.nowStrictlyIncreasing()
 
+  // r2dbc-mysql's ErrorMessage.toException passes null for sqlState on its fallback branch,
+  // so MySQL SQLSTATE 22xxx data exceptions arrive with getSqlState == null and the server error code
+  private final val MySqlDataExceptionErrorCodes = Set(1406, 3140)
+
   private[r2dbc] def isNonTransientStatementError(exception: Throwable): Boolean =
     exception match {
-      case _: R2dbcDataIntegrityViolationException | _: R2dbcBadGrammarException => true
-      case e: R2dbcNonTransientResourceException                                 =>
-        e.getErrorCode != 0 && (e.getSqlState == null || !e.getSqlState.startsWith("08"))
+      case _: R2dbcDataIntegrityViolationException                        => true
+      case e: R2dbcNonTransientResourceException if e.getSqlState == null =>
+        MySqlDataExceptionErrorCodes.contains(e.getErrorCode)
       case e: R2dbcException =>
-        // r2dbc-h2 wraps SQLDataException (SQLSTATE class 22) in a direct R2dbcException subclass
         e.getSqlState != null && (e.getSqlState.startsWith("22") || e.getSqlState.startsWith("23"))
       case _ => false
     }
@@ -110,8 +112,8 @@ private[r2dbc] object R2dbcBatchJournal {
  * request can still contain many events when the caller uses `persistAll` or `persistAsync`
  * bursts, the same as the default journal.
  *
- * A batch that fails with a non-transient statement error, for example a database integrity
- * violation or a value that violates a dialect payload limit, is retried in halves so that only
+ * A batch that fails with a data integrity violation or a per-row data exception, for example
+ * a value that violates a dialect payload limit, is retried in halves so that only
  * the offending persistence ids fail. Transient errors and infrastructure errors fail the whole
  * batch. The retried halves are written concurrently and can use several pool connections at
  * once. Each half re-stamps its requests with new, later timestamps. A single split preserves order, but if the
