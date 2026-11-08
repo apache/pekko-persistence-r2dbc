@@ -105,15 +105,15 @@ private[r2dbc] object R2dbcBatchJournal {
  * request can still contain many events when the caller uses `persistAll` or `persistAsync`
  * bursts, the same as the default journal.
  *
- * A batch that fails with a data integrity violation or a per-row data exception, for example
- * a value that violates a dialect payload limit, is retried in halves so that only
- * the offending persistence ids fail. Transient errors and infrastructure errors fail the whole
- * batch. The retried halves are written concurrently and can use several pool connections at
- * once. Each half re-stamps its requests with new, later timestamps. A single split preserves order, but if the
- * half holding the earlier sequence numbers is retried after its sibling committed, its
- * re-stamped rows can invert the `db_timestamp` order of two same-persistence-id writes.
- * Replay still orders by sequence number; only timestamp-ordered read sides see the inversion.
- * This plugin targets many small concurrent writes.
+ * A batch that fails with a data integrity violation or a per-row data exception, for example a
+ * value that violates a dialect payload limit, is retried in halves so that only the offending
+ * persistence ids fail. Transient errors and infrastructure errors fail the whole batch. The
+ * retried halves are written concurrently and can use several pool connections at once. Each half
+ * re-stamps its requests with new, later timestamps. A single split preserves order, but if the
+ * half holding the earlier sequence numbers is retried after its sibling committed, its re-stamped
+ * rows can invert the `db_timestamp` order of two same-persistence-id writes. Replay still orders
+ * by sequence number; only timestamp-ordered read sides see the inversion. This plugin targets
+ * many small concurrent writes.
  */
 @InternalApi
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
