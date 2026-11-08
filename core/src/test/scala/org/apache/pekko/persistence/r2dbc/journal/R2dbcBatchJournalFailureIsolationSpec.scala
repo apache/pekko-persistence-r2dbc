@@ -21,18 +21,15 @@ import java.time.Instant
 import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.testkit.typed.scaladsl.TestProbe
-import pekko.actor.typed.ActorRef
 import pekko.actor.typed.ActorSystem
-import pekko.actor.typed.scaladsl.adapter._
-import pekko.persistence.AtomicWrite
 import pekko.persistence.JournalProtocol.WriteMessageFailure
 import pekko.persistence.JournalProtocol.WriteMessageSuccess
-import pekko.persistence.JournalProtocol.WriteMessages
 import pekko.persistence.JournalProtocol.WriteMessagesFailed
 import pekko.persistence.JournalProtocol.WriteMessagesSuccessful
-import pekko.persistence.PersistentRepr
+import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -40,7 +37,12 @@ import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.serialization.SerializationExtension
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import io.r2dbc.spi.R2dbcBadGrammarException
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.R2dbcNonTransientException
+import io.r2dbc.spi.R2dbcNonTransientResourceException
+import io.r2dbc.spi.R2dbcPermissionDeniedException
+import io.r2dbc.spi.R2dbcTransientResourceException
 import org.scalatest.wordspec.AnyWordSpecLike
 
 object R2dbcBatchJournalFailureIsolationSpec {
@@ -59,8 +61,7 @@ class R2dbcBatchJournalFailureIsolationSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 
@@ -68,12 +69,6 @@ class R2dbcBatchJournalFailureIsolationSpec
   private val serialization = SerializationExtension(system)
   private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
   import R2dbcBatchJournalFailureIsolationSpec.StoredRow
-
-  private def sendWrite(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): Unit =
-    journal ! WriteMessages(
-      Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
-      replyTo.toClassic,
-      actorInstanceId = 1)
 
   private def expectSuccess(probe: TestProbe[Any], pid: String): Unit = {
     probe.expectMessage(10.seconds, WriteMessagesSuccessful)
@@ -116,30 +111,100 @@ class R2dbcBatchJournalFailureIsolationSpec
       val probeC = createTestProbe[Any]()
 
       // seed pidA seqNr 1 so that the duplicate write below violates PRIMARY KEY(persistence_id, seq_nr)
-      sendWrite(pidA, 1L, "a1", probeA.ref)
+      journal ! batchedJournalWrite(pidA, 1L, "a1", probeA.ref)
       expectSuccess(probeA, pidA)
 
       // these three writes arrive within the 1 second batch window and are flushed as one batch,
       // the duplicate for pidA makes the batch fail with a unique constraint violation,
       // bisection retries the halves so that only pidA fails
-      sendWrite(pidA, 1L, "a1-duplicate", probeA.ref)
-      sendWrite(pidB, 1L, "b1", probeB.ref)
-      sendWrite(pidC, 1L, "c1", probeC.ref)
+      LoggingTestKit.debug("flushing [3] write requests").expect {
+        journal ! batchedJournalWrite(pidA, 1L, "a1-duplicate", probeA.ref)
+        journal ! batchedJournalWrite(pidB, 1L, "b1", probeB.ref)
+        journal ! batchedJournalWrite(pidC, 1L, "c1", probeC.ref)
 
-      val failed = probeA.expectMessageType[WriteMessagesFailed](10.seconds)
-      failed.cause shouldBe a[R2dbcDataIntegrityViolationException]
-      val failure = probeA.expectMessageType[WriteMessageFailure](10.seconds)
-      failure.cause shouldBe a[R2dbcDataIntegrityViolationException]
-      failure.message.persistenceId shouldBe pidA
-      failure.message.sequenceNr shouldBe 1L
+        val failed = probeA.expectMessageType[WriteMessagesFailed](10.seconds)
+        failed.cause shouldBe a[R2dbcDataIntegrityViolationException]
+        val failure = probeA.expectMessageType[WriteMessageFailure](10.seconds)
+        failure.cause shouldBe a[R2dbcDataIntegrityViolationException]
+        failure.message.persistenceId shouldBe pidA
+        failure.message.sequenceNr shouldBe 1L
 
-      expectSuccess(probeB, pidB)
-      expectSuccess(probeC, pidC)
+        expectSuccess(probeB, pidB)
+        expectSuccess(probeC, pidC)
+      }
 
       val rows = storedRows()
       rows.filter(_.pid == pidA).map(r => (r.seqNr, r.event)) shouldBe Vector((1L, "a1"))
       rows.filter(_.pid == pidB).map(r => (r.seqNr, r.event)) shouldBe Vector((1L, "b1"))
       rows.filter(_.pid == pidC).map(r => (r.seqNr, r.event)) shouldBe Vector((1L, "c1"))
+    }
+
+    "fail only the persistence id with an oversized payload on dialects with a payload size limit" in {
+      val entityType = nextEntityType()
+      val pidA = nextPid(entityType)
+      val pidB = nextPid(entityType)
+
+      val probeA = createTestProbe[Any]()
+      val probeB = createTestProbe[Any]()
+
+      val oversized = "a" * 70000
+      LoggingTestKit.debug("flushing [2] write requests").expect {
+        journal ! batchedJournalWrite(pidA, 1L, oversized, probeA.ref)
+        journal ! batchedJournalWrite(pidB, 1L, "b1", probeB.ref)
+
+        if (journalSettings.dialect == Dialect.MySQL || journalSettings.dialect == Dialect.MariaDB) {
+          val failed = probeA.expectMessageType[WriteMessagesFailed](10.seconds)
+          failed.cause shouldBe a[R2dbcNonTransientException]
+          val failure = probeA.expectMessageType[WriteMessageFailure](10.seconds)
+          failure.cause shouldBe a[R2dbcNonTransientException]
+          failure.message.persistenceId shouldBe pidA
+          failure.message.sequenceNr shouldBe 1L
+
+          expectSuccess(probeB, pidB)
+        } else {
+          expectSuccess(probeA, pidA)
+          expectSuccess(probeB, pidB)
+        }
+      }
+
+      if (journalSettings.dialect == Dialect.MySQL || journalSettings.dialect == Dialect.MariaDB) {
+        storedRows().filter(r => r.pid == pidA || r.pid == pidB).map(_.pid).toSet shouldBe Set(pidB)
+      } else {
+        storedRows().filter(r => r.pid == pidA || r.pid == pidB).map(_.pid).toSet shouldBe Set(pidA, pidB)
+      }
+    }
+
+    "classify only statement data and integrity errors as retryable by bisection" in {
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcDataIntegrityViolationException("duplicate key", "23505", 0)) shouldBe true
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcBadGrammarException("Data too long for column", "22001", 1406)) shouldBe true
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Data too long for column", "22001", 1406)) shouldBe true
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Invalid JSON text", "22032", 3140)) shouldBe true
+      // r2dbc-mysql reports some data exceptions without a SQLSTATE, for example 1406 from a batched insert
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Data too long for column", null, 1406)) shouldBe true
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Invalid JSON text", null, 3140)) shouldBe true
+
+      // schema errors, server-wide errors, connection errors, permission errors, and transient errors
+      // must fail the whole batch without bisection
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcBadGrammarException("Table doesn't exist", "42S02", 1146)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Running with --read-only", "HY000", 1290)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Running with --read-only", null, 1290)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Connection unexpectedly closed")) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcNonTransientResourceException("Connection error", "08000", 9000)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcPermissionDeniedException("Access denied", "28000", 1045)) shouldBe false
+      R2dbcBatchJournal.isNonTransientStatementError(
+        new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe false
     }
 
   }

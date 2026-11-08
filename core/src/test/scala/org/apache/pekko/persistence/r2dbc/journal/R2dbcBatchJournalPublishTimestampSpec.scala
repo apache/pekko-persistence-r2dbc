@@ -23,16 +23,11 @@ import scala.concurrent.duration._
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import pekko.actor.typed.ActorRef
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.internal.pubsub.TopicImpl
 import pekko.actor.typed.pubsub.Topic
-import pekko.actor.typed.scaladsl.adapter._
-import pekko.persistence.AtomicWrite
 import pekko.persistence.JournalProtocol.WriteMessageSuccess
-import pekko.persistence.JournalProtocol.WriteMessages
 import pekko.persistence.JournalProtocol.WriteMessagesSuccessful
-import pekko.persistence.PersistentRepr
 import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.TestData
@@ -57,20 +52,13 @@ class R2dbcBatchJournalPublishTimestampSpec
     with AnyWordSpecLike
     with TestDbLifecycle
     with TestData
-    with LogCapturing
-    with BatchedJournalDialectGate {
+    with LogCapturing {
 
   override def typedSystem: ActorSystem[?] = system
 
   private implicit val ec: ExecutionContext = system.executionContext
 
   private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
-
-  private def writeMessages(pid: String, seqNr: Long, event: String, replyTo: ActorRef[Any]): WriteMessages =
-    WriteMessages(
-      Seq(AtomicWrite(PersistentRepr(event, seqNr, pid))),
-      replyTo.toClassic,
-      actorInstanceId = 1)
 
   private def storedTimestamps(): Map[String, Instant] =
     r2dbcExecutor
@@ -109,7 +97,7 @@ class R2dbcBatchJournalPublishTimestampSpec
       pids.zip(probes).zipWithIndex.foreach {
         case ((pid, probe), i) =>
           system.scheduler.scheduleOnce((i * 20).millis,
-            () => journal ! writeMessages(pid, 1L, s"e-$i", probe.ref))
+            () => journal ! batchedJournalWrite(pid, 1L, s"e-$i", probe.ref))
       }
 
       pids.zip(probes).foreach {

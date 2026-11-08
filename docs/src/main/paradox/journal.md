@@ -42,9 +42,10 @@ user in their own test environments.
 
 The default journal writes each incoming write request with its own statement and commit. The batched journal
 plugin (`R2dbcBatchJournal`) instead coalesces concurrent write requests from different persistence ids into one
-transaction: the rows are written as a batch of one cached prepared statement and committed once. This reduces
-commits and statement prepares when many persistence ids write small events at the same time. It adds latency and
-changes failure behavior, see @ref:[Tradeoffs](#tradeoffs).
+transaction and commits once. This reduces commits when many persistence ids write small
+events at the same time. It adds latency and
+changes failure behavior, see @ref:[Tradeoffs](#tradeoffs). Batching is supported and tested for all
+dialects: Postgres, Yugabyte, MySQL, MariaDB, and H2.
 
 The batched journal requires `use-app-timestamp` and `db-timestamp-monotonic-increasing`, which the
 `batched-journal` configuration block enables for this plugin. This is the same timestamp mode that the
@@ -57,8 +58,12 @@ all journal actor instances in the JVM. Equal `db_timestamp` values therefore ne
 JVM (a single request can still contain several events with `persistAll` or `persistAsync`), so
 the `eventsBySlices` query can page through any batch regardless of its buffer size. The stamps can lead
 the wall clock by at most `max-batch-size` microseconds per flush. The lag between the timestamp and the
-commit is bounded by the connection acquisition plus one transaction. Keep `query.behind-current-time`
-comfortably above that lag. Batching is only supported and tested for the Postgres and Yugabyte dialects.
+commit is bounded by the connection acquisition plus one transaction. On Postgres and Yugabyte the rows
+are written as one cached prepared statement. On MySQL and MariaDB the driver executes each row of the
+batched insert as its own statement round trip on the single in-flight flush connection, so batching
+mainly saves commits rather than statement round trips, and the stamp-to-commit lag grows with the batch
+size. Keep `query.behind-current-time` (default 100 millis) comfortably above that lag so live
+`eventsBySlices` queries do not skip events until backtracking.
 
 ### Batched Journal Configuration
 
@@ -118,6 +123,12 @@ persistent actor stops, a typed persistent actor restarts. Isolating a single of
 retry approach twice `max-batch-size` statements, which is the number of statements the default journal would
 have used for the same writes.
 
+The bisection retries data integrity violations and per-row data exceptions. On MySQL and MariaDB an event or
+metadata payload that exceeds the 64 KiB limit of the `BLOB` columns is a data exception, so only the entity
+with the oversized payload fails. Transient errors, for example an InnoDB deadlock or a lock-wait timeout on
+MySQL and MariaDB, fail all writes of the batch without a retry. With the default journal a deadlock or
+lock-wait timeout only affects the one entity that wrote.
+
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited
 by `max-queue-size`, which rejects writes once the limit is reached. A single request can contain an arbitrary
@@ -128,7 +139,9 @@ with the number of actively writing actors. Buffered writes are held in memory u
 When to use:
 Batching is most effective when many persistence ids concurrently write small events. With a low number of
 concurrent writers, or with large events, the default journal performs better because it adds no buffering
-delay.
+delay. On MySQL and MariaDB, where the driver sends each row of a batch in its own round trip and only one
+flush is in flight at a time, throughput can also be lower than the default journal when network latency
+dominates commit cost.
 
 ## Deletes
 
