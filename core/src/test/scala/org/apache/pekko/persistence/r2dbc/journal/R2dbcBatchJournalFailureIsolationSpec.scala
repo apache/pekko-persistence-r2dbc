@@ -18,14 +18,20 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 import io.r2dbc.spi.R2dbcBadGrammarException
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.R2dbcNonTransientException
 import io.r2dbc.spi.R2dbcNonTransientResourceException
 import io.r2dbc.spi.R2dbcPermissionDeniedException
+import io.r2dbc.spi.R2dbcTimeoutException
 import io.r2dbc.spi.R2dbcTransientResourceException
 
 import org.apache.pekko
@@ -73,6 +79,8 @@ class R2dbcBatchJournalFailureIsolationSpec
   private implicit val journalPayloadCodec: PayloadCodec = journalSettings.journalPayloadCodec
   private val serialization = SerializationExtension(system)
   private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private val scheduler = system.classicSystem.scheduler
+  private implicit val ec: ExecutionContext = system.executionContext
   import R2dbcBatchJournalFailureIsolationSpec.StoredRow
 
   private def expectSuccess(probe: TestProbe[Any], pid: String): Unit = {
@@ -210,6 +218,69 @@ class R2dbcBatchJournalFailureIsolationSpec
         new R2dbcPermissionDeniedException("Access denied", "28000", 1045)) shouldBe false
       R2dbcBatchJournal.isNonTransientStatementError(
         new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe false
+    }
+
+    "classify only conflicts with concurrent transactions as transient conflicts" in {
+      // MySQL and MariaDB deadlock and lock-wait timeout, with and without a SQLSTATE
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe true
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("Deadlock found", null, 1213)) shouldBe true
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Lock wait timeout exceeded", "HY000", 1205)) shouldBe true
+      // PostgreSQL serialization failure and deadlock, H2 lock timeout
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("could not serialize access", "40001", 0)) shouldBe true
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("deadlock detected", "40P01", 0)) shouldBe true
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Timeout trying to lock table", "HYT00", 50200)) shouldBe true
+
+      // statement timeouts, integrity violations, connection and other errors are not retried
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("canceling statement due to statement timeout", "57014", 0)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcDataIntegrityViolationException("duplicate key", "23505", 0)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcNonTransientResourceException("Connection unexpectedly closed")) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcBadGrammarException("Table doesn't exist", "42S02", 1146)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(new IllegalStateException("not a database error")) shouldBe false
+    }
+
+    "retry a transient conflict until the attempt succeeds" in {
+      val attempts = new AtomicInteger
+      val retries = new ConcurrentLinkedQueue[Int]
+      val result = R2dbcBatchJournal.retryTransientConflicts(2, 1.millis, scheduler)((_, retry) => retries.add(retry)) {
+        () =>
+          if (attempts.incrementAndGet() <= 2) Future.failed(new R2dbcTransientResourceException("Deadlock", "40001"))
+          else Future.successful("written")
+      }
+      result.futureValue shouldBe "written"
+      attempts.get shouldBe 3
+      retries.asScala.toList shouldBe List(1, 2)
+    }
+
+    "fail with the transient conflict after the retries" in {
+      val attempts = new AtomicInteger
+      val conflict = new R2dbcTransientResourceException("Deadlock", "40001")
+      val result = R2dbcBatchJournal.retryTransientConflicts(1, 1.millis, scheduler)((_, _) => ()) { () =>
+        attempts.incrementAndGet()
+        Future.failed[String](conflict)
+      }
+      result.failed.futureValue shouldBe conflict
+      attempts.get shouldBe 2
+    }
+
+    "not retry other errors" in {
+      val attempts = new AtomicInteger
+      val violation = new R2dbcDataIntegrityViolationException("duplicate key", "23505", 0)
+      val result = R2dbcBatchJournal.retryTransientConflicts(2, 1.millis, scheduler)((_, _) => ()) { () =>
+        attempts.incrementAndGet()
+        Future.failed[String](violation)
+      }
+      result.failed.futureValue shouldBe violation
+      attempts.get shouldBe 1
     }
 
   }

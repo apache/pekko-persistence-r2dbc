@@ -125,9 +125,15 @@ have used for the same writes.
 
 The bisection retries data integrity violations and per-row data exceptions. On MySQL and MariaDB an event or
 metadata payload that exceeds the 64 KiB limit of the `BLOB` columns is a data exception, so only the entity
-with the oversized payload fails. Transient errors, for example an InnoDB deadlock or a lock-wait timeout on
-MySQL and MariaDB, fail all writes of the batch without a retry. With the default journal a deadlock or
-lock-wait timeout only affects the one entity that wrote.
+with the oversized payload fails.
+
+A batch that fails because of a conflict with a concurrent transaction, a deadlock, serialization failure or
+lock-wait timeout, is retried as a whole up to `transient-error-retries` times (default 2), with a growing,
+randomized delay based on `transient-error-retry-backoff` (default 50 ms). A batch holds row locks for up to
+`max-batch-size` persistence ids, so it is more likely than a single write to conflict, for example with a
+concurrent delete or with the batches of another JVM. If the conflict persists after the retries, all writes
+of the batch fail, while with the default journal it only affects the one entity that wrote. The retries add to
+the write latency, which counts toward the journal circuit breaker `call-timeout`.
 
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited
