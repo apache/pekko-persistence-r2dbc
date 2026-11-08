@@ -73,6 +73,17 @@ lazy val core = (project in file("core"))
         Set.empty
       else
         mimaPreviousArtifacts.value
+    },
+    // The PostgreSQL driver is only on the test runtime classpath for the dialects that use it, so that the tests of the
+    // other dialects show that the plugin works without it. The test sources are still compiled with it.
+    Test / fullClasspath := {
+      val classpath = (Test / fullClasspath).value
+      val dialect = sys.props.getOrElse("pekko.persistence.r2dbc.dialect", "postgres")
+      def postgresOnly(module: ModuleID): Boolean =
+        (module.organization == "org.postgresql" && module.name == "r2dbc-postgresql") ||
+        module.organization == "com.ongres.scram" || module.organization == "com.ongres.stringprep"
+      if (dialect == "postgres" || dialect == "yugabyte") classpath
+      else classpath.filterNot(_.get(moduleID.key).exists(postgresOnly))
     })
 
 lazy val migration = (project in file("migration"))

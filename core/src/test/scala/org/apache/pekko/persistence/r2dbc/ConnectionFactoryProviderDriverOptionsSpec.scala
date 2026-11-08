@@ -17,15 +17,10 @@
 
 package org.apache.pekko.persistence.r2dbc
 
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.util.Try
-import scala.util.Using
-
-import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
-import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.{ Option => R2dbcOption }
 
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
@@ -48,27 +43,6 @@ object ConnectionFactoryProviderDriverOptionsSpec {
       options.put(built.getRequiredValue(ConnectionFactoryOptions.DATABASE).toString, built)
       builder
     }
-  }
-
-  /**
-   * Loads the plugin's classes itself, and hides the PostgreSQL driver's classes from them, as for an application
-   * that only has another driver on the classpath.
-   */
-  class WithoutPostgresClassLoader(parent: ClassLoader) extends ClassLoader(parent) {
-    override def loadClass(name: String, resolve: Boolean): Class[?] =
-      getClassLoadingLock(name).synchronized {
-        if (name.startsWith("io.r2dbc.postgresql.")) throw new ClassNotFoundException(name)
-        else if (name.startsWith("org.apache.pekko.persistence.r2dbc.")) {
-          val loaded = findLoadedClass(name)
-          if (loaded != null) loaded
-          else {
-            val stream = getParent.getResourceAsStream(name.replace('.', '/') + ".class")
-            if (stream == null) throw new ClassNotFoundException(name)
-            val bytes = Using.resource(stream)(_.readAllBytes())
-            defineClass(name, bytes, 0, bytes.length)
-          }
-        } else super.loadClass(name, resolve)
-      }
   }
 
   // no database is needed, the connection factories are created but no connections are made
@@ -105,6 +79,15 @@ object ConnectionFactoryProviderDriverOptionsSpec {
       url = "r2dbc:pool:postgresql://postgres@localhost:5432/postgres-pool-url"
       statement-cache-size = 100
     }
+    # r2dbc-proxy, which wraps the PostgreSQL driver and isn't on the classpath
+    postgres-proxy-url = $${capturing} {
+      url = "r2dbc:proxy:postgresql://postgres@localhost:5432/postgres-proxy-url"
+      statement-cache-size = 100
+    }
+    postgres-pool-proxy-url = $${capturing} {
+      url = "r2dbc:pool:proxy:postgresql://postgres@localhost:5432/postgres-pool-proxy-url"
+      statement-cache-size = 100
+    }
     mysql-options = $${capturing} {
       driver = "mysql"
       port = 3306
@@ -114,93 +97,42 @@ object ConnectionFactoryProviderDriverOptionsSpec {
     mysql-options-url = $${capturing} {
       url = "r2dbc:mysql://root@localhost:3306/mysql-options-url"
     }
-    # without the customizer, whose class the isolated provider can't use
-    mysql-without-postgres = $${pekko.persistence.r2dbc.connection-factory} {
-      initial-size = 0
-      driver = "mysql"
-      port = 3306
-    }
-    mariadb-without-postgres = $${pekko.persistence.r2dbc.connection-factory} {
-      initial-size = 0
+    mariadb-options = $${capturing} {
       driver = "mariadb"
       port = 3306
+      database = "mariadb-options"
     }
     """)
     .withFallback(ConfigFactory.load())
     .resolve()
 
-  val PostgresOnlyOptions = Seq(
-    PostgresqlConnectionFactoryProvider.FORCE_BINARY,
-    PostgresqlConnectionFactoryProvider.PREFER_ATTACHED_BUFFERS,
-    PostgresqlConnectionFactoryProvider.PREPARED_STATEMENT_CACHE_QUERIES)
+  // referred to by name, as the PostgreSQL driver is only on the test classpath for the dialects that use it
+  val PostgresOnlyOptions: Seq[R2dbcOption[AnyRef]] =
+    Seq("forceBinary", "preferAttachedBuffers", "preparedStatementCacheQueries").map(R2dbcOption.valueOf[AnyRef])
 }
 
+/**
+ * The PostgreSQL driver's options are checked against the driver by [[ConnectionFactoryProviderPostgresOptionsSpec]].
+ * That the plugin works without the PostgreSQL driver is shown by the tests of the other dialects, which run without
+ * it on the classpath.
+ */
 class ConnectionFactoryProviderDriverOptionsSpec
     extends ScalaTestWithActorTestKit(ConnectionFactoryProviderDriverOptionsSpec.config)
     with AnyWordSpecLike {
   import ConnectionFactoryProviderDriverOptionsSpec._
 
-  private def optionsOf(path: String): ConnectionFactoryOptions = {
-    ConnectionFactoryProvider(system).connectionFactoryFor(path) should not be null
-    options.get(path)
-  }
-
-  private def connectionFactoryWithoutPostgres(path: String): ConnectionFactory = {
-    val loader = new WithoutPostgresClassLoader(getClass.getClassLoader)
-    val providerClass = loader.loadClass(classOf[ConnectionFactoryProvider].getName)
-    providerClass.getClassLoader shouldBe loader
-    val provider = providerClass.getConstructor(classOf[ActorSystem[?]]).newInstance(system)
-    providerClass
-      .getMethod("connectionFactoryFor", classOf[String])
-      .invoke(provider, path)
-      .asInstanceOf[ConnectionFactory]
-  }
-
   "ConnectionFactoryProvider" should {
-    "set the PostgreSQL driver's options under the names the driver reads" in {
-      val postgres = optionsOf("postgres-options")
-      postgres.getValue(PostgresqlConnectionFactoryProvider.FORCE_BINARY) shouldBe java.lang.Boolean.TRUE
-      postgres.getValue(PostgresqlConnectionFactoryProvider.PREFER_ATTACHED_BUFFERS) shouldBe java.lang.Boolean.TRUE
-      val cacheQueries = PostgresqlConnectionFactoryProvider.PREPARED_STATEMENT_CACHE_QUERIES
-      postgres.getValue(cacheQueries) shouldBe Integer.valueOf(100)
-      postgres.getValue(PostgresqlConnectionFactoryProvider.STATEMENT_TIMEOUT) shouldBe Duration.ofSeconds(5)
-      // the driver converts the name with SSLMode.fromValue
-      postgres.getValue(PostgresqlConnectionFactoryProvider.SSL_MODE).asInstanceOf[Any] shouldBe "verify-full"
-      postgres.getValue(PostgresqlConnectionFactoryProvider.SSL_PASSWORD) shouldBe "secret"
-    }
-
-    "set the PostgreSQL driver's certificate and key options under the names the driver reads" in {
-      // the driver then fails to read the certificates, which don't exist
-      Try(ConnectionFactoryProvider(system).connectionFactoryFor("postgres-ssl-files"))
-      val postgres = options.get("postgres-ssl-files")
-      postgres.getValue(PostgresqlConnectionFactoryProvider.SSL_ROOT_CERT) shouldBe "root.crt"
-      postgres.getValue(PostgresqlConnectionFactoryProvider.SSL_CERT) shouldBe "client.crt"
-      postgres.getValue(PostgresqlConnectionFactoryProvider.SSL_KEY) shouldBe "client.key"
-    }
-
-    "set the PostgreSQL driver's options when the url has it as the protocol of the pool driver" in {
-      val postgres = optionsOf("postgres-pool-url")
-      postgres.getValue(PostgresqlConnectionFactoryProvider.FORCE_BINARY) shouldBe java.lang.Boolean.TRUE
-      postgres.getValue(PostgresqlConnectionFactoryProvider.PREFER_ATTACHED_BUFFERS) shouldBe java.lang.Boolean.TRUE
-      val cacheQueries = PostgresqlConnectionFactoryProvider.PREPARED_STATEMENT_CACHE_QUERIES
-      postgres.getValue(cacheQueries) shouldBe Integer.valueOf(100)
-    }
-
-    Seq("mysql-options" -> "the driver setting", "mysql-options-url" -> "the url").foreach { case (path, source) =>
-      s"not set the PostgreSQL driver's options for the MySQL driver from $source" in {
-        val mysql = optionsOf(path)
+    Seq(
+      "mysql-options" -> "the MySQL driver from the driver setting",
+      "mysql-options-url" -> "the MySQL driver from the url",
+      "mariadb-options" -> "the MariaDB driver").foreach { case (path, driver) =>
+      s"not set the PostgreSQL driver's options for $driver" in {
+        ConnectionFactoryProvider(system).connectionFactoryFor(path) should not be null
+        val other = options.get(path)
         PostgresOnlyOptions.foreach { option =>
-          withClue(s"$option:") { mysql.hasOption(option) shouldBe false }
+          withClue(s"$option:") { other.hasOption(option) shouldBe false }
         }
       }
-    }
-
-    "create a MySQL connection factory without the PostgreSQL driver on the classpath" in {
-      connectionFactoryWithoutPostgres("mysql-without-postgres").getMetadata.getName shouldBe "MySQL"
-    }
-
-    "create a MariaDB connection factory without the PostgreSQL driver on the classpath" in {
-      connectionFactoryWithoutPostgres("mariadb-without-postgres").getMetadata.getName shouldBe "MariaDB"
     }
   }
 }
