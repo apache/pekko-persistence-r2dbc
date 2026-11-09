@@ -76,6 +76,19 @@ import org.slf4j.LoggerFactory
   @volatile private var throughput =
     EWMA(0.0, EWMA.alpha(settings.throughputCollectInterval * 2, settings.throughputCollectInterval))
 
+  /**
+   * Creates the topic that the events of the persistence id are published to, if it doesn't exist yet.
+   *
+   * A topic drops what is published to it while it knows no topic instances, which it learns from the receptionist
+   * after it has started, and has no local subscribers. A topic created by publishing an event would drop that event,
+   * and the subscribers on other nodes would only get it from the query. The journals create the topic when they
+   * recover the entity, which is before its first event is published, and the receptionist's reply is local, so it
+   * usually comes before the recovery's database query returns. Subscriptions that the receptionist hasn't gossiped
+   * to this node yet, e.g. of a node that has just joined, aren't covered; their events come from the query.
+   */
+  def createTopic(persistenceId: String): Unit =
+    eventTopic[Any](PersistenceId.extractEntityType(persistenceId), persistenceExt.sliceForPersistenceId(persistenceId))
+
   def eventTopic[Event](entityType: String, slice: Int): ActorRef[Topic.Command[EventEnvelope[Event]]] = {
     val name = topicName(entityType, slice)
     topics
@@ -90,7 +103,7 @@ import org.slf4j.LoggerFactory
     (minSlice to maxSlice).map(eventTopic[Event](entityType, _)).toSet
   }
 
-  private def topicName(entityType: String, slice: Int): String = {
+  private[r2dbc] def topicName(entityType: String, slice: Int): String = {
     val range = sliceRangeLookup.computeIfAbsent(
       slice,
       _ =>
