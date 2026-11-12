@@ -15,6 +15,10 @@ package org.apache.pekko.persistence.r2dbc.journal.h2
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
+
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
@@ -22,8 +26,6 @@ import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.internal.h2.H2Utils
 import pekko.persistence.r2dbc.journal.JournalDao
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
 
 /**
  * INTERNAL API

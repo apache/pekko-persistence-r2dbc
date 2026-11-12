@@ -25,19 +25,20 @@ import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.query.NoOffset
 import pekko.persistence.query.PersistenceQuery
+import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.TestActors
 import pekko.persistence.r2dbc.TestActors.Persister.Persist
-import pekko.persistence.r2dbc.TestActors.Persister.PersistWithAck
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
-import pekko.persistence.r2dbc.QuerySettings
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
+
+import com.typesafe.config.ConfigFactory
 
 object EventsBySlicePerfSpec {
   private val config = ConfigFactory

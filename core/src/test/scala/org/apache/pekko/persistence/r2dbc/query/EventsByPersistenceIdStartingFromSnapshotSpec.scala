@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.query
 
 import java.time.Instant
+
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -37,9 +38,11 @@ import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object EventsByPersistenceIdStartingFromSnapshotSpec {
   sealed trait QueryType

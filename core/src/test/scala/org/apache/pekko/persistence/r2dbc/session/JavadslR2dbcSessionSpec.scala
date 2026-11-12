@@ -27,6 +27,7 @@ import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestDbLifecycle
+
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class JavadslR2dbcSessionSpec

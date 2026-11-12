@@ -17,6 +17,9 @@
 
 package org.apache.pekko.persistence.r2dbc
 
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
@@ -24,11 +27,11 @@ import pekko.actor.testkit.typed.scaladsl.TestProbe
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.eventstream.EventStream
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Option
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object MySQLConnectionFactoryProviderSpec {
 

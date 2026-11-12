@@ -15,16 +15,16 @@ package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
 
-import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.jdk.DurationConverters.JavaDurationOps
-import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
+import scala.util.{ Failure, Success, Try }
 
-import com.typesafe.config.Config
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.R2dbcException
 import io.r2dbc.spi.R2dbcNonTransientResourceException
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.Timers
@@ -47,6 +47,8 @@ import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
+
+import com.typesafe.config.Config
 
 /**
  * INTERNAL API

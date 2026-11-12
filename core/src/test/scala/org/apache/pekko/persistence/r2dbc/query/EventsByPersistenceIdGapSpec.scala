@@ -33,8 +33,10 @@ import pekko.persistence.r2dbc.cleanup.scaladsl.EventSourcedCleanup
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.stream.scaladsl.Sink
 import pekko.stream.testkit.scaladsl.TestSink
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
+
+import com.typesafe.config.ConfigFactory
 
 /**
  * Tests covering sequence-number gap handling in eventsByPersistenceId and

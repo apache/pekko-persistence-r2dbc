@@ -13,6 +13,8 @@
 
 package docs.home.query
 
+// Keep the documentation snippet import boundaries intact.
+// scalafix:off OrganizeImports
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.query.NoOffset
@@ -130,3 +132,5 @@ object QueryDocCompileOnly {
     // #currentChangesBySlices
   }
 }
+
+// scalafix:on OrganizeImports

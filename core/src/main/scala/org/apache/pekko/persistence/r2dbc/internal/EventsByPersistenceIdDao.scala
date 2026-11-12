@@ -15,6 +15,10 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import java.time.Instant
 
+import scala.concurrent.ExecutionContext
+
+import io.r2dbc.spi.Row
+
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.annotation.InternalApi
@@ -26,9 +30,8 @@ import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.journal.JournalDao.SerializedJournalRow
 import pekko.persistence.r2dbc.journal.JournalDao.readMetadata
 import pekko.stream.scaladsl.Source
-import io.r2dbc.spi.Row
+
 import org.slf4j.LoggerFactory
-import scala.concurrent.ExecutionContext
 
 /**
  * INTERNAL API

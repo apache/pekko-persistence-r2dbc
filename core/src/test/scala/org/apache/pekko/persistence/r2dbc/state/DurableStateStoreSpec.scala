@@ -16,15 +16,13 @@ package org.apache.pekko.persistence.r2dbc.state
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.{ LogCapturing, ScalaTestWithActorTestKit }
 import pekko.actor.typed.ActorSystem
-import pekko.persistence.r2dbc.{ TestConfig, TestData, TestDbLifecycle }
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
+import pekko.persistence.r2dbc.{ TestConfig, TestData, TestDbLifecycle }
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
-import org.scalatest.wordspec.AnyWordSpecLike
 
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
+import org.scalatest.wordspec.AnyWordSpecLike
 
 class DurableStateStoreSpec
     extends ScalaTestWithActorTestKit(TestConfig.config)

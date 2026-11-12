@@ -18,7 +18,16 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+
 import scala.concurrent.duration._
+
+import io.r2dbc.spi.R2dbcBadGrammarException
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.R2dbcNonTransientException
+import io.r2dbc.spi.R2dbcNonTransientResourceException
+import io.r2dbc.spi.R2dbcPermissionDeniedException
+import io.r2dbc.spi.R2dbcTransientResourceException
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
@@ -35,15 +44,11 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.serialization.SerializationExtension
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.spi.R2dbcBadGrammarException
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import io.r2dbc.spi.R2dbcNonTransientException
-import io.r2dbc.spi.R2dbcNonTransientResourceException
-import io.r2dbc.spi.R2dbcPermissionDeniedException
-import io.r2dbc.spi.R2dbcTransientResourceException
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object R2dbcBatchJournalFailureIsolationSpec {
 

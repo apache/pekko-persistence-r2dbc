@@ -29,8 +29,10 @@ import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.journal.JournalDao
 import pekko.persistence.r2dbc.snapshot.SnapshotDao
-import com.typesafe.config.Config
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
 
 /**
  * Scala API: Tool for deleting events and/or snapshots for a given list of `persistenceIds` without using persistent

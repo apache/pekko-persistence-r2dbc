@@ -18,6 +18,7 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import scala.concurrent.duration._
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
@@ -30,9 +31,11 @@ import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object R2dbcBatchJournalBatchingSpec {
 

@@ -23,14 +23,16 @@ import java.util.Locale
 
 import scala.util.Try
 
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
+
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.internal.ConnectionAdapter
+
 import com.typesafe.config.Config
-import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Option
 
 /**
  * INTERNAL API

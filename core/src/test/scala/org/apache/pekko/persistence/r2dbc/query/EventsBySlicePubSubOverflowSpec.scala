@@ -13,6 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.query
 
+import scala.concurrent.duration._
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -31,11 +33,11 @@ import pekko.persistence.r2dbc.internal.PubSub
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import scala.concurrent.duration._
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 
 object EventsBySlicePubSubOverflowSpec {
   def config: Config =

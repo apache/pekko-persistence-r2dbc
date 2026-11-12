@@ -16,6 +16,7 @@ package org.apache.pekko.persistence.r2dbc.query
 import org.apache.pekko
 import pekko.actor.ExtendedActorSystem
 import pekko.persistence.query.ReadJournalProvider
+
 import com.typesafe.config.Config
 
 final class R2dbcReadJournalProvider(system: ExtendedActorSystem, config: Config, cfgPath: String)

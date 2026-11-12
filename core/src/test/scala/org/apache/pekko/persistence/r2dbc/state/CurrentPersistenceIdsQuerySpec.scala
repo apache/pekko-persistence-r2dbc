@@ -30,8 +30,10 @@ import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Sink
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
+
+import com.typesafe.config.ConfigFactory
 
 class CurrentPersistenceIdsQuerySpec
     extends ScalaTestWithActorTestKit(

@@ -17,15 +17,17 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.ApiMayChange
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.ConnectionFactorySettings
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
-import io.r2dbc.spi.Connection
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
+
 import org.slf4j.LoggerFactory
 
 @ApiMayChange

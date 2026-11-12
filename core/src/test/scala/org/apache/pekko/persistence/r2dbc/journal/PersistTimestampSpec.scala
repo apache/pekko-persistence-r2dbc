@@ -16,20 +16,22 @@ package org.apache.pekko.persistence.r2dbc.journal
 import java.time.Instant
 
 import scala.concurrent.duration._
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
-import pekko.persistence.r2dbc.internal.PayloadCodec
-import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.internal.PayloadCodec
+import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
+
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class PersistTimestampSpec

@@ -13,6 +13,8 @@
 
 package docs.home.state
 
+// Keep the documentation snippet import boundaries intact.
+// scalafix:off OrganizeImports
 // #additional-column
 import org.apache.pekko
 import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
@@ -48,3 +50,5 @@ class BlogPostTitleColumn extends AdditionalColumn[BlogPost.State, String] {
     }
 }
 // #additional-column
+
+// scalafix:on OrganizeImports

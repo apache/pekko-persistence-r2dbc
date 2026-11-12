@@ -9,13 +9,14 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
+import java.util.concurrent.atomic.AtomicBoolean
+
+import reactor.core.publisher.Mono
+
 import org.scalatest.TestSuite
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import reactor.core.publisher.Mono
-
-import java.util.concurrent.atomic.AtomicBoolean
 
 class MonoToFutureSpec extends AnyWordSpec with ScalaFutures with TestSuite with Matchers {
   "MonoToFutureSpec" should {

@@ -23,16 +23,19 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.util.Try
 import scala.util.Using
 
+import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryOptions
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.postgresql.PostgresqlConnectionFactoryProvider
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.ConnectionFactoryOptions
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object ConnectionFactoryProviderDriverOptionsSpec {
 

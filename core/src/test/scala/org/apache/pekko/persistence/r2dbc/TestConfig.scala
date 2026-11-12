@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc
 
 import org.apache.pekko
 import pekko.persistence.r2dbc.internal.Sql
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 

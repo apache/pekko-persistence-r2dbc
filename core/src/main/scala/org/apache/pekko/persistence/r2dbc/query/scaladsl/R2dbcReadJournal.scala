@@ -20,7 +20,7 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters._
-import com.typesafe.config.Config
+
 import org.apache.pekko
 import pekko.NotUsed
 import pekko.actor.ExtendedActorSystem
@@ -63,7 +63,10 @@ import pekko.serialization.Serializers
 import pekko.stream.OverflowStrategy
 import pekko.stream.scaladsl.Flow
 import pekko.stream.scaladsl.Source
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
 
 object R2dbcReadJournal {
   val Identifier = "pekko.persistence.r2dbc.query"

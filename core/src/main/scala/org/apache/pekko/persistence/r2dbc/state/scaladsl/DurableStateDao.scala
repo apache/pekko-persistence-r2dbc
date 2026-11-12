@@ -17,9 +17,15 @@ import java.lang
 import java.time.Instant
 import java.util
 
-import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NonFatal
+
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.R2dbcDataIntegrityViolationException
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 
 import org.apache.pekko
 import pekko.Done
@@ -47,24 +53,21 @@ import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
+import pekko.persistence.r2dbc.internal.h2.H2Connections
+import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
 import pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
 import pekko.persistence.r2dbc.state.ChangeHandlerException
 import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
-import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
-import pekko.persistence.r2dbc.internal.h2.H2Connections
-import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
+import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
-import com.typesafe.config.Config
-import io.r2dbc.spi.Connection
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
+
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
 
 /**
  * INTERNAL API

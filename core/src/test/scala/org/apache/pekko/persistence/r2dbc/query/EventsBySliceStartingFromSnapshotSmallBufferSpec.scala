@@ -36,9 +36,11 @@ import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Sink
 import pekko.stream.testkit.scaladsl.TestSink
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object EventsBySliceStartingFromSnapshotSmallBufferSpec {
   // small buffer-size so that a full page of events is before the snapshots

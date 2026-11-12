@@ -42,9 +42,11 @@ import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.stream.KillSwitches
 import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object DurableStateBySliceSpec {
   sealed trait QueryType

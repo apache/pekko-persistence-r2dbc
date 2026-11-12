@@ -27,8 +27,10 @@ import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.CleanupSettings
 import pekko.persistence.r2dbc.StateSettings
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
-import com.typesafe.config.Config
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
 
 /**
  * Scala API: Tool for deleting durable state for a given list of `persistenceIds` without using `DurableStateBehavior`

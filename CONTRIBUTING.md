@@ -161,3 +161,24 @@ Example:
 1. GitHub Actions CI automatically merges the code, builds it, runs the tests and sets Pull Request status accordingly of results in GitHub.
 2. [Scalafmt](https://olafurpg.github.io/scalafmt) enforces some of the code style rules.
 3. [sbt-header plugin](https://github.com/sbt/sbt-header) manages consistent copyright headers in every source file.
+
+### Organizing Scala imports
+
+Run `sbt sortImports` using the default Scala 2.13 version to organize imports.
+This enables SemanticDB for the sbt session, applies Scalafix `OrganizeImports`
+to all compile and test sources, then runs Scalafmt. Import organization is
+separate from `applyCodeStyle` because it requires compilation.
+
+The configuration preserves relative imports, groups imports by their resolved
+package and removes unused imports using compiler diagnostics. Scalafmt no
+longer sorts imports independently.
+
+Run `scripts/check-organize-imports.sh` for a focused regression check of
+grouping, relative imports, unused import removal and idempotence. It creates
+an isolated temporary build and accepts an alternative sbt launcher as arguments.
+Set `SCALA_VERSION` to exercise another supported Scala version.
+
+Documentation examples with import snippet markers opt out of
+`OrganizeImports` using `scalafix:off/on` comments. This preserves which
+imports appear in published snippets; do not move the snippet boundaries
+merely to satisfy import sorting.

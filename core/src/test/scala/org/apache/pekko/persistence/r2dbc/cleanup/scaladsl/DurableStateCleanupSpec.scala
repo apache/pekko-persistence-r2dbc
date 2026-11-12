@@ -22,8 +22,10 @@ import pekko.persistence.r2dbc.TestActors.DurableStatePersister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
+
+import com.typesafe.config.ConfigFactory
 
 object DurableStateCleanupSpec {
   val config = ConfigFactory

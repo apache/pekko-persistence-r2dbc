@@ -15,8 +15,12 @@ package org.apache.pekko.persistence.r2dbc.snapshot
 
 import java.time.Instant
 
-import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ ExecutionContext, Future }
+
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 
 import org.apache.pekko
 import pekko.NotUsed
@@ -37,19 +41,18 @@ import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichStatement
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
-import pekko.persistence.r2dbc.snapshot.mariadb.MariaDBSnapshotDao
-import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
-import pekko.persistence.r2dbc.snapshot.h2.H2SnapshotDao
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
+import pekko.persistence.r2dbc.snapshot.h2.H2SnapshotDao
+import pekko.persistence.r2dbc.snapshot.mariadb.MariaDBSnapshotDao
+import pekko.persistence.r2dbc.snapshot.mysql.MySQLSnapshotDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
-import com.typesafe.config.Config
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
+
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
 
 /**
  * INTERNAL API

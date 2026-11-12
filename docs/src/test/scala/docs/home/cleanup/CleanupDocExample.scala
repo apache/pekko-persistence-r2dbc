@@ -13,6 +13,8 @@
 
 package docs.home.cleanup
 
+// Keep the documentation snippet import boundaries intact.
+// scalafix:off OrganizeImports
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 
@@ -44,3 +46,5 @@ object CleanupDocExample {
   // #cleanup
 
 }
+
+// scalafix:on OrganizeImports

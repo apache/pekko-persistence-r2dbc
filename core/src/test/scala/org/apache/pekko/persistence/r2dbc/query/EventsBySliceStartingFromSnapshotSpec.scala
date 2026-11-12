@@ -13,8 +13,6 @@
 
 package org.apache.pekko.persistence.r2dbc.query
 
-import scala.concurrent.duration._
-
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -29,9 +27,7 @@ import pekko.persistence.query.TimestampOffset.toTimestampOffset
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.TestActors
 import pekko.persistence.r2dbc.TestActors.Persister
-import pekko.persistence.r2dbc.TestActors.Persister.Persist
 import pekko.persistence.r2dbc.TestActors.Persister.PersistWithAck
-import pekko.persistence.r2dbc.TestActors.Persister.Ping
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
@@ -43,9 +39,11 @@ import pekko.stream.scaladsl.Sink
 import pekko.stream.scaladsl.Source
 import pekko.stream.testkit.TestSubscriber
 import pekko.stream.testkit.scaladsl.TestSink
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object EventsBySliceStartingFromSnapshotSpec {
   sealed trait QueryType

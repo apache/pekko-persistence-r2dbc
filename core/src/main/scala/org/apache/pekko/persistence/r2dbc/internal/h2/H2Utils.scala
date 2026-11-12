@@ -15,10 +15,11 @@ package org.apache.pekko.persistence.r2dbc.internal.h2
 
 import java.time.Instant
 
+import io.r2dbc.spi.Row
+
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.internal.SettingsTypes
-import io.r2dbc.spi.Row
 
 /**
  * INTERNAL API

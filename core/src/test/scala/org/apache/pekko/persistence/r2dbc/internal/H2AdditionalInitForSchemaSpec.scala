@@ -23,10 +23,12 @@ import pekko.persistence.r2dbc.state.DurableStateStoreAdditionalColumnSpec
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.Outcome
 import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
+
+import com.typesafe.config.ConfigFactory
 
 object H2AdditionalInitForSchemaSpec {
 

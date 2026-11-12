@@ -34,9 +34,11 @@ import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object DurableStateStoreChangeHandlerSpec {
   val config: Config = ConfigFactory

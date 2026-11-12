@@ -26,6 +26,7 @@ import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.{ TestConfig, TestDbLifecycle }
 import pekko.persistence.snapshot.SnapshotStoreSpec
 import pekko.testkit.TestProbe
+
 import org.scalatest.Outcome
 import org.scalatest.Pending
 

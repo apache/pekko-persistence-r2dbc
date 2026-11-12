@@ -14,7 +14,6 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import org.apache.pekko
-import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorRef
@@ -25,9 +24,11 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.typed.PersistenceId
 import pekko.persistence.typed.scaladsl.Effect
 import pekko.persistence.typed.scaladsl.EventSourcedBehavior
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object MultiPluginSpec {
   val config: Config = ConfigFactory

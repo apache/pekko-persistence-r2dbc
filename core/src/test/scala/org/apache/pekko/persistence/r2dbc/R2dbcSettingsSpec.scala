@@ -13,13 +13,15 @@
 
 package org.apache.pekko.persistence.r2dbc
 
-import com.typesafe.config.ConfigException
-import com.typesafe.config.ConfigFactory
 import io.r2dbc.postgresql.client.SSLMode
+
 import org.scalatest.Inspectors._
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
+import com.typesafe.config.ConfigException
+import com.typesafe.config.ConfigFactory
 
 class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 

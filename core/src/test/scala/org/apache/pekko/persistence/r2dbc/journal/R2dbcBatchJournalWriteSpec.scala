@@ -18,7 +18,11 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+
 import scala.concurrent.duration._
+
+import io.r2dbc.spi.Row
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
@@ -46,10 +50,11 @@ import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.stream.testkit.scaladsl.TestSink
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.spi.Row
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object R2dbcBatchJournalWriteSpec {
 

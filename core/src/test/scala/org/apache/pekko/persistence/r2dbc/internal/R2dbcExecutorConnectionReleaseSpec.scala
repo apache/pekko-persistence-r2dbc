@@ -27,10 +27,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
-import org.apache.pekko
-import pekko.actor.testkit.typed.scaladsl.LogCapturing
-import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import pekko.actor.typed.ActorSystem
 import io.r2dbc.spi.Batch
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
@@ -44,11 +40,19 @@ import io.r2dbc.spi.RowMetadata
 import io.r2dbc.spi.Statement
 import io.r2dbc.spi.TransactionDefinition
 import io.r2dbc.spi.ValidationDepth
-import org.reactivestreams.Publisher
-import org.scalatest.wordspec.AnyWordSpecLike
-import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+
+import org.apache.pekko
+import pekko.actor.testkit.typed.scaladsl.LogCapturing
+import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import pekko.actor.typed.ActorSystem
+
+import org.reactivestreams.Publisher
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
+import org.slf4j.LoggerFactory
 
 object R2dbcExecutorConnectionReleaseSpec {
 

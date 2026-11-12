@@ -27,6 +27,7 @@ import pekko.persistence.r2dbc.internal.StartingFromSnapshotStage
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 import pekko.stream.testkit.scaladsl.TestSink
+
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class StartingFromSnapshotStageSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with LogCapturing {
