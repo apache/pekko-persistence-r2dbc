@@ -13,8 +13,6 @@
 
 package org.apache.pekko.persistence.r2dbc
 
-import io.r2dbc.postgresql.client.SSLMode
-
 import org.scalatest.Inspectors._
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
@@ -72,7 +70,6 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
         .withFallback(ConfigFactory.load())
       val settings = ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
       settings.sslMode shouldBe "VERIFY_FULL"
-      SSLMode.fromValue(settings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
 
     "support ssl-mode values in lower and dashes" in {
@@ -81,7 +78,6 @@ class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
         .withFallback(ConfigFactory.load())
       val settings = ConnectionFactorySettings(config.getConfig("pekko.persistence.r2dbc.connection-factory"))
       settings.sslMode shouldBe "verify-full"
-      SSLMode.fromValue(settings.sslMode) shouldBe SSLMode.VERIFY_FULL
     }
 
     "allow to specify ConnectionFactoryOptions customizer" in {

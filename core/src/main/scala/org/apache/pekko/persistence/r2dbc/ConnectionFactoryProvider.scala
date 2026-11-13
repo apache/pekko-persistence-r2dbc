@@ -30,8 +30,8 @@ import io.r2dbc.pool.ConnectionPoolConfiguration
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Option
 import io.r2dbc.spi.Wrapped
+import io.r2dbc.spi.{ Option => R2dbcOption }
 
 import org.apache.pekko
 import pekko.Done
@@ -87,25 +87,32 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   // The names of the PostgreSQL driver (PostgresqlConnectionFactoryProvider), which YugabyteDB uses too.
   private val PostgresDrivers = Set("postgresql", "postgres")
 
+  // Drivers that wrap the database driver and have it as the protocol of the url: r2dbc-pool
+  // (`r2dbc:pool:<driver>://`) and r2dbc-proxy (`r2dbc:proxy:<driver>://`). They pass the other options on.
+  private val WrappingDrivers = Set("pool", "proxy")
+
   // Options of the PostgreSQL driver, referred to by name so that the other drivers don't need r2dbc-postgresql on the
   // classpath.
-  private val ForceBinary = Option.valueOf[java.lang.Boolean]("forceBinary")
-  private val PreferAttachedBuffers = Option.valueOf[java.lang.Boolean]("preferAttachedBuffers")
-  private val PreparedStatementCacheQueries = Option.valueOf[Integer]("preparedStatementCacheQueries")
-  private val SslMode = Option.valueOf[String]("sslMode")
-  private val SslRootCert = Option.valueOf[String]("sslRootCert")
-  private val SslCert = Option.valueOf[String]("sslCert")
-  private val SslKey = Option.valueOf[String]("sslKey")
-  private val SslPassword = Option.valueOf[String]("sslPassword")
+  private val ForceBinary = R2dbcOption.valueOf[java.lang.Boolean]("forceBinary")
+  private val PreferAttachedBuffers = R2dbcOption.valueOf[java.lang.Boolean]("preferAttachedBuffers")
+  private val PreparedStatementCacheQueries = R2dbcOption.valueOf[Integer]("preparedStatementCacheQueries")
+  private val SslMode = R2dbcOption.valueOf[String]("sslMode")
+  private val SslRootCert = R2dbcOption.valueOf[String]("sslRootCert")
+  private val SslCert = R2dbcOption.valueOf[String]("sslCert")
+  private val SslKey = R2dbcOption.valueOf[String]("sslKey")
+  private val SslPassword = R2dbcOption.valueOf[String]("sslPassword")
 
-  // The driver, set with the `driver` setting or in the `url`. A `r2dbc:pool:<driver>://` url has the driver as its
-  // protocol.
-  private def driverName(options: ConnectionFactoryOptions): scala.Option[String] = {
-    def lowerCase(option: Option[?]) = scala.Option(options.getValue(option)).map(_.toString.toLowerCase(Locale.ROOT))
-    lowerCase(ConnectionFactoryOptions.DRIVER).flatMap {
-      case "pool" => lowerCase(ConnectionFactoryOptions.PROTOCOL).map(_.takeWhile(_ != ':'))
-      case driver => Some(driver)
-    }
+  // The database driver, set with the `driver` setting or in the `url`, behind any wrapping drivers, for example
+  // `postgresql` for a `r2dbc:pool:proxy:postgresql://` url.
+  private def driverName(options: ConnectionFactoryOptions): Option[String] = {
+    def lowerCase(option: R2dbcOption[?]) = Option(options.getValue(option)).map(_.toString.toLowerCase(Locale.ROOT))
+    @tailrec def unwrap(driver: String, protocol: String): String =
+      if (WrappingDrivers(driver) && protocol.nonEmpty) {
+        val (next, rest) = protocol.span(_ != ':')
+        unwrap(next, rest.drop(1))
+      } else driver
+    lowerCase(ConnectionFactoryOptions.DRIVER).map(unwrap(_,
+      lowerCase(ConnectionFactoryOptions.PROTOCOL).getOrElse("")))
   }
 }
 
@@ -150,7 +157,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         })
   }
 
-  @tailrec private def connectionPool(connectionFactory: ConnectionFactory): scala.Option[ConnectionPool] =
+  @tailrec private def connectionPool(connectionFactory: ConnectionFactory): Option[ConnectionPool] =
     connectionFactory match {
       case pool: ConnectionPool                           => Some(pool)
       case wrapped: Wrapped[ConnectionFactory] @unchecked => connectionPool(wrapped.unwrap())
@@ -174,7 +181,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
 
   private def createConnectionFactory(settings: ConnectionFactorySettings,
       customizer: ConnectionFactoryOptionsCustomizer,
-      config: Config): (ConnectionFactory, scala.Option[ConnectionAdapter]) = {
+      config: Config): (ConnectionFactory, Option[ConnectionAdapter]) = {
     val builder =
       settings.urlOption match {
         case Some(url) =>
@@ -199,7 +206,7 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
     val driverOptions = builder.build()
     val mariaDB = MariaDBConnections.isMariaDB(driverOptions)
     // the driver can be set with the `driver` setting or in the `url`
-    val mySQL = scala.Option(driverOptions.getValue(ConnectionFactoryOptions.DRIVER)).exists(_.toString == "mysql")
+    val mySQL = Option(driverOptions.getValue(ConnectionFactoryOptions.DRIVER)).exists(_.toString == "mysql")
 
     if (ConnectionFactoryProvider.driverName(driverOptions).exists(ConnectionFactoryProvider.PostgresDrivers))
       builder
@@ -238,8 +245,8 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
       // Unlike the MariaDB time zone, these are not enforced on purpose: rows written by earlier versions may be stored
       // shifted, and the `url` or a customizer can keep the previous options until the data is corrected, see the
       // migration guide.
-      val connectionTimeZone = Option.valueOf[String]("connectionTimeZone")
-      val forceConnectionTimeZoneToSession = Option.valueOf[java.lang.Boolean]("forceConnectionTimeZoneToSession")
+      val connectionTimeZone = R2dbcOption.valueOf[String]("connectionTimeZone")
+      val forceConnectionTimeZoneToSession = R2dbcOption.valueOf[java.lang.Boolean]("forceConnectionTimeZoneToSession")
       if (!driverOptions.hasOption(connectionTimeZone))
         builder.option(connectionTimeZone, "UTC")
       if (!driverOptions.hasOption(forceConnectionTimeZoneToSession))
@@ -259,8 +266,8 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
   // The `url` or a customizer can set the options so that the driver converts timestamps with another time zone than
   // the session uses. Timestamps are then stored shifted, and round trips through the driver hide it.
   private def warnIfSessionTimeZoneDiffers(options: ConnectionFactoryOptions): Unit = {
-    def value(name: String): scala.Option[String] =
-      scala.Option(options.getValue(Option.valueOf[AnyRef](name))).map(_.toString)
+    def value(name: String): Option[String] =
+      Option(options.getValue(R2dbcOption.valueOf[AnyRef](name))).map(_.toString)
     val connectionTimeZone = value("connectionTimeZone").getOrElse("LOCAL") // the default of the driver
     val forced = value("forceConnectionTimeZoneToSession").exists(_.equalsIgnoreCase("true"))
     if (!forced && !connectionTimeZone.equalsIgnoreCase("SERVER"))
