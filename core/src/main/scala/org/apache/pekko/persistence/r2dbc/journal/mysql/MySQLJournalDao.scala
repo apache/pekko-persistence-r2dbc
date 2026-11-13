@@ -42,9 +42,25 @@ private[r2dbc] object MySQLJournalDao {
 
   /** Serialise a set of tags to a JSON array string for MySQL JSON column storage. */
   def tagsToJson(tags: Set[String]): String =
-    tags.iterator
-      .map(t => "\"" + t.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
-      .mkString("[", ",", "]")
+    tags.iterator.map(tagToJson).mkString("[", ",", "]")
+
+  private def tagToJson(tag: String): String = {
+    val sb = new StringBuilder(tag.length + 2)
+    sb.append('"')
+    tag.foreach {
+      case '"'          => sb.append("""\"""")
+      case '\\'         => sb.append("""\\""")
+      case '\n'         => sb.append("""\n""")
+      case '\r'         => sb.append("""\r""")
+      case '\t'         => sb.append("""\t""")
+      case '\b'         => sb.append("""\b""")
+      case '\f'         => sb.append("""\f""")
+      case c if c < ' ' => sb.append("\\u").append(f"${c.toInt}%04x")
+      case c            => sb.append(c)
+    }
+    sb.append('"')
+    sb.toString()
+  }
 
   /**
    * Deserialise a JSON array string from a MySQL JSON column back to a set of tags.
@@ -79,7 +95,16 @@ private[r2dbc] object MySQLJournalDao {
                 case 'n'  => sb.append('\n')
                 case 'r'  => sb.append('\r')
                 case 't'  => sb.append('\t')
-                case c2   => sb.append('\\').append(c2)
+                case 'b'  => sb.append('\b')
+                case 'f'  => sb.append('\f')
+                case 'u'  =>
+                  val hexEnd = i + 5
+                  val hex = if (hexEnd <= n - 1) trimmed.substring(i + 1, hexEnd) else ""
+                  if (hex.isEmpty || !hex.forall(Character.digit(_, 16) >= 0))
+                    throw new IllegalStateException(s"tags JSON contains an invalid unicode escape: $json")
+                  sb.append(Integer.parseInt(hex, 16).toChar)
+                  i += 4
+                case c2 => sb.append('\\').append(c2)
               }
               i += 1
             case other =>
