@@ -15,7 +15,6 @@ package org.apache.pekko.persistence.r2dbc.state.scaladsl
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
 import pekko.NotUsed
@@ -39,7 +38,10 @@ import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Source
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
 
 object R2dbcDurableStateStore {
   val Identifier = "pekko.persistence.r2dbc.state"

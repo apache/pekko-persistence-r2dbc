@@ -19,11 +19,6 @@ import java.util.Locale
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
 
-import org.apache.pekko
-import pekko.actor.typed.ActorSystem
-import pekko.actor.typed.DispatcherSelector
-import pekko.annotation.InternalApi
-import com.typesafe.config.Config
 import io.r2dbc.h2.H2ConnectionConfiguration
 import io.r2dbc.h2.H2ConnectionFactory
 import io.r2dbc.h2.H2ConnectionOption
@@ -31,9 +26,17 @@ import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryMetadata
 import io.r2dbc.spi.Result
-import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+
+import org.apache.pekko
+import pekko.actor.typed.ActorSystem
+import pekko.actor.typed.DispatcherSelector
+import pekko.annotation.InternalApi
+
+import org.reactivestreams.Publisher
+
+import com.typesafe.config.Config
 
 /**
  * INTERNAL API

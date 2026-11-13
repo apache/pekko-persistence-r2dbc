@@ -13,8 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
-import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success, Try }
 
 import org.apache.pekko

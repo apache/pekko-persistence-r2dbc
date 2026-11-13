@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import scala.concurrent.duration._
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -25,6 +26,7 @@ import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.typed.PersistenceId
+
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class PersistTagsSpec

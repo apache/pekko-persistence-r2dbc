@@ -19,7 +19,9 @@ package org.apache.pekko.persistence.r2dbc.snapshot.mariadb
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
+
 import io.r2dbc.spi.ConnectionFactory
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi

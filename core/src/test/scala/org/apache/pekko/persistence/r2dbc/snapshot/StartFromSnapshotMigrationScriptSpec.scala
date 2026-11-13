@@ -40,9 +40,11 @@ import pekko.persistence.r2dbc.cleanup.scaladsl.EventSourcedCleanup
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Sink
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object StartFromSnapshotMigrationScriptSpec {
   val legacyTable = "snapshot_migration_legacy"

@@ -26,7 +26,6 @@ import org.apache.pekko
 import pekko.NotUsed
 import pekko.annotation.InternalApi
 import pekko.japi.Pair
-import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.query.Offset
 import pekko.persistence.query.javadsl._
 import pekko.persistence.query.typed.EventEnvelope
@@ -42,6 +41,7 @@ import pekko.persistence.query.typed.javadsl.{
   EventsBySliceStartingFromSnapshotsQuery,
   LoadEventQuery
 }
+import pekko.persistence.query.{ EventEnvelope => ClassicEventEnvelope }
 import pekko.persistence.r2dbc.query.scaladsl
 import pekko.stream.javadsl.Source
 

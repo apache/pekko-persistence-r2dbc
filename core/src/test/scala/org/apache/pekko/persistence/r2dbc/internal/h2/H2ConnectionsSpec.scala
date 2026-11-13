@@ -19,6 +19,8 @@ package org.apache.pekko.persistence.r2dbc.internal.h2
 
 import scala.concurrent.duration._
 
+import io.r2dbc.spi.ConnectionFactory
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
@@ -27,11 +29,13 @@ import pekko.persistence.r2dbc.JournalSettings
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.journal.JournalDao
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
+import org.slf4j.LoggerFactory
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.spi.ConnectionFactory
-import org.scalatest.wordspec.AnyWordSpecLike
-import org.slf4j.LoggerFactory
 
 class H2ConnectionsSpec extends ScalaTestWithActorTestKit(TestConfig.config) with AnyWordSpecLike with LogCapturing {
 

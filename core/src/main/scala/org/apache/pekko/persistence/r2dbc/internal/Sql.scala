@@ -14,6 +14,7 @@
 package org.apache.pekko.persistence.r2dbc.internal
 
 import scala.annotation.varargs
+
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi

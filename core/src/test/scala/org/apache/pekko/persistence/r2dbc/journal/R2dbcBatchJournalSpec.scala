@@ -13,12 +13,13 @@
 
 package org.apache.pekko.persistence.r2dbc.journal
 
-import com.typesafe.config.{ Config, ConfigFactory }
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.persistence.CapabilityFlag
 import org.apache.pekko.persistence.journal.JournalSpec
 import org.apache.pekko.persistence.r2dbc.TestDbLifecycle
+
+import com.typesafe.config.{ Config, ConfigFactory }
 
 object R2dbcBatchJournalSpec {
   val config: Config = ConfigFactory.parseString(

@@ -13,6 +13,8 @@
 
 package docs.home.state
 
+// Keep the documentation snippet import boundaries intact.
+// scalafix:off OrganizeImports
 // #query
 import scala.concurrent.Future
 
@@ -45,3 +47,5 @@ class BlogPostQuery(system: ActorSystem[?]) {
 
 }
 // #query
+
+// scalafix:on OrganizeImports

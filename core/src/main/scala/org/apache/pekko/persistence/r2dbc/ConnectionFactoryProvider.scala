@@ -25,6 +25,14 @@ import scala.jdk.DurationConverters._
 import scala.util.Failure
 import scala.util.Success
 
+import io.r2dbc.pool.ConnectionPool
+import io.r2dbc.pool.ConnectionPoolConfiguration
+import io.r2dbc.spi.ConnectionFactories
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Option
+import io.r2dbc.spi.Wrapped
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.CoordinatedShutdown
@@ -37,16 +45,11 @@ import pekko.persistence.r2dbc.internal.ConnectionAdapter
 import pekko.persistence.r2dbc.internal.R2dbcExecutor.PublisherOps
 import pekko.persistence.r2dbc.internal.h2.H2Connections
 import pekko.persistence.r2dbc.internal.mariadb.MariaDBConnections
+
+import org.slf4j.LoggerFactory
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.pool.ConnectionPool
-import io.r2dbc.pool.ConnectionPoolConfiguration
-import io.r2dbc.spi.ConnectionFactories
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Option
-import io.r2dbc.spi.Wrapped
-import org.slf4j.LoggerFactory
 
 object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] {
   def createExtension(system: ActorSystem[?]): ConnectionFactoryProvider = new ConnectionFactoryProvider(system)

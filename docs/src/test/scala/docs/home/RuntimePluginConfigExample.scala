@@ -23,6 +23,7 @@ import org.apache.pekko
 import pekko.actor.typed.scaladsl.ActorContext
 import pekko.persistence.typed.PersistenceId
 import pekko.persistence.typed.scaladsl.EventSourcedBehavior
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 

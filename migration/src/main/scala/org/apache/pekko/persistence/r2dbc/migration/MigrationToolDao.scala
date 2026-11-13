@@ -13,17 +13,18 @@
 
 package org.apache.pekko.persistence.r2dbc.migration
 
-import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ ExecutionContext, Future }
+
+import io.r2dbc.spi.ConnectionFactory
 
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
-import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
+import pekko.persistence.r2dbc.internal.Sql.Interpolation
 import pekko.persistence.r2dbc.journal.JournalDao.log
-import io.r2dbc.spi.ConnectionFactory
 
 /**
  * INTERNAL API

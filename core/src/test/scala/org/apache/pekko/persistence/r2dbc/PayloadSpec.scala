@@ -24,8 +24,10 @@ import pekko.persistence.r2dbc.TestActors.DurableStatePersister
 import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.persistence.r2dbc.internal.PayloadCodec.RichRow
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
+
+import com.typesafe.config.ConfigFactory
 
 /**
  * The purpose of this test is to verify JSONB payloads, but it can also be run with ordinary BYTEA payloads. To test

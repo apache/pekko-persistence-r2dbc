@@ -17,19 +17,22 @@
 
 package org.apache.pekko.persistence.r2dbc.internal.mariadb
 
+import io.r2dbc.pool.ConnectionPool
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryOptions
+import io.r2dbc.spi.Wrapped
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.actor.typed.ActorSystem
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.ConnectionFactoryProvider.ConnectionFactoryOptionsCustomizer
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.pool.ConnectionPool
-import io.r2dbc.spi.ConnectionFactory
-import io.r2dbc.spi.ConnectionFactoryOptions
-import io.r2dbc.spi.Wrapped
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object MariaDBConnectionFactoryProviderSpec {
 

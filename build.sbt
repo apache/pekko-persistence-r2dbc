@@ -138,3 +138,6 @@ lazy val docs = project
         IO.copy(List(dir / "pekko-persistence-r2dbc-root-licenses.md" -> targetFile)).toList
       }
     }.taskValue)
+
+// Enable SemanticDB only for import organization, not for ordinary builds.
+addCommandAlias("sortImports", ";scalafixEnable; scalafixAll OrganizeImports; scalafmtAll")

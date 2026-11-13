@@ -16,9 +16,10 @@ package org.apache.pekko.persistence.r2dbc.state
 import org.apache.pekko
 import pekko.actor.ExtendedActorSystem
 import pekko.persistence.state.DurableStateStoreProvider
-import com.typesafe.config.Config
 import pekko.persistence.state.javadsl.{ DurableStateStore => JDurableStateStore }
 import pekko.persistence.state.scaladsl.DurableStateStore
+
+import com.typesafe.config.Config
 
 class R2dbcDurableStateStoreProvider[A](system: ExtendedActorSystem, config: Config, cfgPath: String)
     extends DurableStateStoreProvider {

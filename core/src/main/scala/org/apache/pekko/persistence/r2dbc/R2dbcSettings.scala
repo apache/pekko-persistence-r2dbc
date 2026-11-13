@@ -24,6 +24,7 @@ import pekko.annotation.InternalApi
 import pekko.annotation.InternalStableApi
 import pekko.persistence.r2dbc.internal.PayloadCodec
 import pekko.util.Helpers.toRootLowerCase
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 

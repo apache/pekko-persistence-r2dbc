@@ -22,8 +22,7 @@ package org.apache.pekko.persistence.r2dbc.journal
 import scala.collection.immutable.ListSet
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -56,10 +55,15 @@ import pekko.persistence.typed.scaladsl.EventSourcedBehavior
 import pekko.persistence.typed.scaladsl.RetentionCriteria
 import pekko.persistence.typed.state.scaladsl.DurableStateBehavior
 import pekko.stream.scaladsl.Sink
+
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Inside
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 
 object RuntimePluginConfigSpec {
 

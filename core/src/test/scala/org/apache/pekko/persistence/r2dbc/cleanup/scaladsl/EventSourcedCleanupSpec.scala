@@ -25,9 +25,12 @@ import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.typed.PersistenceId
-import com.typesafe.config.ConfigFactory
+
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import org.slf4j.event.Level
+
+import com.typesafe.config.ConfigFactory
 
 object EventSourcedCleanupSpec {
   val config = ConfigFactory

@@ -13,6 +13,8 @@
 
 package docs.home.state
 
+// Keep the documentation snippet import boundaries intact.
+// scalafix:off OrganizeImports
 // #change-handler
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -82,3 +84,5 @@ class BlogPostCounts(system: ActorSystem[?]) extends ChangeHandler[BlogPost.Stat
   }
 }
 // #change-handler
+
+// scalafix:on OrganizeImports

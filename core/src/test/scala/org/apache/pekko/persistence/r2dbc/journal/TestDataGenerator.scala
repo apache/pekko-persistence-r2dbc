@@ -33,8 +33,10 @@ import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
 import pekko.util.Timeout
-import com.typesafe.config.ConfigFactory
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.ConfigFactory
 
 /**
  * App to store many events as test data. Useful when analyzing query plans and performance.

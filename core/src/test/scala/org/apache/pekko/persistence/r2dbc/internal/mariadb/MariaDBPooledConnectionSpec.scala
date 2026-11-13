@@ -17,19 +17,21 @@
 
 package org.apache.pekko.persistence.r2dbc.internal.mariadb
 
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.Wrapped
+import org.mariadb.r2dbc.MariadbConnection
+import reactor.core.publisher.Mono
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import pekko.persistence.r2dbc.ConnectionFactoryProvider
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
-import io.r2dbc.spi.Connection
-import io.r2dbc.spi.Wrapped
-import org.mariadb.r2dbc.MariadbConnection
+
 import org.scalatest.Outcome
 import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike
-import reactor.core.publisher.Mono
 
 class MariaDBPooledConnectionSpec
     extends ScalaTestWithActorTestKit(TestConfig.config)

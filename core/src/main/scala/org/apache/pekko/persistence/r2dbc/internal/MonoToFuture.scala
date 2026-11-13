@@ -17,13 +17,16 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
-import org.apache.pekko.annotation.InternalApi
-import org.reactivestreams.Subscription
+import java.util.concurrent.atomic.AtomicReference
+
+import scala.concurrent.{ Future, Promise }
+
 import reactor.core.CoreSubscriber
 import reactor.core.publisher.Operators
 
-import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ Future, Promise }
+import org.apache.pekko.annotation.InternalApi
+
+import org.reactivestreams.Subscription
 
 /**
  * INTERNAL API

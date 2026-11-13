@@ -28,6 +28,8 @@ object CommonSettings extends AutoPlugin {
     crossVersion := CrossVersion.binary,
     // Setting javac options in common allows IntelliJ IDEA to import them automatically
     Compile / javacOptions ++= Seq("-encoding", "UTF-8", "--release", "17"),
+    // OrganizeImports needs unused-import diagnostics only while SemanticDB is enabled.
+    scalacOptions ++= (if (semanticdbEnabled.value) Seq("-Wunused:imports") else Nil),
     scalacOptions ++= {
       val commonWconf = Seq(
         // r2dbc-spi annotation parsing warning - external dependency, cannot be fixed

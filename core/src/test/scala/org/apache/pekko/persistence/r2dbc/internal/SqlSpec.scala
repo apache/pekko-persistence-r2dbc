@@ -15,6 +15,7 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import org.apache.pekko
 import pekko.persistence.r2dbc.Dialect
+
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

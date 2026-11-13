@@ -13,13 +13,14 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
+import scala.concurrent.{ ExecutionContext, Future }
+
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
-import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ ExecutionContext, Future }
+import org.slf4j.LoggerFactory
 
 /**
  * INTERNAL API

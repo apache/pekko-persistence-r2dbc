@@ -20,6 +20,7 @@ import pekko.persistence.CapabilityFlag
 import pekko.persistence.journal.JournalSpec
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestDbLifecycle
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 

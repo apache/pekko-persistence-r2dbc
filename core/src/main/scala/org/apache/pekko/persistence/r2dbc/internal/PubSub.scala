@@ -34,6 +34,7 @@ import pekko.persistence.query.TimestampOffset
 import pekko.persistence.query.typed.EventEnvelope
 import pekko.persistence.r2dbc.PublishEventsDynamicSettings
 import pekko.persistence.typed.PersistenceId
+
 import org.slf4j.LoggerFactory
 
 /**

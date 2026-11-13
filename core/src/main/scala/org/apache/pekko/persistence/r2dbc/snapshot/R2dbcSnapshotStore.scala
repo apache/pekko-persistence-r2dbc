@@ -17,22 +17,24 @@ import java.time.Instant
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
 import pekko.persistence.Persistence
+import pekko.persistence.SelectedSnapshot
+import pekko.persistence.SnapshotMetadata
+import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.r2dbc.SnapshotSettings
 import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotMetadata
 import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotRow
 import pekko.persistence.snapshot.SnapshotStore
-import pekko.persistence.SelectedSnapshot
-import pekko.persistence.SnapshotMetadata
-import pekko.persistence.SnapshotSelectionCriteria
 import pekko.persistence.typed.PersistenceId
-import pekko.serialization.Serializers
 import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
+import pekko.serialization.Serializers
+
 import com.typesafe.config.Config
 
 object R2dbcSnapshotStore {

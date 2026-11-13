@@ -13,7 +13,7 @@
 
 package org.apache.pekko.persistence.r2dbc.journal
 
-import com.typesafe.config.Config
+import scala.concurrent.duration.DurationInt
 
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter.ClassicActorSystemOps
@@ -21,7 +21,7 @@ import org.apache.pekko.persistence.CapabilityFlag
 import org.apache.pekko.persistence.journal.JournalPerfSpec
 import org.apache.pekko.persistence.r2dbc.TestDbLifecycle
 
-import scala.concurrent.duration.DurationInt
+import com.typesafe.config.Config
 
 object R2dbcBatchJournalPerfSpec {
   val config: Config = R2dbcBatchJournalSpec.config

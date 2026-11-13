@@ -15,10 +15,11 @@ package org.apache.pekko.persistence.r2dbc.internal
 
 import java.nio.charset.StandardCharsets.UTF_8
 
-import org.apache.pekko.annotation.InternalApi
 import io.r2dbc.postgresql.codec.Json
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
+
+import org.apache.pekko.annotation.InternalApi
 
 /**
  * INTERNAL API

@@ -23,6 +23,7 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.stream.scaladsl.Sink
+
 import org.scalatest.Outcome
 import org.scalatest.Pending
 import org.scalatest.wordspec.AnyWordSpecLike

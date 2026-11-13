@@ -17,10 +17,14 @@ import java.util.Optional
 import java.util.concurrent.CompletionStage
 import java.util.function.{ Function => JFunction }
 
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
 import scala.jdk.FutureConverters._
 import scala.jdk.OptionConverters._
-import scala.concurrent.ExecutionContext
+
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.Row
+import io.r2dbc.spi.Statement
 
 import org.apache.pekko
 import pekko.actor.typed.ActorSystem
@@ -28,9 +32,6 @@ import pekko.annotation.ApiMayChange
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.internal.R2dbcExecutor
 import pekko.persistence.r2dbc.session.{ scaladsl => scaladslSession }
-import io.r2dbc.spi.Connection
-import io.r2dbc.spi.Row
-import io.r2dbc.spi.Statement
 
 @ApiMayChange
 object R2dbcSession {

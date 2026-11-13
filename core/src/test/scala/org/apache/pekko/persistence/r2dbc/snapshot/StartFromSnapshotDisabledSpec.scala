@@ -32,9 +32,11 @@ import pekko.persistence.r2dbc.TestDbLifecycle
 import pekko.persistence.r2dbc.query.javadsl.{ R2dbcReadJournal => JavadslR2dbcReadJournal }
 import pekko.persistence.r2dbc.query.scaladsl.R2dbcReadJournal
 import pekko.persistence.typed.PersistenceId
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
 
 object StartFromSnapshotDisabledSpec {
   val legacyTable = "snapshot_legacy"

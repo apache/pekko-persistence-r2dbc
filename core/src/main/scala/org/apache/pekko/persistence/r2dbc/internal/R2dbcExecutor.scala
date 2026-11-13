@@ -25,20 +25,23 @@ import scala.util.Success
 import scala.util.control.Exception.Catcher
 import scala.util.control.NonFatal
 
-import org.apache.pekko
-import pekko.Done
-import pekko.actor.typed.ActorSystem
-import pekko.annotation.InternalStableApi
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.Result
 import io.r2dbc.spi.Row
 import io.r2dbc.spi.Statement
 import io.r2dbc.spi.Wrapped
-import org.reactivestreams.Publisher
-import org.slf4j.Logger
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+
+import org.apache.pekko
+import pekko.Done
+import pekko.actor.typed.ActorSystem
+import pekko.annotation.InternalStableApi
+
+import org.reactivestreams.Publisher
+
+import org.slf4j.Logger
 
 /**
  * INTERNAL API

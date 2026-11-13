@@ -16,9 +16,9 @@ package org.apache.pekko.persistence.r2dbc.internal
 import scala.util.Try
 
 import org.apache.pekko
-import pekko.actor.{ ActorSystem => ClassicActorSystem }
 import pekko.actor.ExtendedActorSystem
 import pekko.actor.typed.ActorSystem
+import pekko.actor.{ ActorSystem => ClassicActorSystem }
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.{ javadsl => javadslState }

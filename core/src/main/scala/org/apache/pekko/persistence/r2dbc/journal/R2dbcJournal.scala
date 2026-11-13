@@ -18,7 +18,6 @@ import java.time.Instant
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success, Try }
 
-import com.typesafe.config.Config
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.ActorRef
@@ -42,6 +41,8 @@ import pekko.serialization.Serialization
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
 import pekko.stream.scaladsl.Sink
+
+import com.typesafe.config.Config
 
 /**
  * INTERNAL API

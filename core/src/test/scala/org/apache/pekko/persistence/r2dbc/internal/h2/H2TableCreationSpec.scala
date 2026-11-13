@@ -30,10 +30,13 @@ import pekko.persistence.r2dbc.snapshot.SnapshotDao
 import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotRow
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao.SerializedStateRow
+
+import org.scalatest.wordspec.AnyWordSpecLike
+
+import org.slf4j.LoggerFactory
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import org.scalatest.wordspec.AnyWordSpecLike
-import org.slf4j.LoggerFactory
 
 /**
  * The H2 DAOs create the tables of their plugin settings, independent of the dialect that the tests are run with.

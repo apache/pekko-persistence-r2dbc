@@ -13,8 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.internal
 
-import scala.jdk.FutureConverters._
 import scala.concurrent.Future
+import scala.jdk.FutureConverters._
 import scala.util.Try
 
 import org.apache.pekko
@@ -24,8 +24,8 @@ import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.query.DurableStateChange
 import pekko.persistence.r2dbc.session.scaladsl.R2dbcSession
-import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
+import pekko.persistence.r2dbc.state.{ javadsl => javadslState }
 
 /**
  * INTERNAL API

@@ -24,12 +24,6 @@ import java.time.LocalDateTime
 
 import scala.collection.mutable
 
-import org.apache.pekko
-import pekko.persistence.r2dbc.ConnectionFactorySettings
-import pekko.persistence.r2dbc.Dialect
-import pekko.persistence.r2dbc.internal.ConnectionAdapter
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
 import io.r2dbc.spi.Connection
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
@@ -38,10 +32,20 @@ import io.r2dbc.spi.Row
 import io.r2dbc.spi.RowMetadata
 import io.r2dbc.spi.Statement
 import io.r2dbc.spi.Wrapped
+
+import org.apache.pekko
+import pekko.persistence.r2dbc.ConnectionFactorySettings
+import pekko.persistence.r2dbc.Dialect
+import pekko.persistence.r2dbc.internal.ConnectionAdapter
+
 import org.reactivestreams.Publisher
+
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 
 class MariaDBConnectionsSpec extends AnyWordSpec with TestSuite with Matchers {
 

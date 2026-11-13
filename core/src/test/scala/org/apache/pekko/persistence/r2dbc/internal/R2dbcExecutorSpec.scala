@@ -16,6 +16,10 @@ package org.apache.pekko.persistence.r2dbc.internal
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.R2dbcNonTransientResourceException
+import io.r2dbc.spi.Wrapped
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
 import pekko.actor.testkit.typed.scaladsl.LoggingTestKit
@@ -26,14 +30,14 @@ import pekko.persistence.r2dbc.Dialect
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+
+import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.{ Outcome, Pending }
+
+import org.slf4j.LoggerFactory
+
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.r2dbc.spi.Connection
-import io.r2dbc.spi.R2dbcNonTransientResourceException
-import io.r2dbc.spi.Wrapped
-import org.scalatest.{ Outcome, Pending }
-import org.scalatest.wordspec.AnyWordSpecLike
-import org.slf4j.LoggerFactory
 
 object R2dbcExecutorSpec {
   val config: Config = ConfigFactory

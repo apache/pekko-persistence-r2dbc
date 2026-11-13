@@ -35,8 +35,10 @@ import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.typed.PersistenceId
 import pekko.util.Timeout
-import com.typesafe.config.ConfigFactory
+
 import org.slf4j.LoggerFactory
+
+import com.typesafe.config.ConfigFactory
 
 /**
  * App to store many durable state test data. Useful when analyzing query plans and performance.
