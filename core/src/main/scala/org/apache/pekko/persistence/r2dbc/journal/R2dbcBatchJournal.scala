@@ -14,8 +14,9 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+import java.util.concurrent.ThreadLocalRandom
 
-import scala.concurrent.duration.{ Duration, FiniteDuration }
+import scala.concurrent.duration.{ Duration, FiniteDuration, NANOSECONDS }
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.jdk.DurationConverters.JavaDurationOps
 import scala.util.control.NonFatal
@@ -27,11 +28,13 @@ import io.r2dbc.spi.R2dbcNonTransientResourceException
 
 import org.apache.pekko
 import pekko.Done
+import pekko.actor.Scheduler
 import pekko.actor.Timers
 import pekko.actor.typed.ActorSystem
 import pekko.actor.typed.scaladsl.adapter._
 import pekko.annotation.InternalApi
 import pekko.event.Logging
+import pekko.pattern.after
 import pekko.persistence.AtomicWrite
 import pekko.persistence.Persistence
 import pekko.persistence.PersistentRepr
@@ -84,6 +87,40 @@ private[r2dbc] object R2dbcBatchJournal {
         e.getSqlState != null && (e.getSqlState.startsWith("22") || e.getSqlState.startsWith("23"))
       case _ => false
     }
+
+  // Errors that roll back the transaction because it conflicted with a concurrent transaction, so the same writes can
+  // succeed when they are retried: serialization failure or deadlock (SQLSTATE 40001, PostgreSQL deadlock 40P01).
+  // MySQL and MariaDB deadlocks are matched by error code (1213) too, as r2dbc-mysql doesn't always report a SQLSTATE.
+  // Lock-wait timeouts (MySQL/MariaDB 1205, H2 HYT00, PostgreSQL 55P03) are not retried: they arrive only after the
+  // full lock timeout, the lock is usually still held, and as only one flush is in flight each retry would delay all
+  // queued writes of the journal by another lock timeout.
+  private final val TransientConflictSqlStates = Set("40001", "40P01")
+  private final val MySqlTransientConflictErrorCodes = Set(1213)
+
+  private[r2dbc] def isTransientConflictError(exception: Throwable): Boolean =
+    exception match {
+      case e: R2dbcException =>
+        (e.getSqlState != null && TransientConflictSqlStates.contains(e.getSqlState)) ||
+        MySqlTransientConflictErrorCodes.contains(e.getErrorCode)
+      case _ => false
+    }
+
+  /**
+   * Runs `attempt`, and runs it again up to `retries` times when it fails with a transient conflict error. The n-th
+   * retry is delayed by n times `backoff` plus a random part of up to `backoff`, so that conflicting writers don't retry
+   * in lockstep.
+   */
+  private[r2dbc] def retryTransientConflicts[T](retries: Int, backoff: FiniteDuration, scheduler: Scheduler)(
+      onRetry: (Throwable, Int) => Unit)(attempt: () => Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    def run(retry: Int): Future[T] =
+      attempt().recoverWith {
+        case exception if retry <= retries && isTransientConflictError(exception) =>
+          onRetry(exception, retry)
+          val jitter = if (backoff > Duration.Zero) ThreadLocalRandom.current().nextLong(backoff.toNanos) else 0L
+          after(backoff * retry.toLong + FiniteDuration(jitter, NANOSECONDS), scheduler)(run(retry + 1))
+      }
+    run(1)
+  }
 }
 
 /**
@@ -114,15 +151,21 @@ private[r2dbc] object R2dbcBatchJournal {
  * request can still contain many events when the caller uses `persistAll` or `persistAsync`
  * bursts, the same as the default journal.
  *
+ * A batch that fails with a transient conflict, a deadlock or serialization failure, is retried
+ * as a whole up to `transient-error-retries` times with a growing, randomized delay, re-stamping
+ * its requests with new, later timestamps. Only one flush is in flight, so the retry keeps
+ * same-persistence-id writes in order, and the retries delay all queued writes. Lock-wait
+ * timeouts are not retried.
+ *
  * A batch that fails with a data integrity violation or a per-row data exception, for example a
  * value that violates a dialect payload limit, is retried in halves so that only the offending
- * persistence ids fail. Transient errors and infrastructure errors fail the whole batch. The
- * retried halves are written concurrently and can use several pool connections at once. Each half
- * re-stamps its requests with new, later timestamps. A single split preserves order, but if the
- * half holding the earlier sequence numbers is retried after its sibling committed, its re-stamped
- * rows can invert the `db_timestamp` order of two same-persistence-id writes. Replay still orders
- * by sequence number; only timestamp-ordered read sides see the inversion. This plugin targets
- * many small concurrent writes.
+ * persistence ids fail. Infrastructure errors, and conflicts that persist after the retries, fail
+ * the whole batch. The retried halves are written concurrently and can use several pool
+ * connections at once. Each half re-stamps its requests with new, later timestamps. A single split
+ * preserves order, but if the half holding the earlier sequence numbers is retried after its
+ * sibling committed, its re-stamped rows can invert the `db_timestamp` order of two
+ * same-persistence-id writes. Replay still orders by sequence number; only timestamp-ordered read
+ * sides see the inversion. This plugin targets many small concurrent writes.
  */
 @InternalApi
 private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJournal with Timers {
@@ -155,6 +198,16 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
   require(maxBatchSize <= maxQueueSize, "max-batch-size must be less than or equal to `max-queue-size`")
   require(maxBatchTime > Duration.Zero, "max-batch-time must be greater than zero when using R2dbcBatchJournal")
 
+  private val transientErrorRetries: Int = config.getInt("transient-error-retries")
+  private val transientErrorRetryBackoff: FiniteDuration = config.getDuration("transient-error-retry-backoff").toScala
+
+  require(transientErrorRetries >= 0, "transient-error-retries must not be negative when using R2dbcBatchJournal")
+  require(transientErrorRetryBackoff >= Duration.Zero,
+    "transient-error-retry-backoff must not be negative when using R2dbcBatchJournal")
+
+  // the actor context must not be used from the Future callbacks that schedule the retries
+  private val scheduler: Scheduler = context.system.scheduler
+
   private val generation = R2dbcBatchJournal.nextGeneration()
 
   private val journalDao = JournalDao.fromConfig(journalSettings, config)
@@ -178,7 +231,8 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     queue.dropInPlace(count)
     log.debug("flushing [{}] write requests", count)
 
-    def write(requests: Vector[WriteRequest]): Future[Unit] = {
+    // each attempt re-stamps the requests, so that a retried batch gets new, later timestamps
+    def writeOnce(requests: Vector[WriteRequest]): Future[Unit] = {
       val stampedRequests = requests.map(request => request -> R2dbcBatchJournal.nextTimestamp())
 
       journalDao
@@ -189,6 +243,15 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
           requests.foreach(_.promise.trySuccess(Done))
           publish(stampedRequests)
         }
+    }
+
+    def write(requests: Vector[WriteRequest]): Future[Unit] =
+      R2dbcBatchJournal
+        .retryTransientConflicts(transientErrorRetries, transientErrorRetryBackoff, scheduler) { (exception, retry) =>
+          log.info("retry [{}] of [{}] write requests after a transient conflict: {}", retry, requests.size, exception)
+        } { () =>
+          writeOnce(requests)
+        }
         .recoverWith {
           case exception if requests.size > 1 && R2dbcBatchJournal.isNonTransientStatementError(exception) =>
             val (left, right) = requests.splitAt(requests.size / 2)
@@ -197,7 +260,6 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
             requests.foreach(_.promise.tryFailure(exception))
             Future.unit
         }
-    }
 
     write(writeRequests).onComplete(_ => self ! FlushDone(generation))
   }

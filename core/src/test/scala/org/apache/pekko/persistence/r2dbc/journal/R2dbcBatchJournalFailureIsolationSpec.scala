@@ -18,14 +18,21 @@
 package org.apache.pekko.persistence.r2dbc.journal
 
 import java.time.Instant
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 import io.r2dbc.spi.R2dbcBadGrammarException
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException
 import io.r2dbc.spi.R2dbcNonTransientException
 import io.r2dbc.spi.R2dbcNonTransientResourceException
 import io.r2dbc.spi.R2dbcPermissionDeniedException
+import io.r2dbc.spi.R2dbcTimeoutException
 import io.r2dbc.spi.R2dbcTransientResourceException
 
 import org.apache.pekko
@@ -73,6 +80,8 @@ class R2dbcBatchJournalFailureIsolationSpec
   private implicit val journalPayloadCodec: PayloadCodec = journalSettings.journalPayloadCodec
   private val serialization = SerializationExtension(system)
   private lazy val journal = persistenceExt.journalFor("pekko.persistence.r2dbc.batched-journal")
+  private val scheduler = system.classicSystem.scheduler
+  private implicit val ec: ExecutionContext = system.executionContext
   import R2dbcBatchJournalFailureIsolationSpec.StoredRow
 
   private def expectSuccess(probe: TestProbe[Any], pid: String): Unit = {
@@ -103,7 +112,73 @@ class R2dbcBatchJournalFailureIsolationSpec
         })
       .futureValue
 
+  private def executeDdl(sql: String): Unit =
+    r2dbcExecutor.executeDdl("test")(_.createStatement(sql)).futureValue
+
   "R2dbcBatchJournal failure isolation" should {
+
+    "retry the whole batch with new timestamps after a serialization failure" in {
+      journalSettings.dialect match {
+        case Dialect.Postgres | Dialect.Yugabyte =>
+        case _                                   => pending // the conflict is injected with a PL/pgSQL trigger
+      }
+
+      val entityType = nextEntityType()
+      val pidA = nextPid(entityType)
+      val pidB = nextPid(entityType)
+      val pidC = nextPid(entityType)
+
+      val probeA = createTestProbe[Any]()
+      val probeB = createTestProbe[Any]()
+      val probeC = createTestProbe[Any]()
+
+      val table = journalSettings.journalTableWithSchema
+      val name = "batch_retry_conflict"
+      // nextval isn't rolled back with the failed transaction, so only the first insert of pidB fails
+      executeDdl(s"drop trigger if exists $name on $table")
+      executeDdl(s"drop sequence if exists ${name}_seq")
+      executeDdl(s"create sequence ${name}_seq")
+      executeDdl(
+        s"create or replace function ${name}_fn() returns trigger as '" +
+        s"begin if new.persistence_id = ''$pidB'' and nextval(''${name}_seq'') < 2 then " +
+        "raise exception ''injected conflict'' using errcode = ''serialization_failure''; end if; " +
+        "return new; end;' language plpgsql")
+      executeDdl(s"create trigger $name before insert on $table for each row execute procedure ${name}_fn()")
+
+      // the first attempt is stamped right after this log event
+      val flushedAt = new AtomicLong
+      val flushLogged = LoggingTestKit.custom { event =>
+        val matches = event.message.startsWith("flushing [3] write requests")
+        if (matches) flushedAt.set(event.timeStamp)
+        matches
+      }
+
+      try {
+        flushLogged.expect {
+          LoggingTestKit.info("retry [1] of [3] write requests after a transient conflict").expect {
+            journal ! batchedJournalWrite(pidA, 1L, "a1", probeA.ref)
+            journal ! batchedJournalWrite(pidB, 1L, "b1", probeB.ref)
+            journal ! batchedJournalWrite(pidC, 1L, "c1", probeC.ref)
+
+            expectSuccess(probeA, pidA)
+            expectSuccess(probeB, pidB)
+            expectSuccess(probeC, pidC)
+          }
+        }
+      } finally {
+        executeDdl(s"drop trigger if exists $name on $table")
+        executeDdl(s"drop function if exists ${name}_fn()")
+        executeDdl(s"drop sequence if exists ${name}_seq")
+      }
+
+      // the retry ran as a whole, not as bisected halves, and each row is stored once
+      val rows = storedRows().filter(r => Set(pidA, pidB, pidC).contains(r.pid))
+      rows.map(r => (r.pid, r.seqNr, r.event)).toSet shouldBe Set((pidA, 1L, "a1"), (pidB, 1L, "b1"), (pidC, 1L, "c1"))
+      rows.size shouldBe 3
+      // the retry, delayed by at least the 50ms backoff, re-stamped the batch with later timestamps
+      val retryBackoff = 50.millis
+      rows.map(_.dbTimestamp.toEpochMilli).min should be >= (flushedAt.get + retryBackoff.toMillis - 5)
+    }
 
     "fail only the persistence id violating the unique constraint when batched with other writes" in {
       val entityType = nextEntityType()
@@ -210,6 +285,75 @@ class R2dbcBatchJournalFailureIsolationSpec
         new R2dbcPermissionDeniedException("Access denied", "28000", 1045)) shouldBe false
       R2dbcBatchJournal.isNonTransientStatementError(
         new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe false
+    }
+
+    "classify only deadlocks and serialization failures as transient conflicts" in {
+      // MySQL and MariaDB deadlock, with and without a SQLSTATE
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe true
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("Deadlock found", null, 1213)) shouldBe true
+      // PostgreSQL serialization failure and deadlock
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("could not serialize access", "40001", 0)) shouldBe true
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("deadlock detected", "40P01", 0)) shouldBe true
+
+      // lock-wait timeouts arrive after the full lock timeout and would delay all queued writes, not retried
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Lock wait timeout exceeded", "HY000", 1205)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Lock wait timeout exceeded", null, 1205)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Timeout trying to lock table", "HYT00", 50200)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("canceling statement due to lock timeout", "55P03", 0)) shouldBe false
+
+      // statement timeouts, integrity violations, connection and other errors are not retried
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("canceling statement due to statement timeout", "57014", 0)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcDataIntegrityViolationException("duplicate key", "23505", 0)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcNonTransientResourceException("Connection unexpectedly closed")) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcBadGrammarException("Table doesn't exist", "42S02", 1146)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(new IllegalStateException("not a database error")) shouldBe false
+    }
+
+    "retry a transient conflict until the attempt succeeds" in {
+      val attempts = new AtomicInteger
+      val retries = new ConcurrentLinkedQueue[Int]
+      val result = R2dbcBatchJournal.retryTransientConflicts(2, 1.millis, scheduler)((_, retry) => retries.add(retry)) {
+        () =>
+          if (attempts.incrementAndGet() <= 2) Future.failed(new R2dbcTransientResourceException("Deadlock", "40001"))
+          else Future.successful("written")
+      }
+      result.futureValue shouldBe "written"
+      attempts.get shouldBe 3
+      retries.asScala.toList shouldBe List(1, 2)
+    }
+
+    "fail with the transient conflict after the retries" in {
+      val attempts = new AtomicInteger
+      val conflict = new R2dbcTransientResourceException("Deadlock", "40001")
+      val result = R2dbcBatchJournal.retryTransientConflicts(1, 1.millis, scheduler)((_, _) => ()) { () =>
+        attempts.incrementAndGet()
+        Future.failed[String](conflict)
+      }
+      result.failed.futureValue shouldBe conflict
+      attempts.get shouldBe 2
+    }
+
+    "not retry other errors" in {
+      val attempts = new AtomicInteger
+      val violation = new R2dbcDataIntegrityViolationException("duplicate key", "23505", 0)
+      val result = R2dbcBatchJournal.retryTransientConflicts(2, 1.millis, scheduler)((_, _) => ()) { () =>
+        attempts.incrementAndGet()
+        Future.failed[String](violation)
+      }
+      result.failed.futureValue shouldBe violation
+      attempts.get shouldBe 1
     }
 
   }
