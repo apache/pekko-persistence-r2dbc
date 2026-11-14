@@ -20,6 +20,7 @@ package org.apache.pekko.persistence.r2dbc.journal
 import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -111,7 +112,73 @@ class R2dbcBatchJournalFailureIsolationSpec
         })
       .futureValue
 
+  private def executeDdl(sql: String): Unit =
+    r2dbcExecutor.executeDdl("test")(_.createStatement(sql)).futureValue
+
   "R2dbcBatchJournal failure isolation" should {
+
+    "retry the whole batch with new timestamps after a serialization failure" in {
+      journalSettings.dialect match {
+        case Dialect.Postgres | Dialect.Yugabyte =>
+        case _                                   => pending // the conflict is injected with a PL/pgSQL trigger
+      }
+
+      val entityType = nextEntityType()
+      val pidA = nextPid(entityType)
+      val pidB = nextPid(entityType)
+      val pidC = nextPid(entityType)
+
+      val probeA = createTestProbe[Any]()
+      val probeB = createTestProbe[Any]()
+      val probeC = createTestProbe[Any]()
+
+      val table = journalSettings.journalTableWithSchema
+      val name = "batch_retry_conflict"
+      // nextval isn't rolled back with the failed transaction, so only the first insert of pidB fails
+      executeDdl(s"drop trigger if exists $name on $table")
+      executeDdl(s"drop sequence if exists ${name}_seq")
+      executeDdl(s"create sequence ${name}_seq")
+      executeDdl(
+        s"create or replace function ${name}_fn() returns trigger as '" +
+        s"begin if new.persistence_id = ''$pidB'' and nextval(''${name}_seq'') < 2 then " +
+        "raise exception ''injected conflict'' using errcode = ''serialization_failure''; end if; " +
+        "return new; end;' language plpgsql")
+      executeDdl(s"create trigger $name before insert on $table for each row execute procedure ${name}_fn()")
+
+      // the first attempt is stamped right after this log event
+      val flushedAt = new AtomicLong
+      val flushLogged = LoggingTestKit.custom { event =>
+        val matches = event.message.startsWith("flushing [3] write requests")
+        if (matches) flushedAt.set(event.timeStamp)
+        matches
+      }
+
+      try {
+        flushLogged.expect {
+          LoggingTestKit.info("retry [1] of [3] write requests after a transient conflict").expect {
+            journal ! batchedJournalWrite(pidA, 1L, "a1", probeA.ref)
+            journal ! batchedJournalWrite(pidB, 1L, "b1", probeB.ref)
+            journal ! batchedJournalWrite(pidC, 1L, "c1", probeC.ref)
+
+            expectSuccess(probeA, pidA)
+            expectSuccess(probeB, pidB)
+            expectSuccess(probeC, pidC)
+          }
+        }
+      } finally {
+        executeDdl(s"drop trigger if exists $name on $table")
+        executeDdl(s"drop function if exists ${name}_fn()")
+        executeDdl(s"drop sequence if exists ${name}_seq")
+      }
+
+      // the retry ran as a whole, not as bisected halves, and each row is stored once
+      val rows = storedRows().filter(r => Set(pidA, pidB, pidC).contains(r.pid))
+      rows.map(r => (r.pid, r.seqNr, r.event)).toSet shouldBe Set((pidA, 1L, "a1"), (pidB, 1L, "b1"), (pidC, 1L, "c1"))
+      rows.size shouldBe 3
+      // the retry, delayed by at least the 50ms backoff, re-stamped the batch with later timestamps
+      val retryBackoff = 50.millis
+      rows.map(_.dbTimestamp.toEpochMilli).min should be >= (flushedAt.get + retryBackoff.toMillis - 5)
+    }
 
     "fail only the persistence id violating the unique constraint when batched with other writes" in {
       val entityType = nextEntityType()
@@ -220,21 +287,27 @@ class R2dbcBatchJournalFailureIsolationSpec
         new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe false
     }
 
-    "classify only conflicts with concurrent transactions as transient conflicts" in {
-      // MySQL and MariaDB deadlock and lock-wait timeout, with and without a SQLSTATE
+    "classify only deadlocks and serialization failures as transient conflicts" in {
+      // MySQL and MariaDB deadlock, with and without a SQLSTATE
       R2dbcBatchJournal.isTransientConflictError(
         new R2dbcTransientResourceException("Deadlock found", "40001", 1213)) shouldBe true
       R2dbcBatchJournal.isTransientConflictError(
         new R2dbcTransientResourceException("Deadlock found", null, 1213)) shouldBe true
-      R2dbcBatchJournal.isTransientConflictError(
-        new R2dbcTimeoutException("Lock wait timeout exceeded", "HY000", 1205)) shouldBe true
-      // PostgreSQL serialization failure and deadlock, H2 lock timeout
+      // PostgreSQL serialization failure and deadlock
       R2dbcBatchJournal.isTransientConflictError(
         new R2dbcTransientResourceException("could not serialize access", "40001", 0)) shouldBe true
       R2dbcBatchJournal.isTransientConflictError(
         new R2dbcTransientResourceException("deadlock detected", "40P01", 0)) shouldBe true
+
+      // lock-wait timeouts arrive after the full lock timeout and would delay all queued writes, not retried
       R2dbcBatchJournal.isTransientConflictError(
-        new R2dbcTimeoutException("Timeout trying to lock table", "HYT00", 50200)) shouldBe true
+        new R2dbcTimeoutException("Lock wait timeout exceeded", "HY000", 1205)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Lock wait timeout exceeded", null, 1205)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTimeoutException("Timeout trying to lock table", "HYT00", 50200)) shouldBe false
+      R2dbcBatchJournal.isTransientConflictError(
+        new R2dbcTransientResourceException("canceling statement due to lock timeout", "55P03", 0)) shouldBe false
 
       // statement timeouts, integrity violations, connection and other errors are not retried
       R2dbcBatchJournal.isTransientConflictError(

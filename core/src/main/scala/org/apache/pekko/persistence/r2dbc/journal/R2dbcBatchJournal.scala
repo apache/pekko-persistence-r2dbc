@@ -89,11 +89,13 @@ private[r2dbc] object R2dbcBatchJournal {
     }
 
   // Errors that roll back the transaction because it conflicted with a concurrent transaction, so the same writes can
-  // succeed when they are retried: serialization failure or deadlock (SQLSTATE 40001, PostgreSQL deadlock 40P01) and
-  // the H2 lock timeout (HYT00). MySQL and MariaDB are matched by error code too, deadlock (1213) and lock-wait timeout
-  // (1205), as r2dbc-mysql doesn't always report a SQLSTATE.
-  private final val TransientConflictSqlStates = Set("40001", "40P01", "HYT00")
-  private final val MySqlTransientConflictErrorCodes = Set(1205, 1213)
+  // succeed when they are retried: serialization failure or deadlock (SQLSTATE 40001, PostgreSQL deadlock 40P01).
+  // MySQL and MariaDB deadlocks are matched by error code (1213) too, as r2dbc-mysql doesn't always report a SQLSTATE.
+  // Lock-wait timeouts (MySQL/MariaDB 1205, H2 HYT00, PostgreSQL 55P03) are not retried: they arrive only after the
+  // full lock timeout, the lock is usually still held, and as only one flush is in flight each retry would delay all
+  // queued writes of the journal by another lock timeout.
+  private final val TransientConflictSqlStates = Set("40001", "40P01")
+  private final val MySqlTransientConflictErrorCodes = Set(1213)
 
   private[r2dbc] def isTransientConflictError(exception: Throwable): Boolean =
     exception match {
@@ -149,10 +151,11 @@ private[r2dbc] object R2dbcBatchJournal {
  * request can still contain many events when the caller uses `persistAll` or `persistAsync`
  * bursts, the same as the default journal.
  *
- * A batch that fails with a transient conflict, a deadlock, serialization failure or lock-wait
- * timeout, is retried as a whole up to `transient-error-retries` times with a growing,
- * randomized delay, re-stamping its requests with new, later timestamps. Only one flush is in
- * flight, so the retry keeps same-persistence-id writes in order.
+ * A batch that fails with a transient conflict, a deadlock or serialization failure, is retried
+ * as a whole up to `transient-error-retries` times with a growing, randomized delay, re-stamping
+ * its requests with new, later timestamps. Only one flush is in flight, so the retry keeps
+ * same-persistence-id writes in order, and the retries delay all queued writes. Lock-wait
+ * timeouts are not retried.
  *
  * A batch that fails with a data integrity violation or a per-row data exception, for example a
  * value that violates a dialect payload limit, is retried in halves so that only the offending
@@ -245,7 +248,7 @@ private[r2dbc] final class R2dbcBatchJournal(config: Config) extends AsyncWriteJ
     def write(requests: Vector[WriteRequest]): Future[Unit] =
       R2dbcBatchJournal
         .retryTransientConflicts(transientErrorRetries, transientErrorRetryBackoff, scheduler) { (exception, retry) =>
-          log.debug("retry [{}] of [{}] write requests after a transient conflict: {}", retry, requests.size, exception)
+          log.info("retry [{}] of [{}] write requests after a transient conflict: {}", retry, requests.size, exception)
         } { () =>
           writeOnce(requests)
         }

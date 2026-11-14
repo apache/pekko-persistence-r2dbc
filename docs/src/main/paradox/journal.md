@@ -77,6 +77,8 @@ pekko.persistence.r2dbc.batched-journal {
   max-queue-size = 10000 # optional, default value
   max-batch-size = 100 # optional, default value
   max-batch-time = 10ms # optional, default value
+  transient-error-retries = 2 # optional, default value
+  transient-error-retry-backoff = 50ms # optional, default value
 }
 
 # The lag between timestamp and commit includes connection acquisition.
@@ -101,6 +103,10 @@ The batched journal uses the following settings, in addition to the settings of 
   is 10ms. Must be greater than zero. Pekko timers are rounded up to whole scheduler ticks
   (`pekko.scheduler.tick-duration`, default 10ms), so a value below the tick duration takes effect as one
   tick. Lowering `tick-duration` changes the timer resolution for the entire actor system.
+- `transient-error-retries`: Number of times a batch is retried as a whole when it fails because of a deadlock
+  or serialization failure, see Failures below. The default is 2. 0 disables the retries. Must not be negative.
+- `transient-error-retry-backoff`: Base delay before a retry after a transient conflict. The n-th retry waits n
+  times this delay plus a random part of up to this delay. The default is 50ms. Must not be negative.
 
 ### Tradeoffs
 
@@ -127,13 +133,19 @@ The bisection retries data integrity violations and per-row data exceptions. On 
 metadata payload that exceeds the 64 KiB limit of the `BLOB` columns is a data exception, so only the entity
 with the oversized payload fails.
 
-A batch that fails because of a conflict with a concurrent transaction, a deadlock, serialization failure or
-lock-wait timeout, is retried as a whole up to `transient-error-retries` times (default 2), with a growing,
-randomized delay based on `transient-error-retry-backoff` (default 50 ms). A batch holds row locks for up to
-`max-batch-size` persistence ids, so it is more likely than a single write to conflict, for example with a
-concurrent delete or with the batches of another JVM. If the conflict persists after the retries, all writes
-of the batch fail, while with the default journal it only affects the one entity that wrote. The retries add to
-the write latency, which counts toward the journal circuit breaker `call-timeout`.
+A batch that fails because of a conflict with a concurrent transaction, a deadlock or serialization failure,
+is retried as a whole up to `transient-error-retries` times (default 2), with a growing, randomized delay based
+on `transient-error-retry-backoff` (default 50 ms). A batch holds row locks for up to `max-batch-size`
+persistence ids, so it is more likely than a single write to conflict, for example with a concurrent delete or
+with the batches of another JVM. If the conflict persists after the retries, all writes of the batch fail, while
+with the default journal it only affects the one entity that wrote. Only one flush is in flight, so the backoff
+and the retried attempts delay all queued writes, not only the writes of this batch. The retries add to the
+write latency, which counts toward the journal circuit breaker `call-timeout`. Each retry is logged at info
+level.
+
+Lock-wait timeouts, for example MySQL and MariaDB error 1205 or PostgreSQL `55P03`, are not retried. They are
+only reported after the full lock timeout, while the lock is usually still held, so a retry would likely wait
+for another full timeout and hold up all queued writes of the journal. They fail all writes of the batch.
 
 Memory:
 `max-batch-size` limits the number of requests in one batch, not the number of events, and the queue is limited
