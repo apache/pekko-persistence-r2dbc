@@ -182,3 +182,13 @@ Documentation examples with import snippet markers opt out of
 `OrganizeImports` using `scalafix:off/on` comments. This preserves which
 imports appear in published snippets; do not move the snippet boundaries
 merely to satisfy import sorting.
+
+## Formatter configuration
+
+Formatting follows Apache Pekko core: Scalafmt wraps long grouped import
+selectors one per line, and Javafmt targets Java 17 without sorting imports.
+Keep repository-specific source exclusions when updating these settings. Import organization is handled
+separately from this formatter configuration.
+
+Run `sbt scalafmtAll scalafmtSbt javafmtAll` to apply formatting and
+`sbt scalafmtCheckAll scalafmtSbtCheck javafmtCheckAll` to verify it.
