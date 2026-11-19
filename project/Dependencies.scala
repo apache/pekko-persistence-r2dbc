@@ -50,6 +50,7 @@ object Dependencies {
     val pekkoActor = "org.apache.pekko" %% "pekko-actor" % PekkoVersion % Test
     val pekkoActorTyped = "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion % Test
     val pekkoActorTestkitTyped = "org.apache.pekko" %% "pekko-actor-testkit-typed" % PekkoVersion % Test
+    val pekkoClusterTyped = "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion % Test
     val pekkoJackson = "org.apache.pekko" %% "pekko-serialization-jackson" % PekkoVersion % Test
     val pekkoPersistence = "org.apache.pekko" %% "pekko-persistence" % PekkoVersion % Test
     val pekkoPersistenceQuery = "org.apache.pekko" %% "pekko-persistence-query" % PekkoVersion % Test
@@ -87,6 +88,7 @@ object Dependencies {
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoStreamTyped,
     TestDeps.pekkoActorTestkitTyped,
+    TestDeps.pekkoClusterTyped,
     TestDeps.pekkoJackson,
     TestDeps.logback,
     TestDeps.scalaTest)
