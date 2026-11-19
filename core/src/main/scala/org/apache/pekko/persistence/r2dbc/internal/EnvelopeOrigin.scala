@@ -25,6 +25,8 @@ import pekko.persistence.query.typed.EventEnvelope
   val SourceBacktracking = "BT"
   val SourcePubSub = "PS"
   val SourceSnapshot = "SN"
+  // not an event: marks how far backtracking has read, see BySliceQuery.ProgressMarker
+  val SourceBacktrackingProgress = "BTP"
 
   def fromQuery(env: EventEnvelope[?]): Boolean =
     env.source == SourceQuery
@@ -37,6 +39,9 @@ import pekko.persistence.query.typed.EventEnvelope
 
   def fromSnapshot(env: EventEnvelope[?]): Boolean =
     env.source == SourceSnapshot
+
+  def fromBacktrackingProgress(env: EventEnvelope[?]): Boolean =
+    env.source == SourceBacktrackingProgress
 
   def isFilteredEvent(env: Any): Boolean =
     env match {
