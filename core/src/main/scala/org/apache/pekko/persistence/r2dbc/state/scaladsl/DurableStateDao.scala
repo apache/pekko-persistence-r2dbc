@@ -46,6 +46,7 @@ import pekko.persistence.r2dbc.internal.BySliceQuery
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets
 import pekko.persistence.r2dbc.internal.BySliceQuery.Buckets.Bucket
 import pekko.persistence.r2dbc.internal.ChangeHandlerFactory
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.r2dbc.internal.EnvelopeOrigin
 import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.PayloadCodec
@@ -61,6 +62,7 @@ import pekko.persistence.r2dbc.state.scaladsl.AdditionalColumn
 import pekko.persistence.r2dbc.state.scaladsl.ChangeHandler
 import pekko.persistence.r2dbc.state.scaladsl.h2.H2DurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.mysql.MySQLDurableStateDao
+import pekko.persistence.r2dbc.state.scaladsl.oracle.OracleDurableStateDao
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Source
 
@@ -112,6 +114,8 @@ import com.typesafe.config.Config
         new DurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.MySQL | Dialect.MariaDB =>
         new MySQLDurableStateDao(settings, connectionFactory, closeCallsExceeding)
+      case Dialect.Oracle =>
+        new OracleDurableStateDao(settings, connectionFactory, closeCallsExceeding)
       case Dialect.H2 =>
         val tables =
           (settings.durableStateTableWithSchema +:
@@ -291,7 +295,9 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     sql"DELETE from $table WHERE persistence_id = ?"
   }
 
-  private val currentDbTimestampSql =
+  // the current time of the by slice queries; it must come from the same clock as transactionTimestampSql, or
+  // a state written just before a query can be after its upper bound and be missed
+  protected def currentDbTimestampSql: String =
     sql"SELECT transaction_timestamp() AS db_timestamp"
 
   private def allPersistenceIdsSql(table: String): String =
@@ -352,7 +358,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
           readDbTimestamp = Instant.EPOCH, // not needed here
           getPayload(row),
           serId = row.get[Integer]("state_ser_id", classOf[Integer]),
-          serManifest = row.get("state_ser_manifest", classOf[String]),
+          serManifest = EmptyValues.string(row, "state_ser_manifest"),
           tags = Set.empty // tags not fetched in queries (yet)
         ))
   }
@@ -362,8 +368,10 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     val rowPayload = row.getPayload("state_payload")
     if (serId == 0 && (rowPayload == null || util.Arrays.equals(statePayloadCodec.nonePayload, rowPayload)))
       None // delete marker
+    else if (rowPayload == null)
+      Some(Array.emptyByteArray) // Oracle stores an empty payload as NULL
     else
-      Option(rowPayload)
+      Some(rowPayload)
   }
 
   def upsertState(state: SerializedStateRow, value: Any): Future[Done] = {
@@ -704,7 +712,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
 
           SerializedStateRow(
             persistenceId = row.get("persistence_id", classOf[String]),
-            revision = row.get("revision", classOf[Long]),
+            revision = row.get[java.lang.Long]("revision", classOf[java.lang.Long]),
             dbTimestamp = row.get("db_timestamp", classOf[Instant]),
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             // payload = null => lazy loaded for backtracking (ugly, but not worth changing UpdatedDurableState in Akka)
@@ -722,7 +730,7 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
             readDbTimestamp = row.get("read_db_timestamp", classOf[Instant]),
             payload = getPayload(row),
             serId = row.get[Integer]("state_ser_id", classOf[Integer]),
-            serManifest = row.get("state_ser_manifest", classOf[String]),
+            serManifest = EmptyValues.string(row, "state_ser_manifest"),
             tags = Set.empty // tags not fetched in queries (yet)
           ))
 
