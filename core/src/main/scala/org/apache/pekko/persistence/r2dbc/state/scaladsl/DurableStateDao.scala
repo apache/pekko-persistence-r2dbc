@@ -295,7 +295,9 @@ private[r2dbc] class DurableStateDao(settings: StateSettings, connectionFactory:
     sql"DELETE from $table WHERE persistence_id = ?"
   }
 
-  private val currentDbTimestampSql =
+  // the current time of the by slice queries; it must come from the same clock as transactionTimestampSql, or
+  // a state written just before a query can be after its upper bound and be missed
+  protected def currentDbTimestampSql: String =
     sql"SELECT transaction_timestamp() AS db_timestamp"
 
   private def allPersistenceIdsSql(table: String): String =

@@ -17,10 +17,7 @@
 
 package org.apache.pekko.persistence.r2dbc.state.scaladsl.oracle
 
-import java.time.Instant
-
 import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import io.r2dbc.spi.ConnectionFactory
@@ -30,7 +27,6 @@ import org.apache.pekko
 import pekko.actor.typed.ActorSystem
 import pekko.annotation.InternalApi
 import pekko.persistence.r2dbc.StateSettings
-import pekko.persistence.r2dbc.internal.InstantFactory
 import pekko.persistence.r2dbc.internal.Sql.DialectInterpolation
 import pekko.persistence.r2dbc.internal.oracle.OracleUtils
 import pekko.persistence.r2dbc.journal.mysql.MySQLJournalDao
@@ -50,6 +46,9 @@ private[r2dbc] class OracleDurableStateDao(
   OracleUtils.requireByteArrayPayload(settings.durableStatePayloadCodec, "durable state store")
 
   override protected def transactionTimestampSql: String = OracleUtils.currentTimestampSql
+
+  override protected def currentDbTimestampSql: String =
+    s"SELECT ${OracleUtils.currentTimestampSql} AS db_timestamp FROM dual"
 
   // tags are stored as a JSON array, like for MySQL
   override protected def bindTagsForWrite(stmt: Statement, tags: Set[String], index: Int): Statement =
@@ -92,6 +91,4 @@ private[r2dbc] class OracleDurableStateDao(
       ORDER BY db_timestamp, revision
       LIMIT ?"""
   }
-
-  override def currentDbTimestamp(): Future[Instant] = Future.successful(InstantFactory.now())
 }

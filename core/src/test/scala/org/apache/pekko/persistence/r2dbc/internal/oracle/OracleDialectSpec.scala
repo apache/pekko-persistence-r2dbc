@@ -25,6 +25,11 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+import io.r2dbc.spi.Connection
+import io.r2dbc.spi.ConnectionFactory
+import io.r2dbc.spi.ConnectionFactoryMetadata
+import reactor.core.publisher.Mono
+
 import org.apache.pekko
 import pekko.Done
 import pekko.actor.testkit.typed.scaladsl.LogCapturing
@@ -48,10 +53,13 @@ import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotMetadata
 import pekko.persistence.r2dbc.snapshot.SnapshotDao.SerializedSnapshotRow
 import pekko.persistence.r2dbc.state.scaladsl.DurableStateDao
 import pekko.persistence.r2dbc.state.scaladsl.R2dbcDurableStateStore
+import pekko.persistence.r2dbc.state.scaladsl.oracle.OracleDurableStateDao
 import pekko.persistence.state.DurableStateStoreRegistry
 import pekko.persistence.state.scaladsl.GetObjectResult
 import pekko.persistence.typed.PersistenceId
 import pekko.stream.scaladsl.Sink
+
+import org.reactivestreams.Publisher
 
 import org.scalatest.Outcome
 import org.scalatest.Pending
@@ -270,6 +278,32 @@ class OracleDialectSpec
       persistenceIds.foreach { pid =>
         Set(1L, 2L) should contain(dao.load(pid, SnapshotSelectionCriteria.Latest).futureValue.get.seqNr)
       }
+    }
+
+    "read the current time of the durable state queries from the database clock" in {
+      // durable state rows are stamped with the database clock, so the upper bound of the by slice queries must be
+      // too: with the JVM clock, a state written just before a query is missed when the database clock is ahead
+      def dbTime(): Instant =
+        r2dbcExecutor
+          .selectOne("select db time")(
+            _.createStatement(s"SELECT ${OracleUtils.currentTimestampSql} FROM dual"),
+            _.get(0, classOf[Instant]))
+          .futureValue
+          .get
+
+      val before = dbTime()
+      val current = stateDao.currentDbTimestamp().futureValue
+      val after = dbTime()
+      current should (be >= before and be <= after)
+
+      // the database clock can't be moved in a test, so also check that the time is read through a connection
+      val noConnection = new ConnectionFactory {
+        override def create(): Publisher[? <: Connection] =
+          Mono.error(new IllegalStateException("no connection"))
+        override def getMetadata: ConnectionFactoryMetadata = () => "no connection"
+      }
+      val dao = new OracleDurableStateDao(stateSettings, noConnection)(system.executionContext, system)
+      dao.currentDbTimestamp().failed.futureValue.getMessage shouldBe "no connection"
     }
 
     "store and read large event and durable state payloads" in {
