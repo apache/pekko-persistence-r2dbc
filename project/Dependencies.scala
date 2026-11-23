@@ -67,7 +67,7 @@ object Dependencies {
     val pekkoStreamTyped = "org.apache.pekko" %% "pekko-stream-typed" % PekkoVersion % Test
     val pekkoTestkit = "org.apache.pekko" %% "pekko-testkit" % PekkoVersion % Test
 
-    val postgresql = "org.postgresql" % "postgresql" % "42.7.14" % Test
+    val postgresql = "org.postgresql" % "postgresql" % "42.7.15" % Test
 
     val logback = "ch.qos.logback" % "logback-classic" % "1.6.8" % Test
     val scalaTest = "org.scalatest" %% "scalatest" % "3.2.20" % Test
