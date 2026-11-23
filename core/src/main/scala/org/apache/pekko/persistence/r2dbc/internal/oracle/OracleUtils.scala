@@ -50,7 +50,9 @@ private[r2dbc] object OracleUtils {
    * values as equal.
    *
    * The function around `entity_type` means that the slice indexes can't use it to narrow the range that is scanned,
-   * only to filter the index entries of the slice range, which is selected by the leading `slice BETWEEN` condition.
+   * only to filter the index entries. The plan of a slice range query is the same as with `entity_type = ?`: an index
+   * range scan of the slice index, with `slice` and `db_timestamp` as access predicates and the entity type condition
+   * as a filter on the index entries.
    */
   val entityTypeCondition: String = "DECODE(entity_type, ?, 1, 0) = 1"
 
