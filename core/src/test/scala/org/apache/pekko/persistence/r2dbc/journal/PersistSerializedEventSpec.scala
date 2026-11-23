@@ -24,6 +24,7 @@ import pekko.persistence.r2dbc.TestActors.Persister
 import pekko.persistence.r2dbc.TestConfig
 import pekko.persistence.r2dbc.TestData
 import pekko.persistence.r2dbc.TestDbLifecycle
+import pekko.persistence.r2dbc.internal.EmptyValues
 import pekko.persistence.typed.PersistenceId
 import pekko.serialization.SerializationExtension
 import pekko.serialization.Serializers
@@ -82,7 +83,8 @@ abstract class AbstractPersistSerializedEventSpec(config: Config)
               Row(
                 seqNr = row.get[java.lang.Long]("seq_nr", classOf[java.lang.Long]),
                 serializerId = row.get[java.lang.Integer]("event_ser_id", classOf[java.lang.Integer]),
-                manifest = row.get("event_ser_manifest", classOf[String])))
+                // Oracle stores the empty manifest as NULL
+                manifest = EmptyValues.string(row, "event_ser_manifest")))
           .futureValue
 
       rows.sortBy(_.seqNr) shouldBe List(
