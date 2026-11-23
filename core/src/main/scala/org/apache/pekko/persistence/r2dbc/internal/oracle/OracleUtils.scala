@@ -48,6 +48,9 @@ private[r2dbc] object OracleUtils {
    * Oracle stores the empty entity type of a persistence id without an entity type separator as `NULL`, and an empty
    * string bound to the parameter is `NULL` too, so `entity_type = ?` would never match it. `DECODE` treats two `NULL`
    * values as equal.
+   *
+   * The function around `entity_type` means that the slice indexes can't use it to narrow the range that is scanned,
+   * only to filter the index entries of the slice range, which is selected by the leading `slice BETWEEN` condition.
    */
   val entityTypeCondition: String = "DECODE(entity_type, ?, 1, 0) = 1"
 

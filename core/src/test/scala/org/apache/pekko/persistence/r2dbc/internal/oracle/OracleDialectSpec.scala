@@ -262,7 +262,7 @@ class OracleDialectSpec
         .map(m => (m.payload.toSeq, m.serializerId, m.serializerManifest)) shouldBe Some((Seq.empty[Byte], 7, ""))
     }
 
-    "let the last of concurrent first saves of a snapshot win" in {
+    "not fail concurrent first saves of a snapshot" in {
       val dao = SnapshotDao.fromConfig(snapshotSettings, system.settings.config)(system, system.executionContext)
       val persistenceIds = (1 to 20).map(_ => nextPid(nextEntityType()))
       def row(persistenceId: String, seqNr: Long) =
