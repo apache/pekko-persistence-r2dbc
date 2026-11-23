@@ -416,6 +416,13 @@ jobs:
         run: |-
           # the healthcheck of the image waits until the database is open
           docker compose -f docker/docker-compose-oracle.yml up -d --wait
+          # the test suites open and close connection pools in quick succession, and with the default limit of 200
+          # processes the listener then refuses connections (ORA-12516) well below that limit; the limit takes
+          # effect after a restart
+          printf 'WHENEVER SQLERROR EXIT SQL.SQLCODE\nALTER SYSTEM SET processes = 1000 SCOPE = SPFILE;\n' | \
+            docker exec -i docker-oracle-db-1 sqlplus -s / as sysdba
+          docker compose -f docker/docker-compose-oracle.yml restart
+          docker compose -f docker/docker-compose-oracle.yml up -d --wait
           (echo "WHENEVER SQLERROR EXIT SQL.SQLCODE"; cat ddl-scripts/create_tables_oracle.sql) | \
             docker exec -i docker-oracle-db-1 sqlplus -s pekko/pekko@//localhost/FREEPDB1
           # Oracle has a schema per user, so the tests use users instead of databases for database1 and database2
