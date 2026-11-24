@@ -103,6 +103,11 @@ object ConnectionFactoryProvider extends ExtensionId[ConnectionFactoryProvider] 
   private val SslKey = R2dbcOption.valueOf[String]("sslKey")
   private val SslPassword = R2dbcOption.valueOf[String]("sslPassword")
 
+  // Options of the MySQL driver (MySqlConnectionFactoryProvider) for the root certificate and the key password, which
+  // it reads under other names than the PostgreSQL driver. It reads sslMode, sslCert and sslKey under the same names.
+  private val MySqlSslCa = R2dbcOption.valueOf[String]("sslCa")
+  private val MySqlSslKeyPassword = R2dbcOption.valueOf[String]("sslKeyPassword")
+
   // The database driver, set with the `driver` setting or in the `url`, behind any wrapping drivers, for example
   // `postgresql` for a `r2dbc:pool:proxy:postgresql://` url.
   private def driverName(options: ConnectionFactoryOptions): Option[String] = {
@@ -221,12 +226,16 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
     } else if (settings.sslEnabled) {
       builder.option(ConnectionFactoryOptions.SSL, java.lang.Boolean.TRUE)
 
-      // the PostgreSQL driver converts the mode from its name with SSLMode.fromValue
+      // the PostgreSQL driver converts the mode from its name with SSLMode.fromValue, and the MySQL driver with its
+      // own SslMode
       if (settings.sslMode.nonEmpty)
         builder.option(ConnectionFactoryProvider.SslMode, settings.sslMode)
 
+      // the MySQL driver reads the root certificate and the key password under its own names
       if (settings.sslRootCert.nonEmpty)
-        builder.option(ConnectionFactoryProvider.SslRootCert, settings.sslRootCert)
+        builder.option(
+          if (mySQL) ConnectionFactoryProvider.MySqlSslCa else ConnectionFactoryProvider.SslRootCert,
+          settings.sslRootCert)
 
       if (settings.sslCert.nonEmpty)
         builder.option(ConnectionFactoryProvider.SslCert, settings.sslCert)
@@ -235,7 +244,9 @@ class ConnectionFactoryProvider(system: ActorSystem[?]) extends Extension {
         builder.option(ConnectionFactoryProvider.SslKey, settings.sslKey)
 
       if (settings.sslPassword.nonEmpty)
-        builder.option(ConnectionFactoryProvider.SslPassword, settings.sslPassword)
+        builder.option(
+          if (mySQL) ConnectionFactoryProvider.MySqlSslKeyPassword else ConnectionFactoryProvider.SslPassword,
+          settings.sslPassword)
     }
 
     if (mySQL) {
