@@ -94,6 +94,10 @@ lazy val docs = project
     previewPath := (Paradox / siteSubdirName).value,
     Paradox / siteSubdirName := s"docs/pekko-persistence-r2dbc/${projectInfoVersion.value}",
     pekkoParadoxGithub := Some("https://github.com/apache/pekko-persistence-r2dbc"),
+    pekkoParadoxCopyright :=
+      """Copyright © 2011-2023 <a href="https://www.lightbend.com/">Lightbend, Inc</a>.
+        | Apache Pekko, Pekko, Apache, the Apache logo, and the Apache Pekko project logo are either registered trademarks
+        | or trademarks of The Apache Software Foundation in the United States and other countries.""".stripMargin,
     paradoxGroups := Map("Language" -> Seq("Java", "Scala")),
     Global / pekkoParadoxIncubatorNotice := None,
     Compile / paradoxProperties ++= Map(
