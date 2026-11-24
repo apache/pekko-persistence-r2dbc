@@ -57,7 +57,11 @@ import org.slf4j.Logger
       latestBacktracking: TimestampOffset,
       latestBacktrackingSeenCount: Int,
       backtrackingExpectFiltered: Int,
-      buckets: Buckets) {
+      buckets: Buckets,
+      // System.nanoTime when the previous normal query was created, if it had no upper bound
+      previousUnboundedQueryStart: Option[Long] = None,
+      // all events before this database time have been read, once the current backtracking round completes
+      backtrackingProgress: Option[Instant] = None) {
 
     def backtracking: Boolean = backtrackingCount > 0
 
@@ -165,6 +169,16 @@ import org.slf4j.Logger
     def source: String
   }
 
+  /**
+   * Creates and recognizes the envelope that `liveBySlices` emits when a backtracking round has completed while the
+   * query was caught up. Its timestamp is a database time before which all events have been read, so a consumer can
+   * use it to track backtracking progress during idle periods. The envelope is not an event and must be removed from
+   * the stream before it reaches the consumer of the query.
+   */
+  final case class ProgressMarker[Envelope](
+      create: (String, Int, Instant) => Envelope,
+      isMarker: Envelope => Boolean)
+
   trait Dao[SerializedRow] {
     def currentDbTimestamp(): Future[Instant]
 
@@ -201,7 +215,8 @@ import org.slf4j.Logger
     createEnvelope: (TimestampOffset, Row) => Envelope,
     extractOffset: Envelope => TimestampOffset,
     settings: SettingsTypes.BySliceQueryAllSettings,
-    log: Logger)(implicit val ec: ExecutionContext) {
+    log: Logger,
+    progressMarker: Option[BySliceQuery.ProgressMarker[Envelope]] = None)(implicit val ec: ExecutionContext) {
   import BySliceQuery._
   import TimestampOffset.toTimestampOffset
 
@@ -210,6 +225,8 @@ import org.slf4j.Logger
   private val firstBacktrackingQueryWindow =
     backtrackingWindow.plus(settings.backtrackingBehindCurrentTime.toJava)
   private val eventBucketCountInterval = JDuration.ofSeconds(60)
+  private val isProgressMarker: Envelope => Boolean =
+    progressMarker.map(_.isMarker).getOrElse((_: Envelope) => false)
 
   def currentBySlices(
       logPrefix: String,
@@ -316,7 +333,11 @@ import org.slf4j.Logger
         maxSlice: java.lang.Integer,
         initialOffset.timestamp)
 
-    def nextOffset(state: QueryState, envelope: Envelope): QueryState = {
+    // the progress marker is not a row, so it doesn't change the query position
+    def nextOffset(state: QueryState, envelope: Envelope): QueryState =
+      if (isProgressMarker(envelope)) state else nextOffsetFromRow(state, envelope)
+
+    def nextOffsetFromRow(state: QueryState, envelope: Envelope): QueryState = {
       val offset = extractOffset(envelope)
       if (state.backtracking) {
         if (offset.timestamp.isBefore(state.latestBacktracking.timestamp))
@@ -377,15 +398,66 @@ import org.slf4j.Logger
       state.backtracking && state.rowCount < settings.bufferSize - state.backtrackingExpectFiltered
     }
 
+    def idleCountAfter(state: QueryState): Long = if (state.rowCount == 0) state.idleCount + 1 else 0
+
+    def switchToBacktracking(state: QueryState, newIdleCount: Long): Boolean =
+      settings.backtrackingEnabled && !state.backtracking && state.latest != TimestampOffset.Zero &&
+      (newIdleCount >= 5 ||
+      state.rowCountSinceBacktracking + state.rowCount >= settings.bufferSize * 3 ||
+      JDuration
+        .between(state.latestBacktracking.timestamp, state.latest.timestamp)
+        .compareTo(halfBacktrackingWindow) > 0)
+
+    // A backtracking round that starts right after a normal query that found nothing and had no upper bound
+    // can report progress when it completes: the normal query has read everything after `latest` that is older than
+    // its database time minus behind-current-time, and the round everything before `latest` that is older than its
+    // database time minus backtracking.behind-current-time.
+    def startsCaughtUpBacktrackingRound(state: QueryState): Boolean =
+      progressMarker.isDefined && !state.backtracking && state.rowCount == 0 &&
+      state.previousUnboundedQueryStart.isDefined && switchToBacktracking(state, idleCountAfter(state))
+
+    // The database time is read after the normal query ran. The normal query's own database time is no earlier than
+    // this one minus the time that has passed since the normal query was created.
+    def backtrackingProgress(dbTime: Instant, normalQueryStart: Long): Instant = {
+      val sinceNormalQuery = JDuration.ofNanos(System.nanoTime() - normalQueryStart)
+      val readByNormalQuery = dbTime.minus(sinceNormalQuery).minus(settings.behindCurrentTime.toJava)
+      val readByBacktracking = dbTime.minus(settings.backtrackingBehindCurrentTime.toJava)
+      if (readByNormalQuery.isBefore(readByBacktracking)) readByNormalQuery else readByBacktracking
+    }
+
+    def beforeLiveQuery(state: QueryState): Option[Future[QueryState]] = {
+      val bucketsUpdate = beforeQuery(logPrefix, entityType, minSlice, maxSlice, state)
+      state.previousUnboundedQueryStart match {
+        case Some(normalQueryStart) if startsCaughtUpBacktrackingRound(state) =>
+          val stateFuture = bucketsUpdate.getOrElse(Future.successful(state))
+          Some(stateFuture.flatMap { s =>
+            dao.currentDbTimestamp().map { dbTime =>
+              s.copy(backtrackingProgress = Some(backtrackingProgress(dbTime, normalQueryStart)))
+            }
+          })
+        case _ =>
+          bucketsUpdate
+      }
+    }
+
     def nextQuery(state: QueryState): (QueryState, Option[Source[Envelope, NotUsed]]) = {
-      val newIdleCount = if (state.rowCount == 0) state.idleCount + 1 else 0
+      val newIdleCount = idleCountAfter(state)
+      val toBacktracking = switchToBacktracking(state, newIdleCount)
+      val fromBacktracking = !toBacktracking && switchFromBacktracking(state)
+      val progress: Option[Envelope] =
+        (progressMarker, state.backtrackingProgress) match {
+          case (Some(marker), Some(progressTimestamp)) if fromBacktracking =>
+            log.debug(
+              "{} backtracking caught up from slices [{} - {}], all events before [{}] have been read.",
+              logPrefix,
+              minSlice: java.lang.Integer,
+              maxSlice: java.lang.Integer,
+              progressTimestamp)
+            Some(marker.create(entityType, minSlice, progressTimestamp))
+          case _ => None
+        }
       val newState =
-        if (settings.backtrackingEnabled && !state.backtracking && state.latest != TimestampOffset.Zero &&
-          (newIdleCount >= 5 ||
-          state.rowCountSinceBacktracking + state.rowCount >= settings.bufferSize * 3 ||
-          JDuration
-            .between(state.latestBacktracking.timestamp, state.latest.timestamp)
-            .compareTo(halfBacktrackingWindow) > 0)) {
+        if (toBacktracking) {
           // FIXME config for newIdleCount >= 5 and maybe something like `newIdleCount % 5 == 0`
 
           // Note that when starting the query with offset = NoOffset it will switch to backtracking immediately after
@@ -406,14 +478,15 @@ import org.slf4j.Logger
             backtrackingCount = 1,
             latestBacktracking = fromOffset,
             backtrackingExpectFiltered = state.latestBacktrackingSeenCount)
-        } else if (switchFromBacktracking(state)) {
+        } else if (fromBacktracking) {
           // switch from backtracking
           state.copy(
             rowCount = 0,
             rowCountSinceBacktracking = 0,
             queryCount = state.queryCount + 1,
             idleCount = newIdleCount,
-            backtrackingCount = 0)
+            backtrackingCount = 0,
+            backtrackingProgress = None)
         } else {
           // continue
           val newBacktrackingCount = if (state.backtracking) state.backtrackingCount + 1 else 0
@@ -457,18 +530,27 @@ import org.slf4j.Logger
           else s"Found [${state.rowCount}] rows in previous query.")
       }
 
-      newState ->
-      Some(
-        dao
-          .rowsBySlices(
-            entityType,
-            minSlice,
-            maxSlice,
-            fromTimestamp,
-            toTimestamp,
-            behindCurrentTime,
-            backtracking = newState.backtracking)
-          .via(deserializeAndAddOffset(newState.currentOffset)))
+      val rows = dao
+        .rowsBySlices(
+          entityType,
+          minSlice,
+          maxSlice,
+          fromTimestamp,
+          toTimestamp,
+          behindCurrentTime,
+          backtracking = newState.backtracking)
+        .via(deserializeAndAddOffset(newState.currentOffset))
+
+      val stateAfterQuery =
+        if (newState.backtracking) newState
+        else newState.copy(previousUnboundedQueryStart =
+          if (toTimestamp.isEmpty) Some(System.nanoTime()) else None)
+
+      stateAfterQuery ->
+      Some(progress match {
+        case Some(marker) => Source.single(marker).concat(rows)
+        case None         => rows
+      })
     }
 
     // filter after ContinuousQuery so that the filtered envelopes still update the query state,
@@ -478,8 +560,8 @@ import org.slf4j.Logger
       updateState = nextOffset,
       delayNextQuery = delayNextQuery,
       nextQuery = nextQuery,
-      beforeQuery = beforeQuery(logPrefix, entityType, minSlice, maxSlice, _))
-      .filter(filterEventsBeforeSnapshots)
+      beforeQuery = beforeLiveQuery)
+      .filter(env => isProgressMarker(env) || filterEventsBeforeSnapshots(env))
   }
 
   private def beforeQuery(
