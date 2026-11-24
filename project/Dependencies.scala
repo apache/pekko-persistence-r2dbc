@@ -61,6 +61,7 @@ object Dependencies {
     val pekkoPersistenceTck = "org.apache.pekko" %% "pekko-persistence-tck" % PekkoVersion % Test
     val pekkoProtobuf = "org.apache.pekko" %% "pekko-protobuf-v3" % PekkoVersion % Test
     val pekkoSlf4j = "org.apache.pekko" %% "pekko-slf4j" % PekkoVersion % Test
+    val pekkoClusterTyped = "org.apache.pekko" %% "pekko-cluster-typed" % PekkoVersion % Test
     val pekkoShardingTyped = "org.apache.pekko" %% "pekko-cluster-sharding-typed" % PekkoVersion % Test
     val pekkoStream = "org.apache.pekko" %% "pekko-stream" % PekkoVersion % Test
     val pekkoStreamTestkit = "org.apache.pekko" %% "pekko-stream-testkit" % PekkoVersion % Test
@@ -92,6 +93,7 @@ object Dependencies {
     TestDeps.pekkoStreamTestkit,
     TestDeps.pekkoStreamTyped,
     TestDeps.pekkoActorTestkitTyped,
+    TestDeps.pekkoClusterTyped,
     TestDeps.pekkoJackson,
     TestDeps.logback,
     TestDeps.scalaTest)
