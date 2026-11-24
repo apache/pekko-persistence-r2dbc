@@ -13,6 +13,8 @@
 
 package org.apache.pekko.persistence.r2dbc.state
 
+import scala.annotation.nowarn
+
 import org.apache.pekko
 import pekko.actor.testkit.typed.scaladsl.{ LogCapturing, ScalaTestWithActorTestKit }
 import pekko.actor.typed.ActorSystem
@@ -129,6 +131,20 @@ class DurableStateStoreSpec
       store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
       store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
       store.deleteObject(persistenceId, revision = 0).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
+    }
+
+    "hard delete through the deprecated overload" in {
+      val entityType = nextEntityType()
+      val persistenceId = PersistenceId(entityType, "legacy-hard-delete").id
+      val value = "Genuinely Collaborative"
+      store.upsertObject(persistenceId, 1L, value, unusedTag).futureValue
+      store.getObject(persistenceId).futureValue should be(GetObjectResult(Some(value), 1L))
+
+      @nowarn("cat=deprecation")
+      val deleted = store.deleteObject(persistenceId)
+      deleted.futureValue
+
       store.getObject(persistenceId).futureValue should be(GetObjectResult(None, 0L))
     }
 
