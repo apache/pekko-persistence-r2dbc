@@ -41,11 +41,32 @@ The snapshot plugin is used whenever a snapshot write is triggered through the
 
 ## Retention
 
-The R2DBC snapshot plugin only ever keeps *one* snapshot per persistence id in the database. 
-If a `keepNSnapshots > 1` is specified for an `EventSourcedBehavior` that setting will be ignored.
+The R2DBC snapshot store keeps one snapshot per persistence ID. Saving another snapshot replaces the
+previous one. The `keepNSnapshots` argument to typed persistence retention cannot make this store
+keep additional snapshots, but it can affect which **journal events** retention deletes.
 
-The reason for this is that there is no real benefit to keep multiple snapshots around on a relational 
-database with a high consistency.
+The plugin inherits `only-one-snapshot` from Pekko Core's `snapshot-store-plugin-fallback` unless you
+set it for this plugin. The standard fallback is `false`. With `false` and
+`withDeleteEventsOnSnapshot`, `keepNSnapshots` determines how many batches of journal events remain.
+Typed persistence can still send requests to delete old snapshots, even though this store has already
+replaced them.
+
+To opt in to single-snapshot retention for the default R2DBC snapshot plugin, add this to
+`application.conf` (use your configured snapshot plugin path instead if you use a custom plugin ID):
+
+```hocon
+pekko.persistence.r2dbc.snapshot.only-one-snapshot = true
+```
+
+With this setting, typed persistence skips deletion requests for old snapshots, avoiding a database
+round trip when retention would otherwise send one. With `keepNSnapshots > 1`, typed persistence
+logs a warning; use `RetentionCriteria.snapshotEvery(numberOfEvents)` instead.
+
+If your retention criteria also enable `withDeleteEventsOnSnapshot`, typed persistence can delete
+journal events up to and including the latest successfully saved retention snapshot's sequence
+number, rather than keeping the event history associated with `keepNSnapshots`. Enable the setting
+only if consumers that need those older events can tolerate their deletion. This setting does not
+enable event deletion by itself, change what the snapshot store saves, or change its schema.
 
 See also @ref[EventSourcedCleanup tool](cleanup.md#event-sourced-cleanup-tool).
 
