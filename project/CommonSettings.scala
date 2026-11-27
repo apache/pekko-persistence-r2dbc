@@ -65,7 +65,9 @@ object CommonSettings extends AutoPlugin {
       val pekkoProperties = System.getProperties.stringPropertyNames.asScala.toList.collect {
         case key: String if key.startsWith("pekko.") => "-D" + key + "=" + System.getProperty(key)
       }
-      "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" :: pekkoProperties
+      // Agrona, used by Pekko Remote Artery in the cluster tests, needs access to jdk.internal.misc.Unsafe
+      "-Xms1G" :: "-Xmx1G" :: "-XX:MaxDirectMemorySize=256M" ::
+      "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED" :: pekkoProperties
     },
     projectInfoVersion := (if (isSnapshot.value) "snapshot" else version.value))
 

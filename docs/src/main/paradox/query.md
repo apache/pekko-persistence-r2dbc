@@ -190,6 +190,14 @@ pekko.persistence.r2dbc.journal.publish-events = off
 
 If you use many queries or Projection instances you should consider adjusting the `pekko.persistence.r2dbc.journal.publish-events-number-of-topics` configuration, see @ref:[Configuration](#configuration).
 
+The topic of an entity type and slice range is created on a node when it is first used there. On a node that writes
+events but runs no `eventsBySlices` query for that slice range, that is when the first event is published. Pekko keeps
+the messages that are published to a new topic for a short time after it has started, and delivers them to the
+subscribers on the other nodes as they become known, so the first events also reach the queries on other nodes. This is
+configured with `pekko.actor.typed.pubsub.startup-replay-window` and
+`pekko.actor.typed.pubsub.startup-replay-buffer-size`, see
+@extref:[Distributed Publish Subscribe](pekko:typed/distributed-pub-sub.html).
+
 ## Durable state queries
 
 @apidoc[R2dbcDurableStateStore] implements the following @extref:[Persistence Queries](pekko:durable-state/persistence-query.html):
