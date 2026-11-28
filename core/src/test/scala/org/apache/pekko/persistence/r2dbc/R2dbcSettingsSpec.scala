@@ -13,17 +13,86 @@
 
 package org.apache.pekko.persistence.r2dbc
 
+import org.apache.pekko
+import pekko.actor.ActorSystem
+import pekko.persistence.Persistence
+import pekko.testkit.TestKit
+
+import org.scalatest.Assertion
 import org.scalatest.Inspectors._
 import org.scalatest.TestSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import com.typesafe.config.Config
 import com.typesafe.config.ConfigException
 import com.typesafe.config.ConfigFactory
 
 class R2dbcSettingsSpec extends AnyWordSpec with TestSuite with Matchers {
 
   private lazy val configV1 = ConfigFactory.parseResources("config-v1.conf")
+
+  private val snapshotPluginId = "pekko.persistence.r2dbc.snapshot"
+
+  private def withSnapshotStoreConfig(overrides: String)(check: Persistence => Assertion): Assertion = {
+    // The native plugin config path is required, but no test needs a database connection.
+    val h2Config = ConfigFactory.parseString("""
+      pekko.persistence.r2dbc {
+        dialect = h2
+        connection-factory {
+          driver = h2
+          initial-size = 0
+          h2.protocol = mem
+        }
+      }
+      """)
+    val config = ConfigFactory.parseString(overrides)
+      .withFallback(h2Config)
+      .withFallback(ConfigFactory.defaultReferenceUnresolved())
+      .resolve()
+    val system = ActorSystem("R2dbcSnapshotRetentionSettings", config)
+    try check(Persistence(system))
+    finally TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  }
+
+  private def onlyOneSnapshot(
+      persistence: Persistence,
+      pluginId: String = snapshotPluginId,
+      overrides: Config = ConfigFactory.empty()): Boolean = {
+    val snapshotStore = persistence.snapshotStoreFor(pluginId, overrides)
+    persistence.configFor(snapshotStore).getBoolean("only-one-snapshot")
+  }
+
+  "The snapshot retention setting" should {
+    "inherit the stock fallback and allow a plugin-specific opt-in" in {
+      withSnapshotStoreConfig("""
+        pekko.persistence.r2dbc.opt-in-snapshot = ${pekko.persistence.r2dbc.snapshot}
+        pekko.persistence.r2dbc.opt-in-snapshot.only-one-snapshot = true
+        """) { persistence =>
+        onlyOneSnapshot(persistence) shouldBe false
+        onlyOneSnapshot(persistence, "pekko.persistence.r2dbc.opt-in-snapshot") shouldBe true
+      }
+    }
+
+    "inherit the configured application fallback and allow a plugin-specific opt-out" in {
+      withSnapshotStoreConfig("""
+        pekko.persistence.snapshot-store-plugin-fallback.only-one-snapshot = true
+        pekko.persistence.r2dbc.opt-out-snapshot = ${pekko.persistence.r2dbc.snapshot}
+        pekko.persistence.r2dbc.opt-out-snapshot.only-one-snapshot = false
+        """) { persistence =>
+        onlyOneSnapshot(persistence) shouldBe true
+        onlyOneSnapshot(persistence, "pekko.persistence.r2dbc.opt-out-snapshot") shouldBe false
+      }
+    }
+
+    "inherit the runtime snapshot plugin configuration fallback" in {
+      withSnapshotStoreConfig("") { persistence =>
+        val overrides =
+          ConfigFactory.parseString("pekko.persistence.snapshot-store-plugin-fallback.only-one-snapshot = true")
+        onlyOneSnapshot(persistence, overrides = overrides) shouldBe true
+      }
+    }
+  }
 
   "Settings" should {
     "have table names with schema" in {
